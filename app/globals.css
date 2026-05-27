@@ -2043,6 +2043,9 @@ a.me-nav-item:focus-visible {
 }
 
 /* ── PX card (business card / hand-off tool) ─────────────────────────────── */
+/* The hand-off is the hero, expressed as the handle text (large, accent); the
+   QR is demoted to a small, quiet accent in the corner. Editorial left
+   alignment, generous space — intellectual + restrained. */
 
 .pxcard-wrap {
   display: flex;
@@ -2053,63 +2056,57 @@ a.me-nav-item:focus-visible {
 }
 
 .pxcard {
-  width: min(100%, 22rem);
+  position: relative;
+  width: min(100%, 23rem);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.4rem;
-  padding: clamp(1.75rem, 6vw, 2.75rem) 1.75rem;
+  gap: 1.25rem;
+  padding: clamp(1.9rem, 6vw, 2.6rem);
+  padding-bottom: 2.5rem;
   background: var(--bg-elev);
   border: 1px solid var(--hairline);
   border-radius: 0.8rem;
-  text-align: center;
 }
 
-/* Hand-off — the hero: largest, on top. */
-.pxcard-handoff {
+/* Hand-off — hero: the handle text, on top, largest. */
+.pxcard-id {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.85rem;
-  width: 100%;
+  gap: 0.12rem;
 }
-
-.pxcard-code {
-  width: clamp(8.5rem, 42vw, 10.5rem);
-  height: clamp(8.5rem, 42vw, 10.5rem);
-  fill: var(--fg);
-  shape-rendering: crispEdges;
-}
-
-.pxcard-url {
+.pxcard-handle {
   font-family: var(--font-mono);
-  font-size: 0.92rem;
-  letter-spacing: 0.01em;
+  font-size: clamp(1.6rem, 6vw, 2rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
   color: var(--accent);
   text-decoration: none;
   word-break: break-all;
 }
-.pxcard-url:hover,
-.pxcard-url:focus-visible {
+.pxcard-handle:hover,
+.pxcard-handle:focus-visible {
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-underline-offset: 4px;
   outline: none;
+}
+.pxcard-domain {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--fg-muted);
 }
 
 /* Name — smaller than the hand-off. */
 .pxcard-name {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 1.6rem;
-  line-height: 1.1;
+  font-size: 1.3rem;
+  line-height: 1.15;
   color: var(--fg);
 }
 
-/* Contact — smallest, freeform. */
+/* Contact — smallest, freeform, left-aligned. */
 .pxcard-contact {
-  width: 100%;
   display: flex;
-  justify-content: center;
 }
 .pxcard-contact-display {
   display: flex;
@@ -2121,7 +2118,7 @@ a.me-nav-item:focus-visible {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--fg-muted);
-  text-align: center;
+  text-align: left;
 }
 .pxcard-contact-display:hover {
   color: var(--accent);
@@ -2146,7 +2143,6 @@ a.me-nav-item:focus-visible {
   color: var(--fg);
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  text-align: center;
   resize: vertical;
   line-height: 1.5;
 }
@@ -2155,11 +2151,31 @@ a.me-nav-item:focus-visible {
   border-color: var(--accent);
 }
 
+/* QR — small, quiet accent tucked in the corner (scan/open). */
+.pxcard-qr-link {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  line-height: 0;
+}
+.pxcard-qr {
+  width: 2.8rem;
+  height: 2.8rem;
+  fill: var(--fg);
+  shape-rendering: crispEdges;
+  opacity: 0.72;
+  transition: opacity 0.15s ease;
+}
+.pxcard-qr-link:hover .pxcard-qr,
+.pxcard-qr-link:focus-visible .pxcard-qr {
+  opacity: 1;
+}
+
 .pxcard-note {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   line-height: 1.5;
   color: var(--fg-ghost);
-  max-width: 22rem;
+  max-width: 23rem;
   text-align: center;
 }

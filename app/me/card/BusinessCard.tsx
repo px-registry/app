@@ -1,86 +1,56 @@
 "use client";
 
-// PX card — a hand-off tool, not an info sheet. The product is the verifiable
-// hand-off itself, so the exchange is the hero: hand-off (the address + code) on
-// top and largest, the name smaller, the contact smallest and freeform. Three
-// elements, nothing else.
+// PX card — a hand-off tool. The hand-off is the hero, expressed as the handle
+// text (large, accent); the name is smaller; the contact smallest and freeform.
+// The QR is a real, scannable code but demoted to a small, quiet accent in the
+// corner — intellectual + restrained, not a wall of modules.
 //
-// First pass / honest stubs: the code is a deterministic DECORATIVE placeholder
-// (not a scannable QR — real QR generation is a follow-up); the contact is a
-// freeform line kept in localStorage for now (no field on the owner record yet).
+// Stubs that remain: the contact is device-local (localStorage) until an
+// owner-record / encrypted-at-rest design lands. Unsigned visitors see a sample
+// preview so the card is viewable without a session.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import qrcode from "qrcode-generator";
 import { fetchMe, type MeResponse } from "@/lib/auth-client.ts";
 
-const QR_SIZE = 21; // QR v1 grid; here purely decorative.
-
-// Deterministic on/off grid from a seed string (xorshift32 over FNV-1a), with
-// the three QR finder patterns drawn in so it reads as a hand-off code.
-function buildGrid(seed: string, size: number): boolean[] {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  let s = h || 1;
-  const rand = () => {
-    s ^= s << 13;
-    s >>>= 0;
-    s ^= s >> 17;
-    s ^= s << 5;
-    s >>>= 0;
-    return s / 4294967296;
-  };
-  const grid = new Array<boolean>(size * size);
-  for (let i = 0; i < grid.length; i++) grid[i] = rand() < 0.45;
-  const finder = (r: number, c: number) => {
-    for (let i = 0; i < 7; i++)
-      for (let j = 0; j < 7; j++) {
-        const ring = i === 0 || i === 6 || j === 0 || j === 6;
-        const core = i >= 2 && i <= 4 && j >= 2 && j <= 4;
-        grid[(r + i) * size + (c + j)] = ring || core;
-      }
-    // quiet margin row/col just inside the finder
-    for (let k = 0; k < 8; k++) {
-      if (r + 7 < size) grid[(r + 7) * size + (c + (k < 7 ? k : 0))] = false;
-      if (c + 7 < size) grid[(r + (k < 7 ? k : 0)) * size + (c + 7)] = false;
-    }
-  };
-  finder(0, 0);
-  finder(0, size - 7);
-  finder(size - 7, 0);
-  return grid;
-}
-
-function HandoffCode({ seed }: { seed: string }) {
-  const grid = useMemo(() => buildGrid(seed, QR_SIZE), [seed]);
-  const rects: ReactNode[] = [];
-  for (let r = 0; r < QR_SIZE; r++) {
-    for (let c = 0; c < QR_SIZE; c++) {
-      if (grid[r * QR_SIZE + c]) {
-        rects.push(<rect key={r * QR_SIZE + c} x={c} y={r} width={1} height={1} />);
-      }
-    }
-  }
-  return (
-    <svg
-      className="pxcard-code"
-      viewBox={`-1 -1 ${QR_SIZE + 2} ${QR_SIZE + 2}`}
-      role="img"
-      aria-label="Hand-off code (placeholder)"
-    >
-      {rects}
-    </svg>
-  );
-}
-
-// Sample shown to logged-out visitors so the card is viewable as a preview
-// (and so the design can be seen without a session).
 const SAMPLE = {
   handle: "ito-atelier",
   name: "伊藤 篤",
   contact: "ito@atelier.jp\n@itoatelier",
 };
+
+// A real QR (smallest fitting matrix, EC level M) rendered as a quiet SVG. Drawn
+// inverted (light modules on the dark card) to stay on-theme; the handle text is
+// the primary hand-off, so the code is an accent — modern phone cameras read
+// inverted codes. A 1-module quiet zone is baked into the viewBox.
+function QrAccent({ url }: { url: string }) {
+  const { n, rects } = useMemo(() => {
+    const qr = qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    const count = qr.getModuleCount();
+    const out: ReactNode[] = [];
+    for (let r = 0; r < count; r++) {
+      for (let c = 0; c < count; c++) {
+        if (qr.isDark(r, c)) {
+          out.push(<rect key={r * count + c} x={c} y={r} width={1} height={1} />);
+        }
+      }
+    }
+    return { n: count, rects: out };
+  }, [url]);
+  const margin = 1;
+  return (
+    <svg
+      className="pxcard-qr"
+      viewBox={`${-margin} ${-margin} ${n + margin * 2} ${n + margin * 2}`}
+      role="img"
+      aria-label="Scan or open this card"
+    >
+      {rects}
+    </svg>
+  );
+}
 
 export function BusinessCard() {
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -115,6 +85,7 @@ export function BusinessCard() {
   const preview = !me;
   const handle = me?.handle ?? SAMPLE.handle;
   const url = `${handle}.px-registry.org`;
+  const fullUrl = `https://${url}`;
   const name = me?.display_name?.trim() || (preview ? SAMPLE.name : `@${handle}`);
   const shownContact = preview ? SAMPLE.contact : contact;
   const contactLines = shownContact.split("\n").filter((l) => l.trim());
@@ -122,13 +93,12 @@ export function BusinessCard() {
   return (
     <section className="pxcard-wrap">
       <article className="pxcard">
-        {/* Hand-off — hero. The address is the real, working hand-off; the code
-            is a decorative placeholder until real QR generation lands. */}
-        <div className="pxcard-handoff">
-          <HandoffCode seed={handle} />
-          <a className="pxcard-url" href={`https://${url}`}>
-            {url}
+        {/* Hand-off — hero. The handle text is the primary, typeable hand-off. */}
+        <div className="pxcard-id">
+          <a className="pxcard-handle" href={fullUrl}>
+            {handle}
           </a>
+          <span className="pxcard-domain">.px-registry.org</span>
         </div>
 
         <h1 className="pxcard-name">{name}</h1>
@@ -168,6 +138,11 @@ export function BusinessCard() {
             </button>
           )}
         </div>
+
+        {/* QR — small, quiet accent in the corner. */}
+        <a className="pxcard-qr-link" href={fullUrl} aria-label="Open this card">
+          <QrAccent url={fullUrl} />
+        </a>
       </article>
 
       {preview ? (
@@ -177,8 +152,7 @@ export function BusinessCard() {
         </p>
       ) : (
         <p className="pxcard-note">
-          First pass — the code is a placeholder (real QR next); the contact is
-          saved on this device only for now.
+          Your contact is saved on this device only for now.
         </p>
       )}
     </section>
