@@ -17,3 +17,19 @@ bucket_name = "px-app-deliveries"
 # ({pack_id}/{path}), so no code changes are needed — only this var + the domain.
 # [vars]
 # DELIVERY_PUBLIC_BASE = "https://files.px-registry.org"
+
+# Day-7 owner identity (WebAuthn passkeys). The auth Functions store one record
+# per owner — handle → { credential_id, public_key_jwk, recovery_code_hash,
+# display_name?, default_category?, created_at } — under key "handle:<handle>".
+# No secret key, no PII: PX holds a public key and a recovery-code hash only.
+#
+# Create the namespace once, then paste its id below:
+#   wrangler kv namespace create AUTH
+[[kv_namespaces]]
+binding = "AUTH"
+id = "31c4f53ab2d54dea8a977fa7c719e229"
+
+# Sessions and WebAuthn challenges are carried in HMAC-signed, HttpOnly cookies.
+# AUTH_SECRET is that HMAC key. Do NOT commit it: set it as a Pages secret so it
+# overrides the insecure local-dev fallback baked into functions/_auth.ts:
+#   wrangler pages secret put AUTH_SECRET
