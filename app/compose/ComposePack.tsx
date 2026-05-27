@@ -18,6 +18,7 @@ import {
   type PxManifestCoreV1,
   type PxPackFile,
 } from "@/lib/pack/index.ts";
+import { unzipSync } from "fflate";
 import { PackView } from "../PackView";
 
 // Send-a-pack composer — entirely client-side. Files are read with the File
@@ -32,9 +33,9 @@ import { PackView } from "../PackView";
 // to get a folder's *contents* on drop — with a webkitdirectory picker as the
 // click fallback. (Patterns ported from the px-layer0 pack composer.)
 
-// A leaf file, or a container (dropped folder) holding nested files. The
-// editor keeps containers' contents flat (relative paths); the receiver view
-// rebuilds the tree. ZIP expansion (kind "archive") arrives in a follow-up.
+// A leaf file, or a container (dropped folder, or an expanded .zip) holding
+// nested files. The editor keeps containers' contents flat (relative paths);
+// the receiver view rebuilds the tree.
 type ContainedFile = { path: string; bytes: number; sha256: string; note: string };
 type LeafEntry = {
   id: string;
@@ -192,6 +193,7 @@ function mergeEntries(
   prev: Entry[],
   newLeaves: LeafEntry[],
   folders: Map<string, ContainedFile[]>,
+  archives: ContainerEntry[],
 ): Entry[] {
   const next = [...prev];
 
@@ -207,7 +209,7 @@ function mergeEntries(
 
   for (const [name, incoming] of folders) {
     const existing = next.find(
-      (e) => e.kind !== "file" && e.name === name,
+      (e) => e.kind === "folder" && e.name === name,
     ) as ContainerEntry | undefined;
     if (existing) {
       for (const c of incoming) {
@@ -217,6 +219,13 @@ function mergeEntries(
       }
     } else {
       next.push({ id: rid(), kind: "folder", name, note: "", contents: incoming });
+    }
+  }
+
+  // Archives are added as-is; a re-dropped archive of the same name is skipped.
+  for (const archive of archives) {
+    if (!next.some((e) => e.kind === "archive" && e.name === archive.name)) {
+      next.push(archive);
     }
   }
 
@@ -306,36 +315,83 @@ function Editor() {
     setHashing((h) => h + items.length);
     const newLeaves: LeafEntry[] = [];
     const folders = new Map<string, ContainedFile[]>();
+    const archives: ContainerEntry[] = [];
     for (const { file, path } of items) {
       const norm = normalizePath(path);
       if (!isNormalizedPath(norm)) {
         setHashing((h) => h - 1);
         continue;
       }
-      let sha = "";
+      const slash = norm.indexOf("/");
       try {
-        sha = await sha256Hex(new Uint8Array(await file.arrayBuffer()));
+        // A top-level .zip is expanded in the browser into an archive entry.
+        if (slash === -1 && /\.zip$/i.test(norm)) {
+          const buf = new Uint8Array(await file.arrayBuffer());
+          const expanded = await expandZip(norm, buf);
+          if (expanded) {
+            archives.push(expanded);
+            continue;
+          }
+          // Not a readable zip — keep it as an opaque file.
+          newLeaves.push({
+            id: rid(),
+            kind: "file",
+            name: norm,
+            bytes: file.size,
+            sha256: await sha256Hex(buf),
+            note: "",
+          });
+          continue;
+        }
+
+        const sha = await sha256Hex(new Uint8Array(await file.arrayBuffer()));
+        if (slash === -1) {
+          newLeaves.push({
+            id: rid(),
+            kind: "file",
+            name: norm,
+            bytes: file.size,
+            sha256: sha,
+            note: "",
+          });
+        } else {
+          const top = norm.slice(0, slash);
+          const rest = norm.slice(slash + 1);
+          if (!folders.has(top)) folders.set(top, []);
+          folders.get(top)!.push({ path: rest, bytes: file.size, sha256: sha, note: "" });
+        }
       } finally {
         setHashing((h) => h - 1);
       }
-      const slash = norm.indexOf("/");
-      if (slash === -1) {
-        newLeaves.push({
-          id: rid(),
-          kind: "file",
-          name: norm,
-          bytes: file.size,
-          sha256: sha,
-          note: "",
-        });
-      } else {
-        const top = norm.slice(0, slash);
-        const rest = norm.slice(slash + 1);
-        if (!folders.has(top)) folders.set(top, []);
-        folders.get(top)!.push({ path: rest, bytes: file.size, sha256: sha, note: "" });
-      }
     }
-    setEntries((prev) => mergeEntries(prev, newLeaves, folders));
+    setEntries((prev) => mergeEntries(prev, newLeaves, folders, archives));
+  }
+
+  // Expand a .zip in the browser (fflate). Returns null if it is not a valid
+  // archive. Directory records and any unsafe paths are skipped.
+  async function expandZip(
+    name: string,
+    buf: Uint8Array,
+  ): Promise<ContainerEntry | null> {
+    let unzipped: Record<string, Uint8Array>;
+    try {
+      unzipped = unzipSync(buf);
+    } catch {
+      return null;
+    }
+    const contents: ContainedFile[] = [];
+    for (const [entryName, data] of Object.entries(unzipped)) {
+      if (entryName.endsWith("/")) continue; // directory record
+      const inorm = normalizePath(entryName);
+      if (!isNormalizedPath(inorm)) continue;
+      contents.push({
+        path: inorm,
+        bytes: data.length,
+        sha256: await sha256Hex(data),
+        note: "",
+      });
+    }
+    return { id: rid(), kind: "archive", name, note: "", contents };
   }
 
   function addFileList(list: FileList | null) {
