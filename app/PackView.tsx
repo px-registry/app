@@ -1,14 +1,22 @@
+"use client";
+
 import { isSendAPack, shortId, type Pack } from "@/lib/pack/index.ts";
 import { bySlug } from "./categories";
 import { VerifyPopover } from "./VerifyPopover";
 import { LighthouseNote } from "./LighthouseNote";
 
-// One view for a pack, rendered in two contexts:
+// One view for a pack, rendered in three contexts:
 //   • "listing" — the public-register detail at /[category]/[pack_id]
 //   • "viewer"  — the shareable .pack viewer at /pack/[pack_id]
+//   • "preview" — a live render inside the compose flow / a decoded share link,
+//                 viewer layout but without claiming an open was recorded
 // A send-a-pack (a file delivery) adds a cover note and a file list with the
 // sender's per-file annotations. Everything else — the framing, the verifiable
-// record, the chain — is shared, so the two contexts cannot drift apart.
+// record, the chain — is shared, so the contexts cannot drift apart.
+//
+// This is a client component so the compose flow can re-render it live as the
+// author types. Server routes (detail/viewer) render it too; static export
+// still SSRs identical HTML, so their output is unchanged.
 
 const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
 
@@ -36,12 +44,16 @@ export function PackView({
 }: {
   pack: Pack;
   ancestors: Pack[];
-  mode: "listing" | "viewer";
+  mode: "listing" | "viewer" | "preview";
 }) {
   const { core, pack_id } = pack;
   const listing = core.listing;
   const delivery = isSendAPack(core);
   const titleVt = `pack-title-${shortId(pack_id)}`;
+  const dlTitle =
+    mode === "preview"
+      ? "Demo — the file stays in your browser"
+      : "Example pack — files are illustrative";
 
   return (
     <article className="pack">
@@ -63,7 +75,9 @@ export function PackView({
           // on, which is where the value actually sits. PX only points here.
           <span className="sender" title="Owner page — coming soon">
             <span className="sender-name">{listing.sender}</span>
-            <span className="sender-domain">{listing.domain}</span>
+            {listing.domain && (
+              <span className="sender-domain">{listing.domain}</span>
+            )}
           </span>
         )}
       </header>
@@ -94,7 +108,7 @@ export function PackView({
                   {f.bytes !== undefined && (
                     <span className="file-size">{formatBytes(f.bytes)}</span>
                   )}
-                  <button type="button" className="file-dl" disabled title="Example pack — files are illustrative">
+                  <button type="button" className="file-dl" disabled title={dlTitle}>
                     Download
                   </button>
                 </div>
@@ -148,13 +162,23 @@ export function PackView({
         </section>
       )}
 
-      {mode === "viewer" && (
-        <>
-          <LighthouseNote />
-          <p className="send-your-own">
-            Want to send your own pack? <a href="/">Public register →</a>
-          </p>
-        </>
+      {mode === "viewer" && <LighthouseNote />}
+
+      {mode === "preview" && (
+        // The receiver's view, shown before any real open exists. State the
+        // Lighthouse event descriptively rather than claim it happened.
+        <aside className="lighthouse">
+          <span className="lighthouse-line">
+            In a published pack, Lighthouse records each open here.
+          </span>
+          <span className="lighthouse-sub">The event, not who you are.</span>
+        </aside>
+      )}
+
+      {(mode === "viewer" || mode === "preview") && (
+        <p className="send-your-own">
+          Want to send your own pack? <a href="/compose/pack/">Send a pack →</a>
+        </p>
       )}
     </article>
   );

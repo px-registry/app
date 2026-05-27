@@ -50,7 +50,8 @@ export interface PxListing {
   domain: string;
   /** Short human label for the kind of entry, e.g. "Auction", "Wanted". */
   type: string;
-  description: string;
+  /** Optional prose blurb. A send-a-pack leans on its cover note instead. */
+  description?: string;
   fact?: Record<string, string>;
 }
 
