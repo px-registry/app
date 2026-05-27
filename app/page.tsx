@@ -1,13 +1,5 @@
-const categories = [
-  "Auction",
-  "Crowdfund",
-  "Sale",
-  "Video",
-  "Music",
-  "Writing",
-  "Service & Membership",
-  "Matching",
-];
+import { categories } from "./categories";
+import { Footer } from "./Footer";
 
 export default function Home() {
   return (
@@ -20,17 +12,22 @@ export default function Home() {
       </header>
 
       <ul className="categories">
-        {categories.map((name) => (
-          <li className="category" key={name}>
-            <span className="category-name">{name}</span>
-            <span className="category-count">—</span>
+        {categories.map((c) => (
+          <li key={c.slug}>
+            <a className="category" href={`/${c.slug}/`}>
+              <span className="category-name">
+                <span className="category-en">{c.name}</span>
+                <span className="category-ja" lang="ja">
+                  {c.ja}
+                </span>
+              </span>
+              <span className="category-count">—</span>
+            </a>
           </li>
         ))}
       </ul>
 
-      <footer className="foot">
-        PX takes no fee on listed activity. Verifiable via standard tools.
-      </footer>
+      <Footer />
     </main>
   );
 }
