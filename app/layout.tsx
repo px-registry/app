@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthBadge } from "./AuthBadge";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -36,7 +37,10 @@ export default function RootLayout({
       lang="en"
       className={`${cormorant.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <AuthBadge />
+        {children}
+      </body>
     </html>
   );
 }

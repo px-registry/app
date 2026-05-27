@@ -64,7 +64,7 @@ export const onRequestPut: PagesFunction<Env> = async (ctx) => {
     customMetadata: { pack_id: packId },
   });
 
-  const base = downloadBase(env, request.url, packId);
+  const base = downloadBase(env, request, packId);
   return json({
     ok: true,
     key,

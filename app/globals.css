@@ -1006,6 +1006,19 @@ body {
   text-decoration: none;
 }
 
+/* Signed-in auto-fill hint (Phase E) — quiet, just under the intro. */
+.compose-signedin-hint {
+  margin-top: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+
+.signedin-handle {
+  color: var(--accent);
+}
+
 .compose-field {
   border: none;
   border-top: 1px solid var(--hairline);
@@ -1561,4 +1574,236 @@ body {
   font-size: 0.82rem;
   line-height: 1.5;
   color: #c96a4a;
+}
+
+/* ── Day-7 auth: header badge, sign-up / sign-in / me surfaces ───────────── */
+
+/* Header badge — fixed top-right, present on every page, deliberately quiet. */
+.auth-badge {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 50;
+  padding: 0.85rem 1.1rem;
+  min-height: 2.4rem;
+}
+
+.auth-signin {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  color: var(--fg-muted);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+.auth-signin:hover,
+.auth-signin:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+.auth-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--fg);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+.auth-handle:hover,
+.auth-handle:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+.auth-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #5fa463; /* soft green — Worker:OK pattern */
+  box-shadow: 0 0 0.35rem rgba(95, 164, 99, 0.55);
+}
+
+/* Auth surfaces (signup / signin / me / settings) reuse the compose width. */
+.auth {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.auth-h {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(1.9rem, 5vw, 2.85rem);
+  line-height: 1.15;
+}
+
+.auth-intro {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  max-width: 38rem;
+}
+
+.auth-mono {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--fg);
+}
+
+.auth-btn {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--fg-ghost);
+  border-radius: 0.45rem;
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.auth-btn:hover:not(:disabled):not(.is-disabled),
+.auth-btn:focus-visible:not(:disabled):not(.is-disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+.auth-btn:disabled,
+.auth-btn.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #c96a4a;
+  border-left: 2px solid #c96a4a;
+  padding-left: 0.9rem;
+}
+
+.auth-hint-bad {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: #c96a4a;
+  margin-top: -0.4rem;
+}
+
+.auth-alt {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+.auth-alt a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.auth-alt a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.auth-check input {
+  margin-top: 0.2rem;
+  accent-color: var(--accent);
+}
+
+.auth-signout {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.auth-signout:hover {
+  border-color: #c96a4a;
+  color: #c96a4a;
+}
+
+/* Recovery code — shown once, monospace, copyable. */
+.recovery-box {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.1rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+}
+.recovery-code {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+  flex: 1;
+  min-width: 0;
+}
+
+/* /me/ surface */
+.me-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-ghost);
+}
+.me-display {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--fg-muted);
+  margin-top: -0.4rem;
+}
+
+.me-nav {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hairline);
+  margin-top: 0.5rem;
+}
+.me-nav-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem 0.5rem;
+  border-bottom: 1px solid var(--hairline);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 160ms ease;
+}
+a.me-nav-item:hover,
+a.me-nav-item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.me-nav-item.is-soon {
+  opacity: 0.5;
+}
+.me-nav-title {
+  font-size: 1.0625rem;
+  color: var(--fg);
+}
+.me-nav-sub {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--fg-muted);
 }

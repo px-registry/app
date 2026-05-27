@@ -58,17 +58,39 @@ export function expiresAt(from: Date = new Date()): string {
 }
 
 /**
+ * The browser-effective origin of a request. The app's canonical host
+ * (app.px-registry.org) is fronted by the px-registry.org zone router, which
+ * proxies to the Pages origin — so the Function's own URL/Host can read as
+ * *.pages.dev while the request really arrived at app.px-registry.org. We honor
+ * X-Forwarded-Host / X-Forwarded-Proto when the router supplies them, then fall
+ * back to the Host header, then the URL. This keeps the download base in a new
+ * manifest pointed at the brand host the sender actually used. (Requests made
+ * directly to *.pages.dev or localhost have no forwarded headers, so the origin
+ * resolves to that same host — unchanged behavior.)
+ */
+export function effectiveOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const fwdHost = request.headers.get("X-Forwarded-Host");
+  const host = fwdHost
+    ? fwdHost.split(",")[0].trim()
+    : request.headers.get("Host") || url.host;
+  const fwdProto = request.headers.get("X-Forwarded-Proto");
+  const proto = fwdProto
+    ? fwdProto.split(",")[0].trim()
+    : url.protocol.replace(":", "");
+  return `${proto}://${host}`;
+}
+
+/**
  * The absolute download base for a pack: "{root}/{pack_id}/". `root` is the
  * public R2 custom domain when configured, else this deployment's own
- * /api/download proxy (derived from the request origin so the manifest is
- * self-describing wherever it is opened).
+ * /api/download proxy (derived from the request's effective origin so the
+ * manifest is self-describing — and brand-symmetric — wherever it is opened).
  */
-export function downloadBase(env: Env, requestUrl: string, packId: string): string {
-  const origin = new URL(requestUrl).origin;
-  const root = (env.DELIVERY_PUBLIC_BASE || `${origin}/api/download`).replace(
-    /\/+$/,
-    "",
-  );
+export function downloadBase(env: Env, request: Request, packId: string): string {
+  const root = (
+    env.DELIVERY_PUBLIC_BASE || `${effectiveOrigin(request)}/api/download`
+  ).replace(/\/+$/, "");
   return `${root}/${packId}/`;
 }
 
