@@ -45,19 +45,15 @@ import { traverseEntry, type DropFile } from "./folder-intake.ts";
 import { PackIdentityBar } from "./PackIdentityBar.tsx";
 import { ReceiverPreview } from "./ReceiverPreview.tsx";
 import { ShareBar } from "./ShareBar.tsx";
+import type { ComposerIdentity } from "@/lib/auth-client.ts";
+
+// Re-exported so existing importers (ComposePack) keep their import path; the
+// canonical definition now lives with the auth client (lib/auth-client.ts).
+export type { ComposerIdentity };
 
 // A delivery is category-agnostic; it carries a valid category for the manifest
 // without surfacing one in this flow.
 const DELIVERY_CATEGORY = "service";
-
-// Optional owner identity (signed-in sender), used to pre-fill the sender and
-// domain fields. The fields stay editable — a per-pack override is fine, and the
-// manifest carries whatever value is in the field explicitly.
-export type ComposerIdentity = {
-  handle: string;
-  sender: string;
-  domain: string;
-};
 
 function mergeEntries(
   prev: Entry[],
@@ -461,19 +457,27 @@ export function PackComposerBody({
 
   return (
     <section className="compose" data-mode={mode}>
-      <header className="compose-head">
-        <h1 className="compose-h">Send a pack</h1>
-        <p className="compose-intro" lang="ja">
-          ファイルはまずブラウザで読まれ、ハッシュが計算されます。共有の方法はあなたが選びます。
-        </p>
-        {identity && (
-          <p className="compose-signedin-hint">
-            Signed in as <span className="signedin-handle">@{identity.handle}</span>{" "}
-            — your sender and domain are pre-filled below. Edit them for this pack
-            if you like.
+      {/* In Mode 2 (the dashboard) the left rail already names the active mode,
+          so the body's own header would be redundant — suppress it. The "Send a
+          pack" title + intro only render in Mode 1 (the standalone composer). */}
+      {mode === "mode1" && (
+        <header className="compose-head">
+          <h1 className="compose-h">Send a pack</h1>
+          <p className="compose-intro" lang="ja">
+            ファイルはまずブラウザで読まれ、ハッシュが計算されます。共有の方法はあなたが選びます。
           </p>
-        )}
-      </header>
+          {identity && (
+            <p className="compose-signedin-hint">
+              Signed in as{" "}
+              <span className="signedin-handle">@{identity.handle}</span> — your
+              sender and domain are pre-filled below.{" "}
+              <a className="compose-dashboard-link" href="/me/compose/?mode=pack">
+                Try the dashboard →
+              </a>
+            </p>
+          )}
+        </header>
+      )}
 
       {/* Drop is the hero. */}
       <div

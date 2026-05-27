@@ -15,8 +15,7 @@ import {
   type Pack,
   type PxManifestCoreV1,
 } from "@/lib/pack/index.ts";
-import { PX_REGISTRY_DOMAIN } from "@/lib/handle/index.ts";
-import { fetchMe } from "@/lib/auth-client.ts";
+import { fetchMe, toComposerIdentity } from "@/lib/auth-client.ts";
 import { PackView } from "../PackView";
 import {
   PackComposerBody,
@@ -45,12 +44,7 @@ export function ComposePack() {
   useEffect(() => {
     let live = true;
     fetchMe().then((m) => {
-      if (!live || !m.signed_in || !m.handle) return;
-      setIdentity({
-        handle: m.handle,
-        sender: m.display_name?.trim() || m.handle,
-        domain: `${m.handle}.${PX_REGISTRY_DOMAIN}`,
-      });
+      if (live) setIdentity(toComposerIdentity(m));
     });
     return () => {
       live = false;

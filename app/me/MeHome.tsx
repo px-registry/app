@@ -49,10 +49,10 @@ export function MeHome() {
       </p>
 
       <nav className="me-nav" aria-label="Your identity">
-        <a className="me-nav-item" href="/compose/pack/">
-          <span className="me-nav-title">Send a pack</span>
+        <a className="me-nav-item" href="/me/compose/">
+          <span className="me-nav-title">Compose</span>
           <span className="me-nav-sub">
-            Your sender and domain are pre-filled.
+            Send a pack — sender and domain pre-filled. More composers soon.
           </span>
         </a>
         <a className="me-nav-item" href="/me/settings/">
@@ -60,8 +60,8 @@ export function MeHome() {
           <span className="me-nav-sub">Display name, default category.</span>
         </a>
         <span className="me-nav-item is-soon" aria-disabled>
-          <span className="me-nav-title">Dashboard</span>
-          <span className="me-nav-sub">Your activity — coming soon.</span>
+          <span className="me-nav-title">Activity</span>
+          <span className="me-nav-sub">Your published activity — coming soon.</span>
         </span>
       </nav>
 

@@ -1807,3 +1807,237 @@ a.me-nav-item:focus-visible {
   font-size: 0.74rem;
   color: var(--fg-muted);
 }
+
+/* "Try the dashboard →" link in the Mode-1 signed-in hint (client-injected). */
+.compose-dashboard-link {
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.compose-dashboard-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Day-8 Composer Mode 2: dashboard shell (rail + center pane) ─────────── */
+
+.shell-main {
+  min-height: 100vh;
+}
+
+.shell-checking {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: clamp(3rem, 12vh, 9rem) 1.5rem;
+  font-size: 0.95rem;
+  color: var(--fg-muted);
+}
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+  align-items: stretch;
+}
+
+/* Left rail (desktop). */
+.shell-rail {
+  flex: 0 0 13.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.6rem 1rem;
+  border-right: 1px solid var(--hairline);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.shell-rail-brand {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--fg);
+  padding: 0.2rem 0.6rem 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.shell-rail-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.shell-rail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 0.35rem 0.35rem 0;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  color: var(--fg-muted);
+  transition: background-color 160ms ease, color 160ms ease,
+    border-color 160ms ease;
+}
+.shell-rail-item:hover,
+.shell-rail-item:focus-visible {
+  background: var(--hover);
+  color: var(--fg);
+  outline: none;
+}
+.shell-rail-item.is-active {
+  background: var(--hover);
+  border-left-color: var(--accent);
+  color: var(--fg);
+}
+.shell-rail-item.is-active .shell-rail-en {
+  color: var(--accent);
+}
+
+.shell-rail-en {
+  font-size: 0.92rem;
+}
+.shell-rail-ja {
+  font-family: var(--font-serif);
+  font-size: 0.72rem;
+  color: var(--fg-ghost);
+}
+
+.shell-rail-me {
+  margin-top: auto;
+  padding: 0.6rem 0.7rem 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+  text-decoration: none;
+  border-top: 1px solid var(--hairline);
+  transition: color 160ms ease;
+}
+.shell-rail-me:hover,
+.shell-rail-me:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+/* Center pane. */
+.shell-pane {
+  flex: 1;
+  min-width: 0;
+  padding: clamp(1.75rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3rem);
+}
+.shell-pane-pack,
+.shell-pane .coming-soon {
+  max-width: 44rem;
+}
+
+/* Coming-soon placeholder. */
+.coming-soon {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding-top: 1rem;
+}
+.coming-soon-eyebrow {
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  color: var(--fg-ghost);
+}
+.coming-soon-h {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.15;
+  color: var(--fg);
+}
+.coming-soon-tag {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.5rem;
+}
+.coming-soon-body {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  max-width: 34rem;
+}
+.coming-soon-alt {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+.coming-soon-alt a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.coming-soon-alt a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Mobile: rail becomes a horizontal chip scroller across the top. */
+@media (max-width: 768px) {
+  .shell {
+    flex-direction: column;
+  }
+  .shell-rail {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 0.7rem 0.9rem;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline);
+    overflow-x: auto;
+    background: var(--bg);
+  }
+  .shell-rail-brand {
+    padding: 0 0.5rem 0 0;
+    font-size: 1.05rem;
+    flex: 0 0 auto;
+  }
+  .shell-rail-list {
+    flex-direction: row;
+    gap: 0.3rem;
+  }
+  .shell-rail-item {
+    flex: 0 0 auto;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 999px;
+    padding: 0.4rem 0.8rem;
+    white-space: nowrap;
+  }
+  .shell-rail-item.is-active {
+    border-left-color: transparent;
+    border-bottom-color: transparent;
+    background: var(--hover);
+  }
+  /* The Japanese sub-label is dropped in the compact chip row. */
+  .shell-rail-ja {
+    display: none;
+  }
+  .shell-rail-me {
+    margin-top: 0;
+    margin-left: auto;
+    flex: 0 0 auto;
+    border-top: none;
+    padding: 0.4rem 0.5rem;
+    white-space: nowrap;
+  }
+}

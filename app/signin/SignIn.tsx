@@ -14,6 +14,15 @@ function friendlyError(e: unknown): string {
   return "Sign-in failed. Please try again.";
 }
 
+// A post-sign-in redirect target from ?next=, accepted only if it is a
+// same-origin absolute path (leading "/" but not "//", no scheme) — guards
+// against open-redirect to another origin.
+function safeNext(): string | null {
+  if (typeof window === "undefined") return null;
+  const p = new URLSearchParams(window.location.search).get("next");
+  return p && /^\/(?!\/)/.test(p) ? p : null;
+}
+
 export function SignIn() {
   const [handle, setHandle] = useState("");
   const [working, setWorking] = useState(false);
@@ -65,7 +74,7 @@ export function SignIn() {
         return;
       }
 
-      window.location.href = vj.redirect || "/me/";
+      window.location.href = safeNext() || vj.redirect || "/me/";
     } catch (e) {
       setError(friendlyError(e));
       setWorking(false);
