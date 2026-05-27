@@ -1,7 +1,10 @@
 import { categories } from "./categories";
 import { Footer } from "./Footer";
+import { getCategoryCounts } from "@/data/packs";
 
-export default function Home() {
+export default async function Home() {
+  const counts = await getCategoryCounts();
+
   return (
     <main className="page">
       <header className="head">
@@ -21,7 +24,7 @@ export default function Home() {
                   {c.ja}
                 </span>
               </span>
-              <span className="category-count">—</span>
+              <span className="category-count">{counts[c.slug] ?? 0}</span>
             </a>
           </li>
         ))}

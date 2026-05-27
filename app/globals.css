@@ -171,6 +171,468 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Listings (category page) ─────────────────────────────────────────── */
+
+.listings {
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+  margin-top: 1.75rem;
+}
+
+.listings li {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.listing {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.15rem 0.75rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 160ms ease;
+}
+
+.listing:hover,
+.listing:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.listing-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: transform 160ms ease;
+}
+
+.listing:hover .listing-main,
+.listing:focus-visible .listing-main {
+  transform: translateX(4px);
+}
+
+.listing-title {
+  font-size: 1.0625rem;
+  color: var(--fg);
+}
+
+.listing-sender {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--fg-muted);
+}
+
+.listing-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.listing-type {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-ghost);
+}
+
+.listing-fact {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
+/* ── Pack view (detail + viewer) ──────────────────────────────────────── */
+
+.pack {
+  display: flex;
+  flex-direction: column;
+}
+
+.pack-head {
+  margin-bottom: 1.75rem;
+}
+
+.pack-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.pack-type {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.pack-date {
+  color: var(--fg-ghost);
+}
+
+.pack-title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(1.9rem, 5vw, 2.85rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0.85rem 0 1.1rem;
+}
+
+.sender {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  align-self: flex-start;
+}
+
+.sender-name {
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+
+.sender-domain {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+}
+
+.pack-desc {
+  font-family: var(--font-serif);
+  font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+  line-height: 1.6;
+  color: var(--fg);
+  max-width: 38rem;
+}
+
+.pack-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2.5rem;
+  margin-top: 1.5rem;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fact dt {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-ghost);
+}
+
+.fact dd {
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+/* ── Send-a-pack delivery ─────────────────────────────────────────────── */
+
+.delivery {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.delivery-note {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: var(--fg-muted);
+  margin-bottom: 1.5rem;
+  max-width: 38rem;
+}
+
+.files {
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.file {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.file-name {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--fg);
+}
+
+.file-size {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--fg-ghost);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-dl {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.file-note {
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+/* ── Verifiable record ────────────────────────────────────────────────── */
+
+.record {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.record-h,
+.chain-h {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin-bottom: 1.1rem;
+}
+
+.record-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.record-row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.record-row dt {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--fg-ghost);
+}
+
+.record-id {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg);
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.record-pending {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-ghost);
+  font-style: italic;
+}
+
+.verify-trigger {
+  margin-top: 1.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 0.35rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.verify-trigger:hover,
+.verify-trigger:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+
+.verify-pop {
+  margin: auto; /* centers in the top layer */
+  width: min(92vw, 40rem);
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--hairline);
+  border-radius: 0.6rem;
+  padding: 1.4rem;
+  box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.6);
+}
+
+.verify-pop::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.verify-lead {
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+  margin-bottom: 0.9rem;
+}
+
+.verify-cmd {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.6;
+  color: var(--fg);
+  background: #000;
+  border: 1px solid var(--hairline);
+  border-radius: 0.4rem;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.verify-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.verify-copy {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+
+.verify-copy:hover {
+  border-color: var(--accent);
+}
+
+.verify-why {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.verify-why:hover {
+  color: var(--accent);
+}
+
+/* ── Previous chain ───────────────────────────────────────────────────── */
+
+.chain {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.chain-list {
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.chain-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.25rem;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid var(--hairline);
+  transition: background-color 160ms ease;
+}
+
+.chain-link:hover,
+.chain-link:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.chain-title {
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+.chain-id {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--fg-ghost);
+}
+
+/* ── Lighthouse open event + viral hook ───────────────────────────────── */
+
+.lighthouse {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 2.5rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--accent);
+  min-height: 2.4rem; /* reserve space; the line mounts client-side */
+}
+
+.lighthouse-line {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg);
+}
+
+.lighthouse-at {
+  color: var(--fg-muted);
+}
+
+.lighthouse-sub {
+  font-size: 0.78rem;
+  color: var(--fg-ghost);
+}
+
+.send-your-own {
+  margin-top: 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
+.send-your-own a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.send-your-own a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ── Footer ───────────────────────────────────────────────────────────── */
 
 .foot {
@@ -215,8 +677,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none;
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
