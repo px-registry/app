@@ -405,6 +405,71 @@ body {
   color: var(--fg-muted);
 }
 
+/* Container entries (dropped folder / expanded archive) and their tree. */
+.file-kind {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--hairline);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.4rem;
+}
+
+.file-container > .file-row .file-size {
+  margin-left: 0;
+}
+
+.file-container > .file-row {
+  gap: 0.7rem;
+}
+
+.file-container > .file-row .file-name {
+  margin-right: auto;
+}
+
+.ftree {
+  list-style: none;
+  margin-top: 0.75rem;
+  padding-left: 0.25rem;
+  border-left: 1px solid var(--hairline);
+}
+
+.ftree .ftree {
+  margin-top: 0;
+  margin-left: 0.4rem;
+}
+
+.ftree-dir > details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.35rem 0 0.35rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--fg);
+}
+
+.ftree-dir > details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ftree-dir > details > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.45rem;
+  color: var(--fg-ghost);
+  transition: transform 120ms ease;
+}
+
+.ftree-dir > details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.ftree-leaf {
+  padding: 0.45rem 0 0.45rem 0.6rem;
+}
+
 /* ── Verifiable record ────────────────────────────────────────────────── */
 
 .record {
@@ -1053,6 +1118,105 @@ body {
 .share-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.dropzone-hero {
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: clamp(2rem, 8vw, 3.5rem);
+  margin-top: 1.5rem;
+}
+
+.dropzone-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.dropzone-hero .dropzone-line {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  color: var(--fg);
+}
+
+.compose-contents {
+  margin-top: 2rem;
+}
+
+.compose-entries {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.compose-entry {
+  border: 1px solid var(--hairline);
+  border-radius: 0.45rem;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.compose-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.compose-entry-row .file-name {
+  margin-right: auto;
+}
+
+.contained-path {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin-right: auto;
+  word-break: break-all;
+}
+
+.compose-contained {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.3rem 0 0 0.4rem;
+  padding-left: 0.7rem;
+  border-left: 1px solid var(--hairline);
+}
+
+.compose-contained-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.note-area {
+  font-size: 0.85rem;
+}
+
+.compose-details {
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 1.25rem;
+}
+
+.compose-details > summary {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.compose-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.25rem;
 }
 
 .compose-files {

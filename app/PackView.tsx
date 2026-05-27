@@ -1,6 +1,12 @@
 "use client";
 
-import { isSendAPack, shortId, type Pack } from "@/lib/pack/index.ts";
+import {
+  isSendAPack,
+  isContainer,
+  shortId,
+  type Pack,
+  type PxPackFile,
+} from "@/lib/pack/index.ts";
 import { bySlug } from "./categories";
 import { VerifyPopover } from "./VerifyPopover";
 import { LighthouseNote } from "./LighthouseNote";
@@ -35,6 +41,75 @@ function formatBytes(bytes: number): string {
     unit++;
   }
   return `${value.toFixed(1)} ${units[unit]}`;
+}
+
+// A container's `contents` is a flat list whose names are relative paths; the
+// tree is rebuilt here for display (the data stays flat and canonical-stable).
+type TreeNode = {
+  dirs: Map<string, TreeNode>;
+  leaves: { file: PxPackFile; label: string }[];
+};
+
+function buildTree(files: PxPackFile[]): TreeNode {
+  const root: TreeNode = { dirs: new Map(), leaves: [] };
+  for (const file of files) {
+    const parts = file.name.split("/");
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const dir = parts[i];
+      if (!node.dirs.has(dir)) node.dirs.set(dir, { dirs: new Map(), leaves: [] });
+      node = node.dirs.get(dir)!;
+    }
+    node.leaves.push({ file, label: parts[parts.length - 1] });
+  }
+  return root;
+}
+
+function FileLeaf({
+  file,
+  label,
+  dlTitle,
+}: {
+  file: PxPackFile;
+  label: string;
+  dlTitle: string;
+}) {
+  return (
+    <>
+      <div className="file-row">
+        <span className="file-name">{label}</span>
+        {file.bytes !== undefined && (
+          <span className="file-size">{formatBytes(file.bytes)}</span>
+        )}
+        <button type="button" className="file-dl" disabled title={dlTitle}>
+          Download
+        </button>
+      </div>
+      {file.note && <p className="file-note">{file.note}</p>}
+    </>
+  );
+}
+
+// Native <details> gives collapsible folders with no client state.
+function FileTree({ node, dlTitle }: { node: TreeNode; dlTitle: string }) {
+  const dirNames = [...node.dirs.keys()].sort();
+  return (
+    <ul className="ftree">
+      {dirNames.map((name) => (
+        <li className="ftree-dir" key={`dir:${name}`}>
+          <details open>
+            <summary className="ftree-dir-name">{name}</summary>
+            <FileTree node={node.dirs.get(name)!} dlTitle={dlTitle} />
+          </details>
+        </li>
+      ))}
+      {node.leaves.map(({ file, label }) => (
+        <li className="ftree-leaf" key={`file:${file.name}`}>
+          <FileLeaf file={file} label={label} dlTitle={dlTitle} />
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function PackView({
@@ -101,20 +176,28 @@ export function PackView({
         <section className="delivery">
           {core.note && <p className="delivery-note">{core.note}</p>}
           <ul className="files">
-            {core.files!.map((f) => (
-              <li className="file" key={f.name}>
-                <div className="file-row">
-                  <span className="file-name">{f.name}</span>
-                  {f.bytes !== undefined && (
-                    <span className="file-size">{formatBytes(f.bytes)}</span>
-                  )}
-                  <button type="button" className="file-dl" disabled title={dlTitle}>
-                    Download
-                  </button>
-                </div>
-                {f.note && <p className="file-note">{f.note}</p>}
-              </li>
-            ))}
+            {core.files!.map((f) =>
+              isContainer(f) ? (
+                <li className="file file-container" key={f.name}>
+                  <div className="file-row">
+                    <span className="file-name">{f.name}</span>
+                    <span className="file-kind">
+                      {f.kind === "archive" ? "archive" : "folder"}
+                    </span>
+                    <span className="file-size">
+                      {f.contents!.length}{" "}
+                      {f.contents!.length === 1 ? "file" : "files"}
+                    </span>
+                  </div>
+                  {f.note && <p className="file-note">{f.note}</p>}
+                  <FileTree node={buildTree(f.contents!)} dlTitle={dlTitle} />
+                </li>
+              ) : (
+                <li className="file" key={f.name}>
+                  <FileLeaf file={f} label={f.name} dlTitle={dlTitle} />
+                </li>
+              ),
+            )}
           </ul>
         </section>
       )}

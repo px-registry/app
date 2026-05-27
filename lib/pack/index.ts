@@ -12,8 +12,9 @@ export type {
   PxManifestCoreV1,
   Pack,
 } from "./types.ts";
-export { isSendAPack } from "./types.ts";
+export { isSendAPack, isContainer } from "./types.ts";
 
+export { normalizePath, isNormalizedPath } from "./path.ts";
 export { canonicalize, type JsonValue } from "./canonical.ts";
 export { sha256Hex } from "./hash.ts";
 export { computePackId, shortId, SHORT_ID_LENGTH } from "./pack-id.ts";

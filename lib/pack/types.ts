@@ -18,19 +18,30 @@ export type PxVersion = "1.0";
 export type PxKind = "px.pack";
 
 /**
- * One file inside a send-a-pack delivery. `note` carries the sender's
- * per-file annotation ("read this first", "what changed", …) — the human
- * layer that makes a delivery legible without a covering email.
+ * One entry in a send-a-pack delivery. An entry is either a leaf file or a
+ * container (a dropped folder, or an expanded archive) carrying nested
+ * `contents`. `note` carries the sender's per-entry annotation ("read this
+ * first", "what changed", …) — the human layer that makes a delivery legible
+ * without a covering email; it applies to leaves and containers alike.
  *
  * `bytes` / `sha256` are optional: a manifest can describe a delivery whose
  * payload lives elsewhere. When present, `sha256` is the lowercase hex
- * SHA-256 of the file content (content addressing all the way down).
+ * SHA-256 of the file content (content addressing all the way down). Container
+ * entries usually omit them (the hashes live on the leaves inside).
+ *
+ * For a nested entry, `name` is its path relative to the container, using the
+ * normalized separator `/` (see normalizePath). The structure is recursive:
+ * `contents` holds the same type, so folders nest arbitrarily deep — and the
+ * canonicalizer hashes them deterministically because it recurses too.
  */
 export interface PxPackFile {
   name: string;
+  /** "file" (leaf, default) | "folder" | "archive" (an expanded .zip). */
+  kind?: "file" | "folder" | "archive";
   bytes?: number;
   sha256?: string;
   note?: string;
+  contents?: PxPackFile[];
 }
 
 /**
@@ -91,4 +102,9 @@ export interface Pack {
 /** True when a pack carries a file delivery (send-a-pack form). */
 export function isSendAPack(core: PxManifestCoreV1): boolean {
   return Array.isArray(core.files) && core.files.length > 0;
+}
+
+/** True when an entry is a container (folder/archive) with nested contents. */
+export function isContainer(file: PxPackFile): boolean {
+  return Array.isArray(file.contents);
 }

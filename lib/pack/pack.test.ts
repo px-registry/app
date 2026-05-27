@@ -13,6 +13,7 @@ import { canonicalize } from "./canonical.ts";
 import { sha256Hex } from "./hash.ts";
 import { computePackId, shortId } from "./pack-id.ts";
 import { indexById, ancestorsOf, isGenesis } from "./chain.ts";
+import { normalizePath, isNormalizedPath } from "./path.ts";
 import { toPacks } from "./index.ts";
 import type { PxManifestCoreV1, Pack } from "./types.ts";
 
@@ -165,6 +166,100 @@ test("ancestorsOf walks previous links oldest-last", async () => {
   const ancestors = ancestorsOf(c, index);
   assert.deepEqual(ancestors.map((p) => p.pack_id), [g.pack_id]);
   assert.deepEqual(ancestorsOf(g, index), []);
+});
+
+// ── nested contents (folders / archives) ─────────────────────────────────
+
+const nested: PxManifestCoreV1 = {
+  px: "1.0",
+  kind: "px.pack",
+  created_at: "2026-05-26T15:30:00Z",
+  category: "service",
+  listing: {
+    title: "Project handoff",
+    sender: "Studio",
+    domain: "",
+    type: "Delivery",
+  },
+  files: [
+    { name: "cover.pdf", bytes: 1200, sha256: "a".repeat(64), note: "start here" },
+    {
+      name: "src",
+      kind: "folder",
+      contents: [
+        { name: "index.ts", bytes: 80, sha256: "b".repeat(64) },
+        { name: "util/format.ts", bytes: 40, sha256: "c".repeat(64), note: "helpers" },
+      ],
+    },
+  ],
+};
+
+test("computePackId recurses into nested contents deterministically", async () => {
+  const id = await computePackId(nested);
+  assert.match(id, /^[0-9a-f]{64}$/);
+  assert.equal(await computePackId(nested), id);
+});
+
+test("computePackId is invariant to key order at depth", async () => {
+  const reordered: PxManifestCoreV1 = {
+    kind: "px.pack",
+    px: "1.0",
+    created_at: "2026-05-26T15:30:00Z",
+    category: "service",
+    files: [
+      { sha256: "a".repeat(64), note: "start here", name: "cover.pdf", bytes: 1200 },
+      {
+        kind: "folder",
+        name: "src",
+        contents: [
+          { sha256: "b".repeat(64), name: "index.ts", bytes: 80 },
+          { note: "helpers", sha256: "c".repeat(64), name: "util/format.ts", bytes: 40 },
+        ],
+      },
+    ],
+    listing: {
+      type: "Delivery",
+      title: "Project handoff",
+      domain: "",
+      sender: "Studio",
+    },
+  };
+  assert.equal(await computePackId(reordered), await computePackId(nested));
+});
+
+test("a changed nested note changes the pack_id", async () => {
+  const before = await computePackId(nested);
+  const mutated: PxManifestCoreV1 = {
+    ...nested,
+    files: [
+      nested.files![0],
+      {
+        ...nested.files![1],
+        contents: [
+          nested.files![1].contents![0],
+          { ...nested.files![1].contents![1], note: "different" },
+        ],
+      },
+    ],
+  };
+  assert.notEqual(await computePackId(mutated), before);
+});
+
+// ── path normalization (spec §5) ─────────────────────────────────────────
+
+test("normalizePath folds separators and drops . segments", () => {
+  assert.equal(normalizePath("a\\b\\c.txt"), "a/b/c.txt");
+  assert.equal(normalizePath("./a/./b.txt"), "a/b.txt");
+  assert.equal(normalizePath("/leading/slash.txt"), "leading/slash.txt");
+  assert.equal(normalizePath("a//b///c.txt"), "a/b/c.txt");
+});
+
+test("isNormalizedPath rejects leading slash, empty, and traversal", () => {
+  assert.equal(isNormalizedPath("a/b.txt"), true);
+  assert.equal(isNormalizedPath("/a"), false);
+  assert.equal(isNormalizedPath(""), false);
+  assert.equal(isNormalizedPath("a/../b"), false);
+  assert.equal(isNormalizedPath("a/./b"), false);
 });
 
 test("ancestorsOf is cycle-safe", () => {
