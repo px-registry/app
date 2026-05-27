@@ -1,16 +1,20 @@
 "use client";
 
-// Header auth indicator — a single, restrained chip in the top-right, present on
-// every page (mounted from the root layout). Signed out: a quiet "Sign in" link.
-// Signed in: "@handle ●" with a soft green dot (the Worker:OK pattern), linking
-// to /me/. It only reflects state; it never gates anything (§2 Brand Spirit:
-// auth is an optional unlock, not a wall).
+// Header auth indicator — a single restrained chip in the top-right, on every
+// page (mounted from the root layout). Signed out: a quiet "Sign in" link.
+// Signed in: "@handle ●" — now a button that summons the OwnerPopover (identity
+// as substrate, not a destination). The same popover is also opened by the
+// composer rail via a global "px:open-owner" event, so there is one owner
+// surface, reachable from anywhere, with no /me/ page.
+//
+// Renders null until the session is known, so every page's static HTML stays
+// free of auth chrome (sealed pages untouched at build time).
 
 import { useEffect, useState } from "react";
 import { fetchMe, type MeResponse } from "@/lib/auth-client.ts";
+import { OwnerPopover, OWNER_POPOVER_ID } from "@/components/owner/OwnerPopover.tsx";
 
 export function AuthBadge() {
-  // null = not yet known (render nothing to avoid a flash / hydration mismatch).
   const [me, setMe] = useState<MeResponse | null>(null);
 
   useEffect(() => {
@@ -23,9 +27,22 @@ export function AuthBadge() {
     };
   }, []);
 
-  // Until the session is known, render nothing — this keeps the static HTML of
-  // every page free of auth chrome (the chip is injected only after client
-  // hydration), so existing content pages are untouched at build time.
+  // Let the composer rail (or anything) open the same popover.
+  useEffect(() => {
+    const open = () => {
+      const el = document.getElementById(OWNER_POPOVER_ID) as
+        | (HTMLElement & { showPopover?: () => void })
+        | null;
+      try {
+        el?.showPopover?.();
+      } catch {
+        /* already open — ignore */
+      }
+    };
+    window.addEventListener("px:open-owner", open);
+    return () => window.removeEventListener("px:open-owner", open);
+  }, []);
+
   if (me === null) return null;
 
   if (!me.signed_in) {
@@ -39,10 +56,18 @@ export function AuthBadge() {
   }
 
   return (
-    <div className="auth-badge">
-      <a className="auth-handle" href="/me/" title="Your identity">
-        <span className="auth-dot" aria-hidden />@{me.handle}
-      </a>
-    </div>
+    <>
+      <div className="auth-badge">
+        <button
+          type="button"
+          className="auth-handle"
+          popoverTarget={OWNER_POPOVER_ID}
+          title="Your identity"
+        >
+          <span className="auth-dot" aria-hidden />@{me.handle}
+        </button>
+      </div>
+      <OwnerPopover me={me} />
+    </>
   );
 }

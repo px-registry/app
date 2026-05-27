@@ -73,7 +73,7 @@ export const onRequestPost: PagesFunction<AuthEnv> = async ({ request, env }) =>
 
   const secure = isSecureRequest(request);
   const session = await createSessionToken(env, handle);
-  return json({ ok: true, handle, redirect: "/me/" }, 200, [
+  return json({ ok: true, handle, redirect: "/compose/" }, 200, [
     sessionCookie(session, secure),
     clearCookie(CHALLENGE_COOKIE, secure),
   ]);

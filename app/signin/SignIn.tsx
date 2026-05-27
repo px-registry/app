@@ -74,7 +74,7 @@ export function SignIn() {
         return;
       }
 
-      window.location.href = safeNext() || vj.redirect || "/me/";
+      window.location.href = safeNext() || vj.redirect || "/compose/";
     } catch (e) {
       setError(friendlyError(e));
       setWorking(false);

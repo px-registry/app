@@ -145,13 +145,13 @@ export function SignUp() {
         </label>
         <a
           className={`auth-btn${saved ? "" : " is-disabled"}`}
-          href={saved ? "/me/" : undefined}
+          href={saved ? "/compose/" : undefined}
           aria-disabled={!saved}
           onClick={(e) => {
             if (!saved) e.preventDefault();
           }}
         >
-          Continue to your identity →
+          Continue →
         </a>
       </section>
     );

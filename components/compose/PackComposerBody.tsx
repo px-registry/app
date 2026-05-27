@@ -471,7 +471,7 @@ export function PackComposerBody({
               Signed in as{" "}
               <span className="signedin-handle">@{identity.handle}</span> — your
               sender and domain are pre-filled below.{" "}
-              <a className="compose-dashboard-link" href="/me/compose/?mode=pack">
+              <a className="compose-dashboard-link" href="/compose/?mode=pack">
                 Try the dashboard →
               </a>
             </p>

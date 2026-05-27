@@ -25,7 +25,7 @@ export function ComingSoon({
       </p>
       <p className="coming-soon-alt">
         Want to send a file delivery now?{" "}
-        <a href="/me/compose/?mode=pack">Switch to Send a pack →</a>
+        <a href="/compose/?mode=pack">Switch to Send a pack →</a>
       </p>
     </section>
   );

@@ -64,7 +64,9 @@ export function ComposerShell({
   return (
     <div className="shell">
       <nav className="shell-rail" aria-label="Composer modes">
-        <span className="shell-rail-brand">PX</span>
+        <a className="shell-rail-brand" href="/">
+          PX
+        </a>
         <ul className="shell-rail-list">
           {RAIL.map((item) => (
             <li key={item.mode}>
@@ -82,9 +84,13 @@ export function ComposerShell({
             </li>
           ))}
         </ul>
-        <a className="shell-rail-me" href="/me/">
+        <button
+          type="button"
+          className="shell-rail-me"
+          onClick={() => window.dispatchEvent(new CustomEvent("px:open-owner"))}
+        >
           ⌂ me
-        </a>
+        </button>
       </nav>
 
       <div className="shell-pane">

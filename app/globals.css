@@ -1758,55 +1758,6 @@ body {
   min-width: 0;
 }
 
-/* /me/ surface */
-.me-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-ghost);
-}
-.me-display {
-  font-family: var(--font-serif);
-  font-size: 1.25rem;
-  color: var(--fg-muted);
-  margin-top: -0.4rem;
-}
-
-.me-nav {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--hairline);
-  margin-top: 0.5rem;
-}
-.me-nav-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 1rem 0.5rem;
-  border-bottom: 1px solid var(--hairline);
-  text-decoration: none;
-  color: inherit;
-  transition: background-color 160ms ease;
-}
-a.me-nav-item:hover,
-a.me-nav-item:focus-visible {
-  background: var(--hover);
-  outline: none;
-}
-.me-nav-item.is-soon {
-  opacity: 0.5;
-}
-.me-nav-title {
-  font-size: 1.0625rem;
-  color: var(--fg);
-}
-.me-nav-sub {
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  color: var(--fg-muted);
-}
 
 /* "Try the dashboard →" link in the Mode-1 signed-in hint (client-injected). */
 .compose-dashboard-link {
@@ -1854,12 +1805,20 @@ a.me-nav-item:focus-visible {
 }
 
 .shell-rail-brand {
+  display: block;
   font-family: var(--font-serif);
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--fg);
   padding: 0.2rem 0.6rem 0.9rem;
   letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+.shell-rail-brand:hover,
+.shell-rail-brand:focus-visible {
+  color: var(--accent);
+  outline: none;
 }
 
 .shell-rail-list {
@@ -1911,12 +1870,18 @@ a.me-nav-item:focus-visible {
 
 .shell-rail-me {
   margin-top: auto;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0;
+  cursor: pointer;
   padding: 0.6rem 0.7rem 0.2rem;
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--fg-muted);
   text-decoration: none;
-  border-top: 1px solid var(--hairline);
   transition: color 160ms ease;
 }
 .shell-rail-me:hover,
@@ -2178,4 +2143,60 @@ a.me-nav-item:focus-visible {
   color: var(--fg-ghost);
   max-width: 23rem;
   text-align: center;
+}
+
+/* ── Owner popover (card + settings + sign-out, summoned not navigated) ──── */
+
+.owner-pop {
+  margin: auto; /* center in the top layer */
+  width: min(92vw, 23rem);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--hairline);
+  border-radius: 0.7rem;
+  padding: 1.5rem;
+  box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.owner-pop::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Card portion — borderless (the popover is the surface). */
+.owner-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding-bottom: 0.5rem;
+}
+.owner-qr-link {
+  position: absolute;
+  right: 0;
+  top: 0;
+  line-height: 0;
+}
+
+.owner-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--hairline);
+}
+.owner-settings .auth-btn {
+  align-self: flex-start;
+}
+
+.owner-actions {
+  display: flex;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--hairline);
+}
+.owner-actions .auth-signout {
+  margin-top: 0;
 }
