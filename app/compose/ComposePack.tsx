@@ -11,6 +11,8 @@ import {
   canonicalize,
   computePackId,
   sha256Hex,
+  normalizePath,
+  isNormalizedPath,
   type JsonValue,
   type Pack,
   type PxManifestCoreV1,
@@ -22,19 +24,43 @@ import { PackView } from "../PackView";
 // API and never leave the browser; PX receives nothing. The pack_id recomputes
 // live from the manifest, and the share link carries the manifest itself (file
 // list, notes, content hashes — not the bytes), so opening it rebuilds the
-// receiver's view with no server in the loop. That is the honest shape of a
-// demo under "PX holds nothing": the pack travels in the link.
+// receiver's view with no server in the loop.
+//
+// Drop is primary: a folder or a handful of files lands first, with notes; the
+// title/sender metadata is secondary. Folder drop uses the DataTransferItem
+// entries API (webkitGetAsEntry + recursive traversal) — the only reliable way
+// to get a folder's *contents* on drop — with a webkitdirectory picker as the
+// click fallback. (Patterns ported from the px-layer0 pack composer.)
 
-type LocalFile = {
+// A leaf file, or a container (dropped folder) holding nested files. The
+// editor keeps containers' contents flat (relative paths); the receiver view
+// rebuilds the tree. ZIP expansion (kind "archive") arrives in a follow-up.
+type ContainedFile = { path: string; bytes: number; sha256: string; note: string };
+type LeafEntry = {
+  id: string;
+  kind: "file";
   name: string;
   bytes: number;
   sha256: string;
   note: string;
 };
+type ContainerEntry = {
+  id: string;
+  kind: "folder" | "archive";
+  name: string;
+  note: string;
+  contents: ContainedFile[];
+};
+type Entry = LeafEntry | ContainerEntry;
 
 // A delivery is category-agnostic; it carries a valid category for the manifest
 // without surfacing one in this flow.
 const DELIVERY_CATEGORY = "service";
+
+const rid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : String(Math.random()).slice(2);
 
 // ── share-link codec (unicode-safe base64url) ────────────────────────────
 
@@ -52,17 +78,57 @@ function decodeManifest(encoded: string): PxManifestCoreV1 {
   return JSON.parse(new TextDecoder().decode(bytes)) as PxManifestCoreV1;
 }
 
+// ── folder traversal (DataTransferItem entries API) ──────────────────────
+
+type DropFile = { file: File; path: string };
+
+function traverseEntry(
+  entry: FileSystemEntry,
+  basePath: string,
+  out: DropFile[],
+): Promise<void> {
+  return new Promise((resolve) => {
+    if (entry.isFile) {
+      (entry as FileSystemFileEntry).file(
+        (file) => {
+          out.push({ file, path: basePath ? `${basePath}/${entry.name}` : entry.name });
+          resolve();
+        },
+        () => resolve(),
+      );
+    } else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      const all: FileSystemEntry[] = [];
+      const readAll = () =>
+        reader.readEntries(
+          (entries) => {
+            if (!entries.length) {
+              const next = basePath ? `${basePath}/${entry.name}` : entry.name;
+              Promise.all(all.map((e) => traverseEntry(e, next, out))).then(() =>
+                resolve(),
+              );
+            } else {
+              all.push(...Array.from(entries));
+              readAll();
+            }
+          },
+          () => resolve(),
+        );
+      readAll();
+    } else {
+      resolve();
+    }
+  });
+}
+
 // ── component ─────────────────────────────────────────────────────────────
 
 export function ComposePack() {
-  // If the page is opened with a #pack=… fragment, it is a shared link: decode
-  // and show the receiver's view instead of the editor.
   const [shared, setShared] = useState<PxManifestCoreV1 | null>(null);
   const [decodeError, setDecodeError] = useState(false);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const match = hash.match(/[#&]pack=([^&]+)/);
+    const match = window.location.hash.match(/[#&]pack=([^&]+)/);
     if (!match) return;
     try {
       setShared(decodeManifest(decodeURIComponent(match[1])));
@@ -122,12 +188,47 @@ function SharedView({ core }: { core: PxManifestCoreV1 }) {
 
 // ── editor ────────────────────────────────────────────────────────────────
 
+function mergeEntries(
+  prev: Entry[],
+  newLeaves: LeafEntry[],
+  folders: Map<string, ContainedFile[]>,
+): Entry[] {
+  const next = [...prev];
+
+  for (const leaf of newLeaves) {
+    if (
+      !next.some(
+        (e) => e.kind === "file" && e.name === leaf.name && e.bytes === leaf.bytes,
+      )
+    ) {
+      next.push(leaf);
+    }
+  }
+
+  for (const [name, incoming] of folders) {
+    const existing = next.find(
+      (e) => e.kind !== "file" && e.name === name,
+    ) as ContainerEntry | undefined;
+    if (existing) {
+      for (const c of incoming) {
+        if (!existing.contents.some((x) => x.path === c.path)) {
+          existing.contents.push(c);
+        }
+      }
+    } else {
+      next.push({ id: rid(), kind: "folder", name, note: "", contents: incoming });
+    }
+  }
+
+  return next;
+}
+
 function Editor() {
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [title, setTitle] = useState("");
   const [sender, setSender] = useState("");
   const [domain, setDomain] = useState("");
   const [coverNote, setCoverNote] = useState("");
-  const [files, setFiles] = useState<LocalFile[]>([]);
   const [hashing, setHashing] = useState(0);
   const [dragOver, setDragOver] = useState(false);
 
@@ -135,18 +236,35 @@ function Editor() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // created_at is fixed at mount so the pack_id reflects content alone.
   const [createdAt] = useState(() => new Date().toISOString());
-  const inputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
 
-  // The manifest core, rebuilt whenever any input changes.
   const core: PxManifestCoreV1 = useMemo(() => {
-    const packFiles: PxPackFile[] = files.map((f) => ({
-      name: f.name,
-      bytes: f.bytes,
-      sha256: f.sha256,
-      ...(f.note.trim() ? { note: f.note.trim() } : {}),
-    }));
+    const files: PxPackFile[] = entries.map((e) =>
+      e.kind === "file"
+        ? {
+            name: e.name,
+            bytes: e.bytes,
+            sha256: e.sha256,
+            ...(e.note.trim() ? { note: e.note.trim() } : {}),
+          }
+        : {
+            name: e.name,
+            kind: e.kind,
+            ...(e.note.trim() ? { note: e.note.trim() } : {}),
+            // Sort contents so the pack_id is independent of OS/browser
+            // enumeration order (spec §8.4: order by normalized path).
+            contents: [...e.contents]
+              .sort((a, b) => a.path.localeCompare(b.path))
+              .map((c) => ({
+                name: c.path,
+                bytes: c.bytes,
+                sha256: c.sha256,
+                ...(c.note.trim() ? { note: c.note.trim() } : {}),
+              })),
+          },
+    );
     return {
       px: "1.0",
       kind: "px.pack",
@@ -159,11 +277,10 @@ function Editor() {
         domain: domain.trim(),
         type: "Delivery",
       },
-      ...(packFiles.length ? { files: packFiles } : {}),
+      ...(files.length ? { files } : {}),
     };
-  }, [title, sender, domain, coverNote, files, createdAt]);
+  }, [entries, title, sender, domain, coverNote, createdAt]);
 
-  // Recompute pack_id live. A stale async result is dropped via the flag.
   useEffect(() => {
     let live = true;
     computePackId(core).then((id) => {
@@ -174,56 +291,130 @@ function Editor() {
     };
   }, [core]);
 
-  // A new share link must be regenerated after edits.
   useEffect(() => {
     setShareUrl(null);
     setCopied(false);
   }, [core]);
 
-  const hasContent = title.trim() !== "" || files.length > 0;
+  const hasContent = entries.length > 0 || title.trim() !== "";
+  const fileCount = entries.reduce(
+    (n, e) => n + (e.kind === "file" ? 1 : e.contents.length),
+    0,
+  );
 
-  async function addFiles(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0) return;
-    const incoming = Array.from(fileList);
-    setHashing((n) => n + incoming.length);
-    for (const file of incoming) {
+  async function processIntake(items: DropFile[]) {
+    setHashing((h) => h + items.length);
+    const newLeaves: LeafEntry[] = [];
+    const folders = new Map<string, ContainedFile[]>();
+    for (const { file, path } of items) {
+      const norm = normalizePath(path);
+      if (!isNormalizedPath(norm)) {
+        setHashing((h) => h - 1);
+        continue;
+      }
+      let sha = "";
       try {
-        const buf = new Uint8Array(await file.arrayBuffer());
-        const digest = await sha256Hex(buf);
-        setFiles((prev) =>
-          prev.some((p) => p.name === file.name && p.bytes === file.size)
-            ? prev
-            : [
-                ...prev,
-                { name: file.name, bytes: file.size, sha256: digest, note: "" },
-              ],
-        );
+        sha = await sha256Hex(new Uint8Array(await file.arrayBuffer()));
       } finally {
-        setHashing((n) => n - 1);
+        setHashing((h) => h - 1);
+      }
+      const slash = norm.indexOf("/");
+      if (slash === -1) {
+        newLeaves.push({
+          id: rid(),
+          kind: "file",
+          name: norm,
+          bytes: file.size,
+          sha256: sha,
+          note: "",
+        });
+      } else {
+        const top = norm.slice(0, slash);
+        const rest = norm.slice(slash + 1);
+        if (!folders.has(top)) folders.set(top, []);
+        folders.get(top)!.push({ path: rest, bytes: file.size, sha256: sha, note: "" });
       }
     }
+    setEntries((prev) => mergeEntries(prev, newLeaves, folders));
+  }
+
+  function addFileList(list: FileList | null) {
+    if (!list || !list.length) return;
+    const items: DropFile[] = Array.from(list).map((f) => ({
+      file: f,
+      path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name,
+    }));
+    void processIntake(items);
   }
 
   function onDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragOver(false);
-    void addFiles(e.dataTransfer.files);
+    const dt = e.dataTransfer;
+    // Capture entries synchronously — the DataTransfer is cleared after the
+    // event, but the FileSystemEntry objects stay usable across the awaits.
+    const fsEntries: FileSystemEntry[] = [];
+    if (dt.items && dt.items.length && "webkitGetAsEntry" in dt.items[0]) {
+      for (let i = 0; i < dt.items.length; i++) {
+        const en = dt.items[i].webkitGetAsEntry?.();
+        if (en) fsEntries.push(en);
+      }
+    }
+    const plain = Array.from(dt.files);
+    void (async () => {
+      const items: DropFile[] = [];
+      for (const en of fsEntries) await traverseEntry(en, "", items);
+      if (!items.length) {
+        for (const f of plain) if (f.size > 0) items.push({ file: f, path: f.name });
+      }
+      if (items.length) await processIntake(items);
+    })();
   }
 
-  function setNote(index: number, note: string) {
-    setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, note } : f)));
+  // ── mutations ──
+  function setLeafNote(id: string, note: string) {
+    setEntries((prev) =>
+      prev.map((e) => (e.id === id && e.kind === "file" ? { ...e, note } : e)),
+    );
   }
-
-  function removeFile(index: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+  function setContainerNote(id: string, note: string) {
+    setEntries((prev) =>
+      prev.map((e) => (e.id === id && e.kind !== "file" ? { ...e, note } : e)),
+    );
+  }
+  function setContainedNote(id: string, path: string, note: string) {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === id && e.kind !== "file"
+          ? {
+              ...e,
+              contents: e.contents.map((c) => (c.path === path ? { ...c, note } : c)),
+            }
+          : e,
+      ),
+    );
+  }
+  function removeEntry(id: string) {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+  }
+  function removeContained(id: string, path: string) {
+    setEntries((prev) =>
+      prev
+        .map((e) =>
+          e.id === id && e.kind !== "file"
+            ? { ...e, contents: e.contents.filter((c) => c.path !== path) }
+            : e,
+        )
+        .filter((e) => e.kind === "file" || e.contents.length > 0),
+    );
   }
 
   function createShareLink() {
-    const url = `${window.location.origin}/compose/pack/#pack=${encodeManifest(core)}`;
-    setShareUrl(url);
+    setShareUrl(
+      `${window.location.origin}/compose/pack/#pack=${encodeManifest(core)}`,
+    );
     setCopied(false);
   }
-
   async function copyLink() {
     if (!shareUrl) return;
     try {
@@ -231,7 +422,7 @@ function Editor() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard blocked — the link is selectable in the field.
+      /* clipboard blocked — link is selectable in the field */
     }
   }
 
@@ -246,171 +437,260 @@ function Editor() {
         </p>
       </header>
 
-      {/* 1 — details */}
-      <fieldset className="compose-field">
-        <legend>Pack</legend>
-        <label className="field">
-          <span className="field-label">Title</span>
-          <input
-            className="field-input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="The Tide Tables — final files"
-          />
-        </label>
-        <div className="field-row">
-          <label className="field">
-            <span className="field-label">Sender</span>
-            <input
-              className="field-input"
-              value={sender}
-              onChange={(e) => setSender(e.target.value)}
-              placeholder="Asterism Books"
-            />
-          </label>
-          <label className="field">
-            <span className="field-label">
-              Domain <span className="field-opt">optional</span>
-            </span>
-            <input
-              className="field-input"
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              placeholder="asterism-books.example"
-            />
-          </label>
-        </div>
-        <label className="field">
-          <span className="field-label">
-            Cover note <span className="field-opt">optional</span>
-          </span>
-          <textarea
-            className="field-input field-area"
-            value={coverNote}
-            onChange={(e) => setCoverNote(e.target.value)}
-            placeholder="Everything you need to sign off is here — read the notes first."
-            rows={2}
-          />
-        </label>
-      </fieldset>
-
-      {/* 2 — files */}
-      <fieldset className="compose-field">
-        <legend>Files</legend>
-        <div
-          className={`dropzone${dragOver ? " is-over" : ""}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-        >
-          <p className="dropzone-line">Drop files here</p>
+      {/* Drop is the hero. */}
+      <div
+        className={`dropzone dropzone-hero${dragOver ? " is-over" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+      >
+        <p className="dropzone-line">Drop files or a folder</p>
+        <div className="dropzone-actions">
           <button
             type="button"
             className="dropzone-btn"
-            onClick={() => inputRef.current?.click()}
+            onClick={() => filesRef.current?.click()}
           >
             Choose files
           </button>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            hidden
-            onChange={(e) => {
-              void addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </div>
-        {hashing > 0 && (
-          <p className="compose-note">Hashing {hashing} file(s)…</p>
-        )}
-
-        {files.length > 0 && (
-          <ul className="compose-files">
-            {files.map((f, i) => (
-              <li className="compose-file" key={`${f.name}-${f.sha256}`}>
-                <div className="compose-file-row">
-                  <span className="file-name">{f.name}</span>
-                  <button
-                    type="button"
-                    className="compose-file-rm"
-                    onClick={() => removeFile(i)}
-                    aria-label={`Remove ${f.name}`}
-                  >
-                    remove
-                  </button>
-                </div>
-                <textarea
-                  className="field-input field-area"
-                  value={f.note}
-                  onChange={(e) => setNote(i, e.target.value)}
-                  placeholder="Read this first — what changed since the proof."
-                  rows={2}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </fieldset>
-
-      {/* 3 — identity */}
-      <section className="compose-identity">
-        <h2 className="compose-sub-h">Identity</h2>
-        <p className="identity-hint">This is your pack&rsquo;s identity.</p>
-        <code className="identity-id">{packId ?? "computing…"}</code>
-        <details className="identity-manifest">
-          <summary>Canonical manifest (what gets hashed)</summary>
-          <pre className="identity-json">
-            {canonicalize(core as unknown as JsonValue)}
-          </pre>
-        </details>
-      </section>
-
-      {/* 4 — receiver preview */}
-      <section className="compose-preview">
-        <h2 className="compose-sub-h">Receiver&rsquo;s view</h2>
-        {hasContent && previewPack ? (
-          <div className="preview-frame">
-            <PackView pack={previewPack} ancestors={[]} mode="preview" />
-          </div>
-        ) : (
-          <p className="compose-note">
-            Add a title and a file or two to see what the receiver sees.
-          </p>
-        )}
-      </section>
-
-      {/* 5 — share */}
-      <section className="compose-share">
-        <h2 className="compose-sub-h">Share</h2>
-        <p className="demo-banner">
-          Demo mode — files stay in your browser; PX receives nothing. The link
-          carries the manifest (file list, notes, content hashes), not the file
-          bytes. Nothing is stored, so a published <code>/pack/&lt;id&gt;/</code>{" "}
-          address comes in a later phase.
-        </p>
-        {!shareUrl ? (
           <button
             type="button"
-            className="share-btn"
-            onClick={createShareLink}
-            disabled={!hasContent}
+            className="dropzone-btn"
+            onClick={() => folderRef.current?.click()}
           >
-            Create share link
+            Add folder
           </button>
-        ) : (
-          <div className="share-out">
-            <input className="share-url" readOnly value={shareUrl} />
-            <button type="button" className="share-copy" onClick={copyLink}>
-              {copied ? "Copied" : "Copy link"}
-            </button>
+        </div>
+        <input
+          ref={filesRef}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            addFileList(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={folderRef}
+          type="file"
+          hidden
+          // @ts-expect-error webkitdirectory is a non-standard attribute
+          webkitdirectory=""
+          onChange={(e) => {
+            addFileList(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {hashing > 0 && (
+        <p className="compose-note">Hashing {hashing} file(s) in your browser…</p>
+      )}
+
+      {entries.length > 0 && (
+        <section className="compose-contents">
+          <h2 className="compose-sub-h">
+            Contents · {fileCount} {fileCount === 1 ? "file" : "files"}
+          </h2>
+          <ul className="compose-entries">
+            {entries.map((e) =>
+              e.kind === "file" ? (
+                <li className="compose-entry" key={e.id}>
+                  <div className="compose-entry-row">
+                    <span className="file-name">{e.name}</span>
+                    <button
+                      type="button"
+                      className="compose-file-rm"
+                      onClick={() => removeEntry(e.id)}
+                      aria-label={`Remove ${e.name}`}
+                    >
+                      remove
+                    </button>
+                  </div>
+                  <NoteArea
+                    value={e.note}
+                    onChange={(v) => setLeafNote(e.id, v)}
+                  />
+                </li>
+              ) : (
+                <li className="compose-entry compose-entry-container" key={e.id}>
+                  <div className="compose-entry-row">
+                    <span className="file-name">{e.name}</span>
+                    <span className="file-kind">
+                      {e.kind === "archive" ? "archive" : "folder"}
+                    </span>
+                    <span className="file-size">{e.contents.length} files</span>
+                    <button
+                      type="button"
+                      className="compose-file-rm"
+                      onClick={() => removeEntry(e.id)}
+                      aria-label={`Remove ${e.name}`}
+                    >
+                      remove
+                    </button>
+                  </div>
+                  <NoteArea
+                    value={e.note}
+                    onChange={(v) => setContainerNote(e.id, v)}
+                    placeholder="Note for this folder…"
+                  />
+                  <ul className="compose-contained">
+                    {[...e.contents]
+                      .sort((a, b) => a.path.localeCompare(b.path))
+                      .map((c) => (
+                        <li className="compose-contained-item" key={c.path}>
+                          <div className="compose-entry-row">
+                            <span className="contained-path">{c.path}</span>
+                            <button
+                              type="button"
+                              className="compose-file-rm"
+                              onClick={() => removeContained(e.id, c.path)}
+                              aria-label={`Remove ${c.path}`}
+                            >
+                              remove
+                            </button>
+                          </div>
+                          <NoteArea
+                            value={c.note}
+                            onChange={(v) => setContainedNote(e.id, c.path, v)}
+                          />
+                        </li>
+                      ))}
+                  </ul>
+                </li>
+              ),
+            )}
+          </ul>
+        </section>
+      )}
+
+      {/* Metadata is secondary — folded away until wanted. */}
+      <details className="compose-details">
+        <summary>Pack details (optional)</summary>
+        <div className="compose-details-body">
+          <label className="field">
+            <span className="field-label">Title</span>
+            <input
+              className="field-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="The Tide Tables — final files"
+            />
+          </label>
+          <div className="field-row">
+            <label className="field">
+              <span className="field-label">Sender</span>
+              <input
+                className="field-input"
+                value={sender}
+                onChange={(e) => setSender(e.target.value)}
+                placeholder="Asterism Books"
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">
+                Domain <span className="field-opt">optional</span>
+              </span>
+              <input
+                className="field-input"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="asterism-books.example"
+              />
+            </label>
           </div>
-        )}
-      </section>
+          <label className="field">
+            <span className="field-label">
+              Cover note <span className="field-opt">optional</span>
+            </span>
+            <textarea
+              className="field-input field-area"
+              value={coverNote}
+              onChange={(e) => setCoverNote(e.target.value)}
+              placeholder="Everything you need to sign off is here — read the notes first."
+              rows={2}
+            />
+          </label>
+        </div>
+      </details>
+
+      {hasContent && (
+        <>
+          <section className="compose-identity">
+            <h2 className="compose-sub-h">Identity</h2>
+            <p className="identity-hint">This is your pack&rsquo;s identity.</p>
+            <code className="identity-id">{packId ?? "computing…"}</code>
+            <details className="identity-manifest">
+              <summary>Canonical manifest (what gets hashed)</summary>
+              <pre className="identity-json">
+                {canonicalize(core as unknown as JsonValue)}
+              </pre>
+            </details>
+          </section>
+
+          <section className="compose-preview">
+            <h2 className="compose-sub-h">Receiver&rsquo;s view</h2>
+            {previewPack ? (
+              <div className="preview-frame">
+                <PackView pack={previewPack} ancestors={[]} mode="preview" />
+              </div>
+            ) : (
+              <p className="compose-note">Building preview…</p>
+            )}
+          </section>
+
+          <section className="compose-share">
+            <h2 className="compose-sub-h">Share</h2>
+            <p className="demo-banner">
+              Demo mode — files stay in your browser; PX receives nothing. The
+              link carries the manifest (file list, notes, content hashes), not
+              the file bytes. Nothing is stored, so a published{" "}
+              <code>/pack/&lt;id&gt;/</code> address comes in a later phase.
+            </p>
+            {!shareUrl ? (
+              <button
+                type="button"
+                className="share-btn"
+                onClick={createShareLink}
+                disabled={!hasContent}
+              >
+                Create share link
+              </button>
+            ) : (
+              <div className="share-out">
+                <input className="share-url" readOnly value={shareUrl} />
+                <button type="button" className="share-copy" onClick={copyLink}>
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </section>
+  );
+}
+
+// Auto-growing note textarea, used for every annotation (leaf and contained).
+function NoteArea({
+  value,
+  onChange,
+  placeholder = "Read this first — what changed…",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <textarea
+      className="field-input field-area note-area"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={1}
+    />
   );
 }
