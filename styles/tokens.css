@@ -16,6 +16,7 @@
   --fg-ghost: #565450;
   --accent: #c9a24a;
   --hairline: rgba(232, 230, 225, 0.1);
+  --hover: rgba(232, 230, 225, 0.045);
 
   --font-serif: var(--font-cormorant), "Shippori Mincho", "Yu Mincho",
     "Hiragino Mincho ProN", serif;
