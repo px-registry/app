@@ -1,0 +1,25 @@
+/*
+ * PX design tokens — dark theme sketch (たたき台 / not final).
+ *
+ * Lineage:
+ *   --bg / --fg        apps/px-composer dark palette (#0a0a0a / #e8e6e1)
+ *   --accent           px-registry-apex --amber (#8a7040), lifted for
+ *                      legibility on near-black; gold/mustard family
+ *
+ * Compass: PX_DESIGN_INTENT §2 Brand Spirit — subtraction, restraint.
+ */
+:root {
+  --bg: #0a0a0a;
+  --bg-elev: #0d0d0d;
+  --fg: #e8e6e1;
+  --fg-muted: #8a8780;
+  --fg-ghost: #565450;
+  --accent: #c9a24a;
+  --hairline: rgba(232, 230, 225, 0.1);
+
+  --font-serif: var(--font-cormorant), "Shippori Mincho", "Yu Mincho",
+    "Hiragino Mincho ProN", serif;
+  --font-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "SFMono-Regular", ui-monospace,
+    monospace;
+}
