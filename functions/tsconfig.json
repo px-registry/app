@@ -1,0 +1,16 @@
+{
+  "comment": "Pages Functions run on the Workers runtime, not the DOM. They are excluded from the root tsconfig (whose lib is dom, for the React app) and type-checked separately against @cloudflare/workers-types. Wrangler compiles them with esbuild; this config is for editor/type correctness only.",
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext"],
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["**/*.ts"]
+}

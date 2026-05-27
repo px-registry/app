@@ -9,15 +9,16 @@ export type {
   PxKind,
   PxPackFile,
   PxListing,
+  PxDelivery,
   PxManifestCoreV1,
   Pack,
 } from "./types.ts";
-export { isSendAPack, isContainer } from "./types.ts";
+export { isSendAPack, isContainer, hasDelivery } from "./types.ts";
 
 export { normalizePath, isNormalizedPath } from "./path.ts";
 export { canonicalize, type JsonValue } from "./canonical.ts";
 export { sha256Hex } from "./hash.ts";
-export { computePackId, shortId, SHORT_ID_LENGTH } from "./pack-id.ts";
+export { computePackId, stripDelivery, shortId, SHORT_ID_LENGTH } from "./pack-id.ts";
 export { indexById, ancestorsOf, isGenesis } from "./chain.ts";
 
 import { computePackId } from "./pack-id.ts";

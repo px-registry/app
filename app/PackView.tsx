@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import {
   isSendAPack,
   isContainer,
   shortId,
+  sha256Hex,
   type Pack,
+  type PxDelivery,
   type PxPackFile,
 } from "@/lib/pack/index.ts";
 import { bySlug } from "./categories";
@@ -65,15 +68,78 @@ function buildTree(files: PxPackFile[]): TreeNode {
   return root;
 }
 
+// Encode a pack-relative path for a URL, segment by segment (spaces, unicode).
+const encodeSegments = (p: string) =>
+  p.split("/").map(encodeURIComponent).join("/");
+
+type LeafState =
+  | "idle"
+  | "downloading"
+  | "verified"
+  | "mismatch"
+  | "expired"
+  | "error";
+
+// Shared download context threaded to every leaf in a delivery.
+type Deliverable = {
+  delivery: PxDelivery;
+  expired: boolean;
+} | null;
+
 function FileLeaf({
   file,
   label,
+  pathPrefix,
+  deliverable,
   dlTitle,
 }: {
   file: PxPackFile;
   label: string;
+  /** Container name for nested files, "" for top-level leaves. */
+  pathPrefix: string;
+  deliverable: Deliverable;
   dlTitle: string;
 }) {
+  const [state, setState] = useState<LeafState>("idle");
+
+  const fullPath = pathPrefix ? `${pathPrefix}/${file.name}` : file.name;
+  // Functional only when bytes are actually delivered and we can verify them.
+  const live =
+    deliverable !== null &&
+    !deliverable.expired &&
+    typeof file.sha256 === "string";
+
+  async function download() {
+    if (!deliverable) return;
+    setState("downloading");
+    try {
+      const url = deliverable.delivery.base + encodeSegments(fullPath);
+      const res = await fetch(url);
+      if (!res.ok) {
+        setState(res.status === 404 || res.status === 410 ? "expired" : "error");
+        return;
+      }
+      const buf = await res.arrayBuffer();
+      // Verify against the manifest hash before handing the file over.
+      const digest = await sha256Hex(new Uint8Array(buf));
+      if (file.sha256 && digest !== file.sha256) {
+        setState("mismatch");
+        return;
+      }
+      const objUrl = URL.createObjectURL(new Blob([buf]));
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = label;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+      setState("verified");
+    } catch {
+      setState("error");
+    }
+  }
+
   return (
     <>
       <div className="file-row">
@@ -81,17 +147,69 @@ function FileLeaf({
         {file.bytes !== undefined && (
           <span className="file-size">{formatBytes(file.bytes)}</span>
         )}
-        <button type="button" className="file-dl" disabled title={dlTitle}>
-          Download
-        </button>
+        {live ? (
+          <button
+            type="button"
+            className="file-dl"
+            onClick={download}
+            disabled={state === "downloading"}
+          >
+            {state === "downloading"
+              ? "Verifying…"
+              : state === "verified"
+                ? "Download again"
+                : "Download"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="file-dl"
+            disabled
+            title={deliverable?.expired ? "This delivery has expired" : dlTitle}
+          >
+            Download
+          </button>
+        )}
+        {state === "verified" && (
+          <span className="file-verified" title="Hash matches the manifest">
+            Verified ✓
+          </span>
+        )}
+        {state === "mismatch" && (
+          <span className="file-tampered">⚠ hash mismatch</span>
+        )}
       </div>
+      {state === "mismatch" && (
+        <p className="file-warning" role="alert">
+          This file does not match its manifest hash — it may be corrupted or
+          tampered. It was not saved. The pack_id above is unchanged; re-check
+          the source.
+        </p>
+      )}
+      {state === "expired" && (
+        <p className="file-warning">This file is no longer available — the delivery has expired.</p>
+      )}
+      {state === "error" && (
+        <p className="file-warning">Download failed. The link may be unavailable; try again.</p>
+      )}
       {file.note && <p className="file-note">{file.note}</p>}
     </>
   );
 }
 
-// Native <details> gives collapsible folders with no client state.
-function FileTree({ node, dlTitle }: { node: TreeNode; dlTitle: string }) {
+// Native <details> gives collapsible folders with no client state. `pathPrefix`
+// is the container name, threaded down so each leaf can form its download URL.
+function FileTree({
+  node,
+  pathPrefix,
+  deliverable,
+  dlTitle,
+}: {
+  node: TreeNode;
+  pathPrefix: string;
+  deliverable: Deliverable;
+  dlTitle: string;
+}) {
   const dirNames = [...node.dirs.keys()].sort();
   return (
     <ul className="ftree">
@@ -99,13 +217,24 @@ function FileTree({ node, dlTitle }: { node: TreeNode; dlTitle: string }) {
         <li className="ftree-dir" key={`dir:${name}`}>
           <details open>
             <summary className="ftree-dir-name">{name}</summary>
-            <FileTree node={node.dirs.get(name)!} dlTitle={dlTitle} />
+            <FileTree
+              node={node.dirs.get(name)!}
+              pathPrefix={pathPrefix}
+              deliverable={deliverable}
+              dlTitle={dlTitle}
+            />
           </details>
         </li>
       ))}
       {node.leaves.map(({ file, label }) => (
         <li className="ftree-leaf" key={`file:${file.name}`}>
-          <FileLeaf file={file} label={label} dlTitle={dlTitle} />
+          <FileLeaf
+            file={file}
+            label={label}
+            pathPrefix={pathPrefix}
+            deliverable={deliverable}
+            dlTitle={dlTitle}
+          />
         </li>
       ))}
     </ul>
@@ -123,12 +252,24 @@ export function PackView({
 }) {
   const { core, pack_id } = pack;
   const listing = core.listing;
-  const delivery = isSendAPack(core);
+  const isDelivery = isSendAPack(core);
   const titleVt = `pack-title-${shortId(pack_id)}`;
   const dlTitle =
     mode === "preview"
       ? "Demo — the file stays in your browser"
       : "Example pack — files are illustrative";
+
+  // Live delivery: bytes really held in storage. Absent on the example packs,
+  // so their download buttons stay illustrative (disabled). When present, work
+  // out whether the 30-day window has passed.
+  const expMs = core.delivery ? Date.parse(core.delivery.expires_at) : NaN;
+  const expired = Number.isFinite(expMs) ? Date.now() > expMs : false;
+  const daysLeft = Number.isFinite(expMs)
+    ? Math.ceil((expMs - Date.now()) / 86_400_000)
+    : null;
+  const deliverable: Deliverable = core.delivery
+    ? { delivery: core.delivery, expired }
+    : null;
 
   return (
     <article className="pack">
@@ -172,9 +313,30 @@ export function PackView({
         </dl>
       )}
 
-      {delivery && (
+      {isDelivery && (
         <section className="delivery">
           {core.note && <p className="delivery-note">{core.note}</p>}
+
+          {deliverable &&
+            (expired ? (
+              <p className="delivery-expired">
+                This delivery has expired. The files were held for 30 days and
+                then deleted — long-term storage is not PX&rsquo;s role.
+              </p>
+            ) : (
+              <p className="delivery-custody">
+                Each file is verified against its manifest hash on download. PX
+                relayed these bytes into delivery storage and does not read their
+                contents.
+                {daysLeft !== null && daysLeft <= 7 && (
+                  <span className="delivery-expiring">
+                    {" "}
+                    Expires in {daysLeft} {daysLeft === 1 ? "day" : "days"}.
+                  </span>
+                )}
+              </p>
+            ))}
+
           <ul className="files">
             {core.files!.map((f) =>
               isContainer(f) ? (
@@ -190,11 +352,22 @@ export function PackView({
                     </span>
                   </div>
                   {f.note && <p className="file-note">{f.note}</p>}
-                  <FileTree node={buildTree(f.contents!)} dlTitle={dlTitle} />
+                  <FileTree
+                    node={buildTree(f.contents!)}
+                    pathPrefix={f.name}
+                    deliverable={deliverable}
+                    dlTitle={dlTitle}
+                  />
                 </li>
               ) : (
                 <li className="file" key={f.name}>
-                  <FileLeaf file={f} label={f.name} dlTitle={dlTitle} />
+                  <FileLeaf
+                    file={f}
+                    label={f.name}
+                    pathPrefix=""
+                    deliverable={deliverable}
+                    dlTitle={dlTitle}
+                  />
                 </li>
               ),
             )}

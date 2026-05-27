@@ -45,6 +45,35 @@ export interface PxPackFile {
 }
 
 /**
+ * Where a send-a-pack's file bytes are temporarily held for download, and when
+ * that custody expires. PX relays the bytes into delivery storage (R2), holds
+ * them for a fixed window (30 days), then they are deleted. PX never reads the
+ * contents — it only streams them through.
+ *
+ * This field is attached AFTER the pack_id is computed and is excluded from the
+ * pack_id preimage (see computePackId / stripDelivery): a delivery is custody
+ * metadata, not content. Attaching it — or its expiring — never changes a
+ * pack's content-addressed identity, so a delivery can be added to an existing
+ * pack without minting a new id, and the same files always hash the same way
+ * whether or not bytes were uploaded.
+ *
+ * `base` is an absolute URL ending in "/"; a file's download URL is
+ * `base + <its pack-relative path, each segment URI-encoded>`. The pack-relative
+ * path is the file's `name` for a top-level leaf, or `<container name>/<name>`
+ * for a file nested inside a folder/archive. `expires_at` is the ISO 8601
+ * instant after which the bytes are gone (informational — the deletion is
+ * enforced by the storage lifecycle rule, not by this string).
+ *
+ * It lives on the manifest core rather than per-file because every file in one
+ * send-a-pack shares a single storage prefix and a single 30-day window, and a
+ * shared base keeps the manifest small enough to ride in the share-link URL.
+ */
+export interface PxDelivery {
+  base: string;
+  expires_at: string;
+}
+
+/**
  * Listing-form payload: a public-register entry. These are the fields a
  * category page and a listing detail render. They describe activity that
  * lives on the owner's own domain — PX points at it, it does not host it.
@@ -88,6 +117,12 @@ export interface PxManifestCoreV1 {
   listing?: PxListing;
   files?: PxPackFile[];
   previous?: string;
+  /**
+   * Optional delivery custody (send-a-pack only). EXCLUDED from the pack_id —
+   * see PxDelivery and computePackId. Absent on every listing pack and on any
+   * send-a-pack whose bytes were not uploaded (a metadata-only share link).
+   */
+  delivery?: PxDelivery;
 }
 
 /**
@@ -102,6 +137,11 @@ export interface Pack {
 /** True when a pack carries a file delivery (send-a-pack form). */
 export function isSendAPack(core: PxManifestCoreV1): boolean {
   return Array.isArray(core.files) && core.files.length > 0;
+}
+
+/** True when a pack's bytes are (or were) held for download — `delivery` set. */
+export function hasDelivery(core: PxManifestCoreV1): boolean {
+  return typeof core.delivery?.base === "string";
 }
 
 /** True when an entry is a container (folder/archive) with nested contents. */

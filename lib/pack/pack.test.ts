@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 
 import { canonicalize } from "./canonical.ts";
 import { sha256Hex } from "./hash.ts";
-import { computePackId, shortId } from "./pack-id.ts";
+import { computePackId, shortId, stripDelivery } from "./pack-id.ts";
 import { indexById, ancestorsOf, isGenesis } from "./chain.ts";
 import { normalizePath, isNormalizedPath } from "./path.ts";
 import { toPacks } from "./index.ts";
@@ -243,6 +243,60 @@ test("a changed nested note changes the pack_id", async () => {
     ],
   };
   assert.notEqual(await computePackId(mutated), before);
+});
+
+// ── delivery custody is excluded from the pack_id ─────────────────────────
+
+test("attaching a core delivery does not change the pack_id", async () => {
+  const before = await computePackId(nested);
+  const withDelivery: PxManifestCoreV1 = {
+    ...nested,
+    delivery: {
+      base: "https://app.px-registry.org/api/download/" + "f".repeat(64) + "/",
+      expires_at: "2026-06-26T00:00:00.000Z",
+    },
+  };
+  assert.equal(await computePackId(withDelivery), before);
+});
+
+test("the delivery target/expiry never perturbs the id", async () => {
+  const a: PxManifestCoreV1 = {
+    ...nested,
+    delivery: { base: "https://a.example/x/", expires_at: "2026-01-01T00:00:00Z" },
+  };
+  const b: PxManifestCoreV1 = {
+    ...nested,
+    delivery: { base: "https://b.example/y/", expires_at: "2030-12-31T00:00:00Z" },
+  };
+  assert.equal(await computePackId(a), await computePackId(b));
+  assert.equal(await computePackId(a), await computePackId(nested));
+});
+
+test("a per-file delivery (forward-compat) is also stripped", async () => {
+  const before = await computePackId(nested);
+  const withFileDelivery = {
+    ...nested,
+    files: [
+      { ...nested.files![0], delivery: { base: "https://x/", expires_at: "z" } },
+      {
+        ...nested.files![1],
+        contents: [
+          { ...nested.files![1].contents![0], delivery: { base: "https://y/", expires_at: "z" } },
+          nested.files![1].contents![1],
+        ],
+      },
+    ],
+  } as unknown as PxManifestCoreV1;
+  assert.equal(await computePackId(withFileDelivery), before);
+});
+
+test("stripDelivery leaves a delivery-free core's content intact", () => {
+  // The canonical form of the stripped core must equal that of the original
+  // when there was no delivery — the guarantee that existing pack_ids are frozen.
+  assert.equal(
+    canonicalize(stripDelivery(nested) as unknown as Parameters<typeof canonicalize>[0]),
+    canonicalize(nested as unknown as Parameters<typeof canonicalize>[0]),
+  );
 });
 
 // ── path normalization (spec §5) ─────────────────────────────────────────

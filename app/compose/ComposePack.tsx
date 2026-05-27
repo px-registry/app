@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -10,11 +11,14 @@ import {
 import {
   canonicalize,
   computePackId,
+  stripDelivery,
+  hasDelivery,
   sha256Hex,
   normalizePath,
   isNormalizedPath,
   type JsonValue,
   type Pack,
+  type PxDelivery,
   type PxManifestCoreV1,
   type PxPackFile,
 } from "@/lib/pack/index.ts";
@@ -122,6 +126,112 @@ function traverseEntry(
   });
 }
 
+// ── upload (sender → delivery storage) ───────────────────────────────────
+//
+// Each file is PUT to /api/upload/{pack_id}/{path}; the Function streams it into
+// R2 and PX holds it for 30 days. We use XMLHttpRequest (not fetch) purely for
+// its upload-progress events, so the sender sees per-file progress. The content
+// pack_id is computed before any upload and used as the storage prefix, so the
+// share link's identity is fixed before a single byte leaves the browser.
+
+type UploadItem = { fullPath: string; blob: Blob };
+type FileState = "pending" | "uploading" | "done" | "error";
+type FileProgress = { pct: number; state: FileState };
+type UploadResponse = { ok: boolean; base: string; expires_at: string; error?: string };
+
+const encodeSegments = (p: string) =>
+  p.split("/").map(encodeURIComponent).join("/");
+
+// Where the /api/* Functions live. Same-origin when we are already on the Pages
+// deployment (pages.dev) or running locally. But the canonical surface,
+// app.px-registry.org, is fronted by the px-registry.org zone router, which only
+// proxies GET to Pages — a PUT to the apex never reaches the upload Function. So
+// from any non-Pages host we target the Pages origin directly; the permissive
+// CORS on the Functions lets the browser PUT cross-origin, and the download base
+// the Function returns is then on that same Pages origin (portable for any
+// receiver). When a public R2 custom domain (files.px-registry.org) is wired up,
+// this whole hop goes away.
+const PAGES_ORIGIN = "https://px-app.pages.dev";
+function apiOrigin(): string {
+  const { hostname, origin } = window.location;
+  if (
+    hostname.endsWith(".pages.dev") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  ) {
+    return origin;
+  }
+  return PAGES_ORIGIN;
+}
+
+function putWithProgress(
+  url: string,
+  blob: Blob,
+  onProgress: (pct: number) => void,
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", blob.type || "application/octet-stream");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as UploadResponse);
+        } catch {
+          reject(new Error("Upload response was not readable"));
+        }
+      } else {
+        let msg = `Upload failed (HTTP ${xhr.status})`;
+        try {
+          const j = JSON.parse(xhr.responseText) as UploadResponse;
+          if (j?.error) msg = j.error;
+        } catch {
+          /* non-JSON error body */
+        }
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(blob);
+  });
+}
+
+async function uploadAll(
+  packId: string,
+  items: UploadItem[],
+  origin: string,
+  onItemProgress: (fullPath: string, pct: number, state: FileState) => void,
+  concurrency = 6,
+): Promise<PxDelivery> {
+  let base = "";
+  let expires_at = "";
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const it = items[next++];
+      const url = `${origin}/api/upload/${packId}/${encodeSegments(it.fullPath)}`;
+      onItemProgress(it.fullPath, 0, "uploading");
+      try {
+        const res = await putWithProgress(url, it.blob, (p) =>
+          onItemProgress(it.fullPath, p, "uploading"),
+        );
+        base = res.base;
+        expires_at = res.expires_at;
+        onItemProgress(it.fullPath, 1, "done");
+      } catch (err) {
+        onItemProgress(it.fullPath, 0, "error");
+        throw err;
+      }
+    }
+  }
+  const pool = Array.from({ length: Math.min(concurrency, items.length) }, worker);
+  await Promise.all(pool);
+  return { base, expires_at };
+}
+
 // ── component ─────────────────────────────────────────────────────────────
 
 export function ComposePack() {
@@ -168,12 +278,24 @@ function SharedView({ core }: { core: PxManifestCoreV1 }) {
     };
   }, [core]);
 
+  const delivered = hasDelivery(core);
   return (
     <section className="compose">
       <p className="demo-banner">
-        Demo pack — rebuilt from the link. PX stored nothing; the manifest
-        travelled in the URL. File contents are not carried, so downloads are a
-        later phase.
+        {delivered ? (
+          <>
+            Rebuilt from the link. The files were briefly relayed through PX into
+            delivery storage and are held for 30 days, then automatically
+            deleted. PX does not read file contents. Each download is verified
+            against its hash below.
+          </>
+        ) : (
+          <>
+            Demo pack — rebuilt from the link. PX stored nothing; the manifest
+            travelled in the URL. File contents are not carried, so downloads are
+            a later phase.
+          </>
+        )}
       </p>
       {pack ? (
         <PackView pack={pack} ancestors={[]} mode="preview" />
@@ -245,50 +367,75 @@ function Editor() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Delivery custody: the file bytes, once relayed to storage. Attached only
+  // after a successful upload, and stripped from the pack_id, so it never
+  // changes the pack's content identity.
+  const [delivery, setDelivery] = useState<PxDelivery | null>(null);
+  const [uploadState, setUploadState] = useState<
+    "idle" | "uploading" | "done" | "error"
+  >("idle");
+  const [progress, setProgress] = useState<Record<string, FileProgress>>({});
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const [createdAt] = useState(() => new Date().toISOString());
+  // The actual bytes, held outside React state (too large for it), keyed by the
+  // pack-relative path. Populated on intake, read at upload time.
+  const blobsRef = useRef<Map<string, Blob>>(new Map());
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
 
-  const core: PxManifestCoreV1 = useMemo(() => {
-    const files: PxPackFile[] = entries.map((e) =>
-      e.kind === "file"
-        ? {
-            name: e.name,
-            bytes: e.bytes,
-            sha256: e.sha256,
-            ...(e.note.trim() ? { note: e.note.trim() } : {}),
-          }
-        : {
-            name: e.name,
-            kind: e.kind,
-            ...(e.note.trim() ? { note: e.note.trim() } : {}),
-            // Sort contents so the pack_id is independent of OS/browser
-            // enumeration order (spec §8.4: order by normalized path).
-            contents: [...e.contents]
-              .sort((a, b) => a.path.localeCompare(b.path))
-              .map((c) => ({
-                name: c.path,
-                bytes: c.bytes,
-                sha256: c.sha256,
-                ...(c.note.trim() ? { note: c.note.trim() } : {}),
-              })),
-          },
-    );
-    return {
-      px: "1.0",
-      kind: "px.pack",
-      created_at: createdAt,
-      category: DELIVERY_CATEGORY,
-      ...(coverNote.trim() ? { note: coverNote.trim() } : {}),
-      listing: {
-        title: title.trim() || "Untitled pack",
-        sender: sender.trim() || "Unnamed sender",
-        domain: domain.trim(),
-        type: "Delivery",
-      },
-      ...(files.length ? { files } : {}),
-    };
-  }, [entries, title, sender, domain, coverNote, createdAt]);
+  // Build the manifest core from the current editor state. `deliveryArg`, when
+  // given, is embedded — but computePackId strips it, so the content identity is
+  // identical whether or not bytes were uploaded.
+  const buildCore = useCallback(
+    (deliveryArg?: PxDelivery): PxManifestCoreV1 => {
+      const files: PxPackFile[] = entries.map((e) =>
+        e.kind === "file"
+          ? {
+              name: e.name,
+              bytes: e.bytes,
+              sha256: e.sha256,
+              ...(e.note.trim() ? { note: e.note.trim() } : {}),
+            }
+          : {
+              name: e.name,
+              kind: e.kind,
+              ...(e.note.trim() ? { note: e.note.trim() } : {}),
+              // Sort contents so the pack_id is independent of OS/browser
+              // enumeration order (spec §8.4: order by normalized path).
+              contents: [...e.contents]
+                .sort((a, b) => a.path.localeCompare(b.path))
+                .map((c) => ({
+                  name: c.path,
+                  bytes: c.bytes,
+                  sha256: c.sha256,
+                  ...(c.note.trim() ? { note: c.note.trim() } : {}),
+                })),
+            },
+      );
+      return {
+        px: "1.0",
+        kind: "px.pack",
+        created_at: createdAt,
+        category: DELIVERY_CATEGORY,
+        ...(coverNote.trim() ? { note: coverNote.trim() } : {}),
+        listing: {
+          title: title.trim() || "Untitled pack",
+          sender: sender.trim() || "Unnamed sender",
+          domain: domain.trim(),
+          type: "Delivery",
+        },
+        ...(files.length ? { files } : {}),
+        ...(deliveryArg ? { delivery: deliveryArg } : {}),
+      };
+    },
+    [entries, title, sender, domain, coverNote, createdAt],
+  );
+
+  const core: PxManifestCoreV1 = useMemo(
+    () => buildCore(delivery ?? undefined),
+    [buildCore, delivery],
+  );
 
   useEffect(() => {
     let live = true;
@@ -300,10 +447,17 @@ function Editor() {
     };
   }, [core]);
 
+  // Editing the *content* invalidates the link, the upload, and the delivery:
+  // the pack_id changes, so any already-uploaded bytes no longer match. (Adding
+  // a delivery only changes the delivery field, so it does not trip this.)
   useEffect(() => {
     setShareUrl(null);
     setCopied(false);
-  }, [core]);
+    setDelivery(null);
+    setUploadState("idle");
+    setProgress({});
+    setUploadError(null);
+  }, [entries, title, sender, domain, coverNote]);
 
   const hasContent = entries.length > 0 || title.trim() !== "";
   const fileCount = entries.reduce(
@@ -341,6 +495,7 @@ function Editor() {
             sha256: await sha256Hex(buf),
             note: "",
           });
+          blobsRef.current.set(norm, file);
           continue;
         }
 
@@ -354,11 +509,14 @@ function Editor() {
             sha256: sha,
             note: "",
           });
+          blobsRef.current.set(norm, file);
         } else {
           const top = norm.slice(0, slash);
           const rest = norm.slice(slash + 1);
           if (!folders.has(top)) folders.set(top, []);
           folders.get(top)!.push({ path: rest, bytes: file.size, sha256: sha, note: "" });
+          // Keyed by the full pack-relative path (top/rest === norm).
+          blobsRef.current.set(norm, file);
         }
       } finally {
         setHashing((h) => h - 1);
@@ -390,6 +548,9 @@ function Editor() {
         sha256: await sha256Hex(data),
         note: "",
       });
+      // The decompressed bytes, keyed by the full pack-relative path so the
+      // uploader (and the receiver's download URL) find them under name/inorm.
+      blobsRef.current.set(`${name}/${inorm}`, new Blob([data as BlobPart]));
     }
     return { id: rid(), kind: "archive", name, note: "", contents };
   }
@@ -465,12 +626,67 @@ function Editor() {
     );
   }
 
+  // Metadata-only link: the file list, notes and hashes travel in the URL; no
+  // bytes are uploaded (the original 持たない share). Built from a delivery-free
+  // core so it carries no delivery field even if an upload happened earlier.
   function createShareLink() {
     setShareUrl(
-      `${window.location.origin}/compose/pack/#pack=${encodeManifest(core)}`,
+      `${window.location.origin}/compose/pack/#pack=${encodeManifest(buildCore())}`,
     );
     setCopied(false);
   }
+
+  // Gather the actual bytes for every file currently listed, in manifest order.
+  function collectUploadItems(): UploadItem[] {
+    const items: UploadItem[] = [];
+    for (const e of entries) {
+      if (e.kind === "file") {
+        const blob = blobsRef.current.get(e.name);
+        if (blob) items.push({ fullPath: e.name, blob });
+      } else {
+        for (const c of e.contents) {
+          const fullPath = `${e.name}/${c.path}`;
+          const blob = blobsRef.current.get(fullPath);
+          if (blob) items.push({ fullPath, blob });
+        }
+      }
+    }
+    return items;
+  }
+
+  // Real delivery: relay every file's bytes into storage (held 30 days), then
+  // embed the returned base + expiry into the share link's manifest.
+  async function uploadAndShare() {
+    const items = collectUploadItems();
+    if (!items.length) return;
+    setUploadState("uploading");
+    setUploadError(null);
+    setProgress(
+      Object.fromEntries(
+        items.map((it) => [it.fullPath, { pct: 0, state: "pending" as FileState }]),
+      ),
+    );
+    try {
+      // Identity first: the content pack_id (delivery-free) is the storage prefix.
+      const id = await computePackId(buildCore());
+      const d = await uploadAll(
+        id,
+        items,
+        apiOrigin(),
+        (fullPath, pct, state) =>
+          setProgress((p) => ({ ...p, [fullPath]: { pct, state } })),
+      );
+      setDelivery(d);
+      setShareUrl(
+        `${window.location.origin}/compose/pack/#pack=${encodeManifest(buildCore(d))}`,
+      );
+      setUploadState("done");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+      setUploadState("error");
+    }
+  }
+
   async function copyLink() {
     if (!shareUrl) return;
     try {
@@ -484,12 +700,27 @@ function Editor() {
 
   const previewPack: Pack | null = packId ? { pack_id: packId, core } : null;
 
+  // Aggregate upload progress for the status line.
+  const progressValues = Object.values(progress);
+  const uploadTotal = progressValues.length;
+  const uploadDone = progressValues.filter((p) => p.state === "done").length;
+  const aggregatePct = uploadTotal
+    ? Math.round(
+        (progressValues.reduce(
+          (s, p) => s + (p.state === "done" ? 1 : p.pct),
+          0,
+        ) /
+          uploadTotal) *
+          100,
+      )
+    : 0;
+
   return (
     <section className="compose">
       <header className="compose-head">
         <h1 className="compose-h">Send a pack</h1>
         <p className="compose-intro" lang="ja">
-          ファイルはあなたのブラウザに留まります。PX は受け取りません。
+          ファイルはまずブラウザで読まれ、ハッシュが計算されます。共有の方法はあなたが選びます。
         </p>
       </header>
 
@@ -682,7 +913,7 @@ function Editor() {
             <details className="identity-manifest">
               <summary>Canonical manifest (what gets hashed)</summary>
               <pre className="identity-json">
-                {canonicalize(core as unknown as JsonValue)}
+                {canonicalize(stripDelivery(core) as unknown as JsonValue)}
               </pre>
             </details>
           </section>
@@ -700,27 +931,116 @@ function Editor() {
 
           <section className="compose-share">
             <h2 className="compose-sub-h">Share</h2>
-            <p className="demo-banner">
-              Demo mode — files stay in your browser; PX receives nothing. The
-              link carries the manifest (file list, notes, content hashes), not
-              the file bytes. Nothing is stored, so a published{" "}
-              <code>/pack/&lt;id&gt;/</code> address comes in a later phase.
-            </p>
-            {!shareUrl ? (
-              <button
-                type="button"
-                className="share-btn"
-                onClick={createShareLink}
-                disabled={!hasContent}
-              >
-                Create share link
-              </button>
-            ) : (
-              <div className="share-out">
-                <input className="share-url" readOnly value={shareUrl} />
-                <button type="button" className="share-copy" onClick={copyLink}>
-                  {copied ? "Copied" : "Copy link"}
+
+            {uploadState !== "done" && (
+              <p className="delivery-articulation">
+                PX briefly relays your files to delivery storage. PX does not
+                read file contents. They are held for 30 days, then automatically
+                deleted — long-term storage is not PX&rsquo;s role. The receiver
+                verifies each file against its hash.
+              </p>
+            )}
+
+            {/* Per-file upload progress. */}
+            {uploadState === "uploading" && (
+              <div className="upload-progress">
+                <p className="compose-note">
+                  Relaying {uploadDone}/{uploadTotal} file(s) to delivery
+                  storage… ({aggregatePct}%)
+                </p>
+                <ul className="upload-list">
+                  {Object.entries(progress).map(([path, fp]) => (
+                    <li className="upload-item" key={path}>
+                      <span className="upload-path">{path}</span>
+                      <span className="upload-bar" aria-hidden>
+                        <span
+                          className="upload-bar-fill"
+                          style={{
+                            width: `${Math.round(
+                              (fp.state === "done" ? 1 : fp.pct) * 100,
+                            )}%`,
+                          }}
+                        />
+                      </span>
+                      <span className={`upload-state upload-state-${fp.state}`}>
+                        {fp.state === "done"
+                          ? "✓"
+                          : fp.state === "error"
+                            ? "failed"
+                            : `${Math.round(fp.pct * 100)}%`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {uploadState === "error" && (
+              <p className="upload-error" role="alert">
+                Upload failed: {uploadError}. Nothing was shared.{" "}
+                <button
+                  type="button"
+                  className="share-retry"
+                  onClick={uploadAndShare}
+                >
+                  Try again
                 </button>
+              </p>
+            )}
+
+            {!shareUrl ? (
+              <div className="share-actions">
+                {fileCount > 0 && (
+                  <button
+                    type="button"
+                    className="share-btn"
+                    onClick={uploadAndShare}
+                    disabled={uploadState === "uploading"}
+                  >
+                    {uploadState === "uploading"
+                      ? "Uploading…"
+                      : "Upload & create share link"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="share-btn-secondary"
+                  onClick={createShareLink}
+                  disabled={!hasContent || uploadState === "uploading"}
+                >
+                  Share file list only (no upload)
+                </button>
+              </div>
+            ) : (
+              <div className="share-result">
+                <p
+                  className={
+                    delivery ? "delivery-confirmed" : "metadata-only-note"
+                  }
+                >
+                  {delivery ? (
+                    <>
+                      Files uploaded. This link delivers the bytes and expires{" "}
+                      {new Date(delivery.expires_at).toLocaleDateString()} (30
+                      days). The receiver downloads and verifies each file.
+                    </>
+                  ) : (
+                    <>
+                      Metadata-only link — the file list and hashes travel in the
+                      URL; no bytes were uploaded.
+                    </>
+                  )}
+                </p>
+                <div className="share-out">
+                  <input className="share-url" readOnly value={shareUrl} />
+                  <button
+                    type="button"
+                    className="share-copy"
+                    onClick={copyLink}
+                  >
+                    {copied ? "Copied" : "Copy link"}
+                  </button>
+                </div>
               </div>
             )}
           </section>

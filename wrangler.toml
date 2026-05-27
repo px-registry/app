@@ -1,3 +1,19 @@
 name = "px-app"
 compatibility_date = "2026-05-27"
 pages_build_output_dir = "out"
+
+# Day-6 delivery custody. The send-a-pack flow relays file bytes through a Pages
+# Function into R2, which holds them for 30 days (lifecycle rule on the bucket)
+# and then deletes them. PX never stores them long-term and never reads the
+# contents — it only streams them through.
+[[r2_buckets]]
+binding = "DELIVERIES"
+bucket_name = "px-app-deliveries"
+
+# Where receivers download from. Unset (the default) routes downloads through the
+# same-origin /api/download proxy — always works, no CORS, no custom domain.
+# Set it to a public R2 custom domain (e.g. "https://files.px-registry.org") to
+# serve bytes directly from R2 with zero egress cost; the key scheme is identical
+# ({pack_id}/{path}), so no code changes are needed — only this var + the domain.
+# [vars]
+# DELIVERY_PUBLIC_BASE = "https://files.px-registry.org"
