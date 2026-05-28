@@ -2200,3 +2200,163 @@ body {
 .owner-actions .auth-signout {
   margin-top: 0;
 }
+
+/* ── Sale offer (sale/v1) ─────────────────────────────────────────────────
+ * The buyer's view (SaleView) and the sale-specific bits of the composer.
+ * Reuses .pack / .pack-head / .sender / .record from the shared pack view;
+ * only the price hero and the photo gallery are new. */
+
+.sale-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 1.6rem 0 0.4rem;
+}
+
+.sale-price-amount {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: 1;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+}
+
+.sale-price-cur {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--fg-ghost);
+}
+
+.sale-gallery {
+  margin-top: 2rem;
+}
+
+.sale-photos {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.9rem;
+}
+
+.sale-photo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.sale-photo-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  border: 1px solid var(--hairline);
+  background: var(--bg-elev);
+}
+
+.sale-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.4rem;
+  border: 1px dashed var(--hairline);
+  background: var(--bg-elev);
+  color: var(--fg-ghost);
+  font-size: 1.8rem;
+}
+
+.sale-photo-cap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.sale-photo-name {
+  color: var(--fg-muted);
+  word-break: break-all;
+}
+
+.sale-photo-size {
+  color: var(--fg-ghost);
+}
+
+.sale-photo-note {
+  color: var(--fg-ghost);
+  font-style: italic;
+}
+
+.sale-photos-note {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--fg-muted);
+  max-width: 38rem;
+}
+
+.sale-desc {
+  font-family: var(--font-serif);
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  line-height: 1.6;
+  color: var(--fg);
+  max-width: 38rem;
+  margin-top: 1.8rem;
+}
+
+.sale-record-intro {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--fg-muted);
+  max-width: 38rem;
+  margin-bottom: 1.1rem;
+}
+.sale-record-intro span {
+  color: var(--accent);
+}
+
+/* Composer: price/currency split, and the editable photo strip. */
+.sale-price-field {
+  flex: 2;
+}
+.sale-currency-field {
+  flex: 1;
+  min-width: 7rem;
+}
+.sale-currency-field select.field-input {
+  cursor: pointer;
+  appearance: none;
+}
+
+.sale-photo-edit {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.8rem;
+}
+
+.sale-photo-edit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sale-photo-edit-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  border: 1px solid var(--hairline);
+}
+
+.sale-photo-edit-name {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--fg-muted);
+  word-break: break-all;
+}

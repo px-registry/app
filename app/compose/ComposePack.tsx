@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import {
   computePackId,
   hasDelivery,
+  isSale,
   type Pack,
   type PxManifestCoreV1,
 } from "@/lib/pack/index.ts";
@@ -82,10 +83,26 @@ function SharedView({ core }: { core: PxManifestCoreV1 }) {
   }, [core]);
 
   const delivered = hasDelivery(core);
+  const sale = isSale(core);
   return (
     <section className="compose">
       <p className="demo-banner">
-        {delivered ? (
+        {sale ? (
+          delivered ? (
+            <>
+              A verifiable offer, rebuilt from the link. The photos were briefly
+              relayed through PX into delivery storage and are held for 30 days,
+              then automatically deleted. PX runs no payment and holds no money —
+              the offer below is what is verifiable.
+            </>
+          ) : (
+            <>
+              A verifiable offer, rebuilt from the link. PX stored nothing; the
+              manifest travelled in the URL. The photos are not carried in a
+              listing-only link.
+            </>
+          )
+        ) : delivered ? (
           <>
             Rebuilt from the link. The files were briefly relayed through PX into
             delivery storage and are held for 30 days, then automatically
@@ -106,7 +123,11 @@ function SharedView({ core }: { core: PxManifestCoreV1 }) {
         <p className="compose-intro">Reading pack…</p>
       )}
       <p className="send-your-own">
-        <a href="/compose/pack/">Send a pack of your own →</a>
+        {sale ? (
+          <a href="/compose/?mode=sale">Compose a sale of your own →</a>
+        ) : (
+          <a href="/compose/pack/">Send a pack of your own →</a>
+        )}
       </p>
     </section>
   );

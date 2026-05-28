@@ -6,10 +6,11 @@
 // minted by PX — it falls out of the bytes. PX holds nothing; the manifest is
 // self-describing and verifiable with standard tools.
 //
-// Two shapes share one core:
+// Three shapes share one core:
 //   • listing form    — a public-register entry pointing at owner activity
 //   • send-a-pack form — a file delivery (the .pack viewer / B2B wedge)
-// The discriminator is which payload is present (`listing` vs `files`).
+//   • sale form        — a verifiable offer to sell one thing (Business edition)
+// The discriminator is which payload is present (`listing` / `files` / `sale`).
 
 /** Manifest format version. */
 export type PxVersion = "1.0";
@@ -96,6 +97,52 @@ export interface PxListing {
 }
 
 /**
+ * Price for a sale offer. `amount` is a non-negative integer in the currency's
+ * minor unit (yen for JPY — which has no sub-unit; cents for USD), so the price
+ * canonicalizes exactly: no floating-point money ever enters the pack_id
+ * preimage. `currency` is an ISO 4217 code from the supported set (see
+ * lib/pack/price.ts). Formatting back to a human price is a pure function of
+ * these two fields, shared by the composer and the buyer's view.
+ */
+export interface PxPrice {
+  amount: number;
+  currency: string;
+}
+
+/**
+ * One photo in a sale offer. Like a send-a-pack leaf, the bytes live elsewhere
+ * (R2 delivery) or not at all (a listing-only share); `sha256` content-addresses
+ * the image when present, so a displayed/downloaded photo can be verified
+ * against the manifest. `name` is the file name (a normalized, slash-free leaf —
+ * sale photos are a flat set, never a tree).
+ */
+export interface PxSalePhoto {
+  name: string;
+  bytes?: number;
+  sha256?: string;
+}
+
+/**
+ * Sale-form payload — a verifiable offer to sell one thing. A third manifest
+ * shape alongside `listing` and `files`; the discriminator is, as ever, which
+ * payload is present. PX implements no payment and holds no money — the manifest
+ * is a content-addressed, verifiable *offer* (title + price + photos hash into
+ * the pack_id, so the terms cannot be altered after the fact without minting a
+ * new id). The transaction itself happens on the seller's own domain; PX only
+ * points at it. This is the Business edition's high-trust offer.
+ */
+export interface PxSale {
+  title: string;
+  price: PxPrice;
+  /** Seller handle, e.g. "Ito Atelier". */
+  sender: string;
+  /** Seller domain the offer lives on, e.g. "ito-atelier.example". */
+  domain: string;
+  photos?: PxSalePhoto[];
+  description?: string;
+}
+
+/**
  * The manifest core — the exact object that gets canonicalized and hashed to
  * produce the pack_id. It MUST NOT contain the pack_id itself (the id is a
  * function of everything else; including it would be circular).
@@ -116,6 +163,12 @@ export interface PxManifestCoreV1 {
   note?: string;
   listing?: PxListing;
   files?: PxPackFile[];
+  /**
+   * Optional sale offer (sale form). Content, not custody — it hashes into the
+   * pack_id. Absent on every listing and send-a-pack, so adding it leaves their
+   * ids byte-identical.
+   */
+  sale?: PxSale;
   previous?: string;
   /**
    * Optional delivery custody (send-a-pack only). EXCLUDED from the pack_id —
@@ -137,6 +190,11 @@ export interface Pack {
 /** True when a pack carries a file delivery (send-a-pack form). */
 export function isSendAPack(core: PxManifestCoreV1): boolean {
   return Array.isArray(core.files) && core.files.length > 0;
+}
+
+/** True when a pack carries a sale offer (sale form). */
+export function isSale(core: PxManifestCoreV1): boolean {
+  return core.sale !== undefined;
 }
 
 /** True when a pack's bytes are (or were) held for download — `delivery` set. */

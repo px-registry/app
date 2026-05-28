@@ -1,24 +1,30 @@
 "use client";
 
 // ComposerShell — the post-login Mode-2 dashboard: a left rail of composer modes
-// and a center pane that swaps without navigating. "Send a pack" is fully
-// functional (it mounts the Day-7 PackComposerBody unchanged); the eight
-// category composers are honest "coming soon" placeholders.
+// and a center pane that swaps without navigating. Two categories are fully
+// functional — "Send a pack" mounts the Day-7 PackComposerBody and "Sale" mounts
+// the SaleComposerBody — and the remaining categories are honest "coming soon"
+// placeholders.
 //
 // Two load-bearing decisions:
-//   • PackComposerBody stays MOUNTED across mode switches (toggled with
-//     display:none, not conditionally rendered) so its internal draft — file
-//     blobs, upload progress, notes — survives a detour through another mode.
+//   • The active composers stay MOUNTED across mode switches (toggled with
+//     display:none, not conditionally rendered) so their internal draft — file
+//     blobs, photo thumbnails, upload progress, notes — survives a detour
+//     through another mode.
 //   • Mode lives in the URL (?mode=…) via replaceState: deep-linkable and
 //     back-button-clean, but never triggers a navigation (single-page UX).
 
 import { useCallback, useState } from "react";
 import { categories } from "@/app/categories";
 import { PackComposerBody } from "./PackComposerBody.tsx";
+import { SaleComposerBody } from "./SaleComposerBody.tsx";
 import { ComingSoon } from "./ComingSoon.tsx";
 import type { ComposerIdentity } from "@/lib/auth-client.ts";
 
 const PACK_MODE = "pack";
+// "sale" is one of the eight category slugs; its rail item mounts a real
+// composer rather than the coming-soon placeholder.
+const SALE_MODE = "sale";
 
 type RailItem = { mode: string; labelEn: string; labelJa: string };
 
@@ -94,14 +100,21 @@ export function ComposerShell({
       </nav>
 
       <div className="shell-pane">
-        {/* Always mounted; visibility toggled so the draft survives switches. */}
+        {/* Active composers stay mounted; visibility toggled so each draft
+            survives switching to another mode and back. */}
         <div
           className="shell-pane-pack"
           style={mode === PACK_MODE ? undefined : { display: "none" }}
         >
           <PackComposerBody mode="mode2" identity={identity} />
         </div>
-        {mode !== PACK_MODE && (
+        <div
+          className="shell-pane-pack"
+          style={mode === SALE_MODE ? undefined : { display: "none" }}
+        >
+          <SaleComposerBody identity={identity} />
+        </div>
+        {mode !== PACK_MODE && mode !== SALE_MODE && (
           <ComingSoon labelEn={active.labelEn} labelJa={active.labelJa} />
         )}
       </div>

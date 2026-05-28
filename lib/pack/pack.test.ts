@@ -14,6 +14,8 @@ import { sha256Hex } from "./hash.ts";
 import { computePackId, shortId, stripDelivery } from "./pack-id.ts";
 import { indexById, ancestorsOf, isGenesis } from "./chain.ts";
 import { normalizePath, isNormalizedPath } from "./path.ts";
+import { formatPrice, parsePriceInput } from "./price.ts";
+import { isSale } from "./types.ts";
 import { toPacks } from "./index.ts";
 import type { PxManifestCoreV1, Pack } from "./types.ts";
 
@@ -297,6 +299,119 @@ test("stripDelivery leaves a delivery-free core's content intact", () => {
     canonicalize(stripDelivery(nested) as unknown as Parameters<typeof canonicalize>[0]),
     canonicalize(nested as unknown as Parameters<typeof canonicalize>[0]),
   );
+});
+
+// ── sale offers (sale/v1 form) ────────────────────────────────────────────
+
+const saleCore: PxManifestCoreV1 = {
+  px: "1.0",
+  kind: "px.pack",
+  created_at: "2026-05-29T00:00:00Z",
+  category: "sale",
+  sale: {
+    title: "Wheel-thrown stoneware mug",
+    price: { amount: 4800, currency: "JPY" },
+    sender: "Mariko Kiln",
+    domain: "mariko.example",
+    photos: [
+      { name: "front.jpg", bytes: 81_200, sha256: "a".repeat(64) },
+      { name: "side.jpg", bytes: 77_010, sha256: "b".repeat(64) },
+    ],
+    description: "One mug, wood-fired. Glaze pools at the foot.",
+  },
+};
+
+test("isSale discriminates the sale form from listing/send-a-pack", () => {
+  assert.equal(isSale(saleCore), true);
+  assert.equal(isSale(sample), false); // a listing
+  assert.equal(isSale(nested), false); // a send-a-pack
+});
+
+test("a sale pack_id is deterministic and content-addressed", async () => {
+  const id = await computePackId(saleCore);
+  assert.match(id, /^[0-9a-f]{64}$/);
+  assert.equal(await computePackId(saleCore), id);
+});
+
+test("changing the price changes the sale pack_id", async () => {
+  const before = await computePackId(saleCore);
+  const repriced: PxManifestCoreV1 = {
+    ...saleCore,
+    sale: { ...saleCore.sale!, price: { amount: 5200, currency: "JPY" } },
+  };
+  assert.notEqual(await computePackId(repriced), before);
+});
+
+test("a sale pack_id ignores authored key order", async () => {
+  const reordered: PxManifestCoreV1 = {
+    kind: "px.pack",
+    category: "sale",
+    px: "1.0",
+    created_at: "2026-05-29T00:00:00Z",
+    sale: {
+      description: "One mug, wood-fired. Glaze pools at the foot.",
+      domain: "mariko.example",
+      sender: "Mariko Kiln",
+      price: { currency: "JPY", amount: 4800 },
+      title: "Wheel-thrown stoneware mug",
+      photos: [
+        { sha256: "a".repeat(64), name: "front.jpg", bytes: 81_200 },
+        { bytes: 77_010, sha256: "b".repeat(64), name: "side.jpg" },
+      ],
+    },
+  };
+  assert.equal(await computePackId(reordered), await computePackId(saleCore));
+});
+
+test("attaching a delivery to a sale does not change its pack_id", async () => {
+  const before = await computePackId(saleCore);
+  const withDelivery: PxManifestCoreV1 = {
+    ...saleCore,
+    delivery: {
+      base: "https://app.px-registry.org/api/download/" + "f".repeat(64) + "/",
+      expires_at: "2026-06-28T00:00:00.000Z",
+    },
+  };
+  assert.equal(await computePackId(withDelivery), before);
+});
+
+test("adding a sale field never perturbs a listing pack_id", async () => {
+  // The byte-identity guarantee: a listing/send-a-pack has no `sale`, so the
+  // canonical form (and thus the frozen pack_id) is unchanged by the new field.
+  assert.equal(
+    canonicalize(stripDelivery(sample) as unknown as Parameters<typeof canonicalize>[0]),
+    canonicalize(sample as unknown as Parameters<typeof canonicalize>[0]),
+  );
+});
+
+// ── price formatting (display layer, pure) ────────────────────────────────
+
+test("formatPrice renders minor units per currency precision", () => {
+  assert.equal(formatPrice(1200, "JPY"), "¥1,200");
+  assert.equal(formatPrice(4800, "JPY"), "¥4,800");
+  assert.equal(formatPrice(1_234_567, "JPY"), "¥1,234,567");
+  assert.equal(formatPrice(999, "USD"), "$9.99");
+  assert.equal(formatPrice(100_000, "USD"), "$1,000.00");
+  assert.equal(formatPrice(5, "USD"), "$0.05");
+});
+
+test("formatPrice falls back for an unknown currency", () => {
+  assert.equal(formatPrice(42, "EUR"), "42 EUR");
+});
+
+test("parsePriceInput converts typed major units to integer minor units", () => {
+  assert.equal(parsePriceInput("4800", "JPY"), 4800);
+  assert.equal(parsePriceInput("1,200", "JPY"), 1200);
+  assert.equal(parsePriceInput("9.99", "USD"), 999);
+  assert.equal(parsePriceInput("10", "USD"), 1000);
+  assert.equal(parsePriceInput("", "JPY"), 0);
+  assert.equal(parsePriceInput("abc", "USD"), 0);
+  assert.equal(parsePriceInput("-5", "USD"), 0);
+});
+
+test("parsePriceInput then formatPrice round-trips", () => {
+  assert.equal(formatPrice(parsePriceInput("9.99", "USD"), "USD"), "$9.99");
+  assert.equal(formatPrice(parsePriceInput("4800", "JPY"), "JPY"), "¥4,800");
 });
 
 // ── path normalization (spec §5) ─────────────────────────────────────────

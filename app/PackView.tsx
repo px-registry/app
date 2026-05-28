@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   isSendAPack,
+  isSale,
   isContainer,
   shortId,
   sha256Hex,
@@ -13,6 +14,7 @@ import {
 import { bySlug } from "./categories";
 import { VerifyPopover } from "./VerifyPopover";
 import { LighthouseNote } from "./LighthouseNote";
+import { SaleView } from "./SaleView";
 
 // One view for a pack, rendered in three contexts:
 //   • "listing" — the public-register detail at /[category]/[pack_id]
@@ -251,6 +253,14 @@ export function PackView({
   mode: "listing" | "viewer" | "preview";
 }) {
   const { core, pack_id } = pack;
+
+  // Sale form (sale/v1) renders its own view — price hero, photo gallery. The
+  // dispatch is the first thing PackView does, so the file-pack / listing render
+  // below is reached only by non-sale packs and stays byte-identical.
+  if (isSale(core)) {
+    return <SaleView pack={pack} mode={mode} />;
+  }
+
   const listing = core.listing;
   const isDelivery = isSendAPack(core);
   const titleVt = `pack-title-${shortId(pack_id)}`;

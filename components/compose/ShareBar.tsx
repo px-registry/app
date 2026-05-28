@@ -26,6 +26,9 @@ export function ShareBar({
   onUploadAndShare,
   onCreateShareLink,
   onCopyLink,
+  noun = "file",
+  uploadLabel = "Upload & create share link",
+  metadataLabel = "Share file list only (no upload)",
 }: {
   hasContent: boolean;
   fileCount: number;
@@ -38,7 +41,15 @@ export function ShareBar({
   onUploadAndShare: () => void;
   onCreateShareLink: () => void;
   onCopyLink: () => void;
+  /** Singular for the thing being shared ("file" | "photo"); drives the prose. */
+  noun?: string;
+  /** Primary (upload) button label. */
+  uploadLabel?: string;
+  /** Secondary (metadata-only) button label. */
+  metadataLabel?: string;
 }) {
+  const plural = `${noun}s`;
+  const Plural = plural.charAt(0).toUpperCase() + plural.slice(1);
   // Aggregate upload progress for the status line.
   const progressValues = Object.values(progress);
   const uploadTotal = progressValues.length;
@@ -60,10 +71,10 @@ export function ShareBar({
 
       {uploadState !== "done" && (
         <p className="delivery-articulation">
-          PX briefly relays your files to delivery storage. PX does not read file
-          contents. They are held for 30 days, then automatically deleted —
-          long-term storage is not PX&rsquo;s role. The receiver verifies each
-          file against its hash.
+          PX briefly relays your {plural} to delivery storage. PX does not read{" "}
+          {noun} contents. They are held for 30 days, then automatically deleted —
+          long-term storage is not PX&rsquo;s role. The receiver verifies each{" "}
+          {noun} against its hash.
         </p>
       )}
 
@@ -71,7 +82,7 @@ export function ShareBar({
       {uploadState === "uploading" && (
         <div className="upload-progress">
           <p className="compose-note">
-            Relaying {uploadDone}/{uploadTotal} file(s) to delivery storage… (
+            Relaying {uploadDone}/{uploadTotal} {noun}(s) to delivery storage… (
             {aggregatePct}%)
           </p>
           <ul className="upload-list">
@@ -119,9 +130,7 @@ export function ShareBar({
               onClick={onUploadAndShare}
               disabled={uploadState === "uploading"}
             >
-              {uploadState === "uploading"
-                ? "Uploading…"
-                : "Upload & create share link"}
+              {uploadState === "uploading" ? "Uploading…" : uploadLabel}
             </button>
           )}
           <button
@@ -130,7 +139,7 @@ export function ShareBar({
             onClick={onCreateShareLink}
             disabled={!hasContent || uploadState === "uploading"}
           >
-            Share file list only (no upload)
+            {metadataLabel}
           </button>
         </div>
       ) : (
@@ -138,14 +147,14 @@ export function ShareBar({
           <p className={delivery ? "delivery-confirmed" : "metadata-only-note"}>
             {delivery ? (
               <>
-                Files uploaded. This link delivers the bytes and expires{" "}
+                {Plural} uploaded. This link delivers the bytes and expires{" "}
                 {new Date(delivery.expires_at).toLocaleDateString()} (30 days).
-                The receiver downloads and verifies each file.
+                The receiver downloads and verifies each {noun}.
               </>
             ) : (
               <>
-                Metadata-only link — the file list and hashes travel in the URL;
-                no bytes were uploaded.
+                Metadata-only link — the {noun} list and hashes travel in the
+                URL; no bytes were uploaded.
               </>
             )}
           </p>

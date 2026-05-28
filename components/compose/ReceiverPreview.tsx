@@ -7,10 +7,17 @@
 import { PackView } from "@/app/PackView";
 import type { Pack } from "@/lib/pack/index.ts";
 
-export function ReceiverPreview({ pack }: { pack: Pack | null }) {
+export function ReceiverPreview({
+  pack,
+  label = "Receiver’s view",
+}: {
+  pack: Pack | null;
+  /** Heading override — "Buyer's view" for the sale composer, etc. */
+  label?: string;
+}) {
   return (
     <section className="compose-preview">
-      <h2 className="compose-sub-h">Receiver&rsquo;s view</h2>
+      <h2 className="compose-sub-h">{label}</h2>
       {pack ? (
         <div className="preview-frame">
           <PackView pack={pack} ancestors={[]} mode="preview" />
