@@ -2443,8 +2443,11 @@ body {
 .owner-pop {
   margin: auto; /* center in the top layer */
   width: min(92vw, 23rem);
-  max-height: 90vh;
-  overflow-y: auto;
+  /* dvh + a hard cap below the viewport so the frame never exceeds the window;
+     the body scrolls inside it (overflow:hidden here), keeping the close button
+     and the top of the card on-screen on short / non-fullscreen windows. */
+  max-height: 88dvh;
+  overflow: hidden;
   background: var(--bg-elev);
   color: var(--fg);
   border: 1px solid var(--hairline);
@@ -2453,22 +2456,21 @@ body {
   box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.25rem;
 }
 .owner-pop::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
+/* Non-scrolling header close button — always reachable. */
 .owner-close {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.7rem;
-  z-index: 1;
+  align-self: flex-end;
+  margin: -0.3rem -0.2rem 0 0;
   background: transparent;
   border: none;
   cursor: pointer;
   font-size: 0.95rem;
   line-height: 1;
-  padding: 0.3rem;
+  padding: 0.1rem 0.25rem;
   color: var(--fg-ghost);
   transition: color 160ms ease;
 }
@@ -2476,6 +2478,13 @@ body {
 .owner-close:focus-visible {
   color: var(--fg);
   outline: none;
+}
+/* The scrollable region of the popover (everything below the close button). */
+.owner-pop-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 /* Card portion — borderless (the popover is the surface). */

@@ -79,21 +79,32 @@ export function OwnerPopover({ me }: { me: MeResponse }) {
 
   return (
     <div id={OWNER_POPOVER_ID} popover="auto" className="owner-pop">
-      {/* Visible close — light-dismiss (Esc / click-outside) works too, but a
-          popover summoned via showPopover() from the composer footer has no
-          discoverable way out otherwise. Declarative native hide, no JS. */}
+      {/* Visible close, pinned in a non-scrolling header so it stays reachable
+          even when the body is taller than a short window. Direct hidePopover()
+          (not popovertargetaction) for cross-browser reliability; light-dismiss
+          (Esc / click-outside) still works too. */}
       <button
         type="button"
         className="owner-close"
         aria-label="Close"
-        popoverTarget={OWNER_POPOVER_ID}
-        popoverTargetAction="hide"
+        onClick={() => {
+          const el = document.getElementById(OWNER_POPOVER_ID) as
+            | (HTMLElement & { hidePopover?: () => void })
+            | null;
+          try {
+            el?.hidePopover?.();
+          } catch {
+            /* already closed */
+          }
+        }}
       >
         ✕
       </button>
 
-      {/* Card — the hand-off. Handle text is the hero; QR a quiet corner accent. */}
-      <div className="owner-card">
+      {/* Scrolls within the popover frame; the close button above stays put. */}
+      <div className="owner-pop-body">
+        {/* Card — the hand-off. Handle text is the hero; QR a quiet corner accent. */}
+        <div className="owner-card">
         <div className="pxcard-id">
           <a className="pxcard-handle" href={fullUrl}>
             {handle}
@@ -148,10 +159,11 @@ export function OwnerPopover({ me }: { me: MeResponse }) {
         onDisplayNameChange={setCardName}
       />
 
-      <div className="owner-actions">
-        <button type="button" className="auth-signout" onClick={doSignOut}>
-          Sign out
-        </button>
+        <div className="owner-actions">
+          <button type="button" className="auth-signout" onClick={doSignOut}>
+            Sign out
+          </button>
+        </div>
       </div>
     </div>
   );
