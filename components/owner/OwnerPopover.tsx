@@ -79,6 +79,19 @@ export function OwnerPopover({ me }: { me: MeResponse }) {
 
   return (
     <div id={OWNER_POPOVER_ID} popover="auto" className="owner-pop">
+      {/* Visible close — light-dismiss (Esc / click-outside) works too, but a
+          popover summoned via showPopover() from the composer footer has no
+          discoverable way out otherwise. Declarative native hide, no JS. */}
+      <button
+        type="button"
+        className="owner-close"
+        aria-label="Close"
+        popoverTarget={OWNER_POPOVER_ID}
+        popoverTargetAction="hide"
+      >
+        ✕
+      </button>
+
       {/* Card — the hand-off. Handle text is the hero; QR a quiet corner accent. */}
       <div className="owner-card">
         <div className="pxcard-id">

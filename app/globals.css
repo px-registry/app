@@ -2458,6 +2458,25 @@ body {
 .owner-pop::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
+.owner-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.7rem;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0.3rem;
+  color: var(--fg-ghost);
+  transition: color 160ms ease;
+}
+.owner-close:hover,
+.owner-close:focus-visible {
+  color: var(--fg);
+  outline: none;
+}
 
 /* Card portion — borderless (the popover is the surface). */
 .owner-card {
