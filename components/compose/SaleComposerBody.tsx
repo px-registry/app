@@ -60,8 +60,15 @@ function isImage(file: File, name: string): boolean {
 
 export function SaleComposerBody({
   identity = null,
+  signedIn = false,
+  onRequireAuth,
 }: {
   identity?: ComposerIdentity | null;
+  /** Whether an owner session is live; when false, publishing is gated. */
+  signedIn?: boolean;
+  /** Summon sign-in before a publish; resolves to the identity, or null if
+   *  dismissed. Omitted in any host that doesn't gate (none today). */
+  onRequireAuth?: () => Promise<ComposerIdentity | null>;
 }) {
   const [title, setTitle] = useState("");
   const [amountInput, setAmountInput] = useState("");
@@ -252,7 +259,22 @@ export function SaleComposerBody({
     });
   }
 
-  function createShareLink() {
+  // Publishing a sale attributes the offer to the seller, so a signed-out seller
+  // is asked to sign in first (inline, draft preserved). Returns false if they
+  // dismissed it. When already signed in, or when no gate is wired, it's a no-op.
+  async function ensureAuth(): Promise<boolean> {
+    if (signedIn || !onRequireAuth) return true;
+    const id = await onRequireAuth();
+    if (!id) return false;
+    // Seed seller/domain from the new identity if still empty (best-effort; the
+    // parent also re-seeds via the identity effect on its next render).
+    setSender((s) => s || id.sender);
+    setDomain((d) => d || id.domain);
+    return true;
+  }
+
+  async function createShareLink() {
+    if (!(await ensureAuth())) return;
     setShareUrl(
       `${window.location.origin}/compose/pack/#pack=${encodeManifest(buildCore())}`,
     );
@@ -271,6 +293,7 @@ export function SaleComposerBody({
   async function uploadAndShare() {
     const items = collectUploadItems();
     if (!items.length) return;
+    if (!(await ensureAuth())) return;
     setUploadState("uploading");
     setUploadError(null);
     setProgress(

@@ -14,8 +14,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import qrcode from "qrcode-generator";
-import { categories } from "@/app/categories";
 import { signOut, type MeResponse } from "@/lib/auth-client.ts";
+import { OwnerSettingsForm } from "./OwnerSettingsForm.tsx";
 
 export const OWNER_POPOVER_ID = "px-owner-popover";
 
@@ -49,46 +49,27 @@ function QrAccent({ url }: { url: string }) {
   );
 }
 
-type Save = "idle" | "saving" | "saved" | "error";
-
 export function OwnerPopover({ me }: { me: MeResponse }) {
   const handle = me.handle ?? "";
   const url = `${handle}.px-registry.org`;
   const fullUrl = `https://${url}`;
 
-  const [displayName, setDisplayName] = useState(me.display_name ?? "");
-  const [category, setCategory] = useState(me.default_category ?? "");
+  // The card's name mirrors the settings form's display name live (the form
+  // owns the persisted state; this is just the card label).
+  const [cardName, setCardName] = useState(me.display_name ?? "");
   const [contact, setContact] = useState("");
   const [editingContact, setEditingContact] = useState(false);
-  const [save, setSave] = useState<Save>("idle");
 
   useEffect(() => {
     if (handle) setContact(localStorage.getItem(`pxcard:contact:${handle}`) || "");
   }, [handle]);
 
-  const name = displayName.trim() || `@${handle}`;
+  const name = cardName.trim() || `@${handle}`;
   const contactLines = contact.split("\n").filter((l) => l.trim());
 
   function saveContact(v: string) {
     setContact(v);
     if (handle) localStorage.setItem(`pxcard:contact:${handle}`, v);
-  }
-
-  async function persist() {
-    setSave("saving");
-    try {
-      const res = await fetch("/api/auth/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ display_name: displayName, default_category: category }),
-      });
-      const j = await res.json();
-      setSave(res.ok && j.ok ? "saved" : "error");
-      if (res.ok && j.ok) setTimeout(() => setSave("idle"), 1600);
-    } catch {
-      setSave("error");
-    }
   }
 
   async function doSignOut() {
@@ -147,45 +128,12 @@ export function OwnerPopover({ me }: { me: MeResponse }) {
         </a>
       </div>
 
-      {/* Settings */}
-      <div className="owner-settings">
-        <label className="field">
-          <span className="field-label">
-            Display name <span className="field-opt">optional</span>
-          </span>
-          <input
-            className="field-input"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Itō Atelier"
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">
-            Default category <span className="field-opt">optional</span>
-          </span>
-          <select
-            className="field-input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="">No default</option>
-            {categories.map((c) => (
-              <option key={c.slug} value={c.slug}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" className="auth-btn" onClick={persist} disabled={save === "saving"}>
-          {save === "saving" ? "Saving…" : save === "saved" ? "Saved ✓" : "Save"}
-        </button>
-        {save === "error" && (
-          <p className="auth-error" role="alert">
-            Could not save.
-          </p>
-        )}
-      </div>
+      {/* Settings — shared with the composer's 設定 tool (SettingsPanel). */}
+      <OwnerSettingsForm
+        initialDisplayName={me.display_name ?? ""}
+        initialCategory={me.default_category ?? ""}
+        onDisplayNameChange={setCardName}
+      />
 
       <div className="owner-actions">
         <button type="button" className="auth-signout" onClick={doSignOut}>

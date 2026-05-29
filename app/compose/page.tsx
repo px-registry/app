@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { ComposeAdaptive } from "@/components/compose/ComposeAdaptive.tsx";
+import { ComposerShell } from "@/components/compose/ComposerShell.tsx";
 
 export const metadata: Metadata = {
   title: "Start something — PX Registry",
   description: "Compose a pack: send files, or list owner-domain activity.",
 };
 
-// Adaptive entry: the public chooser (signed out) or the Mode-2 dashboard
-// (signed in). All branching is client-side in ComposeAdaptive; static export is
-// preserved (the chooser is the prerendered default).
+// The composer dashboard is the single /compose/ surface for everyone — the
+// former signed-out chooser is subsumed. It renders client-side (tools explore,
+// drafts, deferred sign-in); static export prerenders the dashboard shell.
 export default function ComposeHome() {
-  return <ComposeAdaptive />;
+  return <ComposerShell />;
 }

@@ -27,6 +27,14 @@ export function AuthBadge() {
     };
   }, []);
 
+  // Re-read the session when something signs in out-of-band (the composer's
+  // inline sign-in modal), so this badge and its popover stop being stale.
+  useEffect(() => {
+    const refresh = () => fetchMe().then((m) => setMe(m));
+    window.addEventListener("px:session-changed", refresh);
+    return () => window.removeEventListener("px:session-changed", refresh);
+  }, []);
+
   // Let the composer rail (or anything) open the same popover.
   useEffect(() => {
     const open = () => {
