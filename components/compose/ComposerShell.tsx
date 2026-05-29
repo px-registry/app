@@ -211,7 +211,7 @@ export function ComposerShell() {
             <button
               type="button"
               className="tools-owner"
-              onClick={() => window.dispatchEvent(new CustomEvent("px:open-owner"))}
+              onClick={() => selectMode(SETTINGS_MODE)}
             >
               <span className="tools-owner-dot" aria-hidden />@{identity.handle}
             </button>

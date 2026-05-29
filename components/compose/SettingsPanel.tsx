@@ -5,9 +5,14 @@
 // lock the door — it explains and offers the inline sign-in (deferred auth).
 // Copy is dictionary-sourced so the toggle localizes it.
 
-import type { MeResponse } from "@/lib/auth-client.ts";
+import { signOut, type MeResponse } from "@/lib/auth-client.ts";
 import { OwnerSettingsForm } from "@/components/owner/OwnerSettingsForm.tsx";
 import { useT } from "@/lib/i18n/context.tsx";
+
+async function doSignOut() {
+  await signOut();
+  window.location.href = "/";
+}
 
 export function SettingsPanel({
   me,
@@ -33,6 +38,11 @@ export function SettingsPanel({
           <p className="settings-foot">
             {t("settings.signedInAs", { handle: me!.handle ?? "" })}
           </p>
+          <div className="owner-actions">
+            <button type="button" className="auth-signout" onClick={doSignOut}>
+              Sign out
+            </button>
+          </div>
         </>
       ) : (
         <>
