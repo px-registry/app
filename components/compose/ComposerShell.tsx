@@ -22,7 +22,7 @@
 // that PX never sees — no account needed).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { categories } from "@/app/categories";
+import { categories, type Category } from "@/app/categories";
 import { PackComposerBody } from "./PackComposerBody.tsx";
 import { SaleComposerBody } from "./SaleComposerBody.tsx";
 import { ComingSoon } from "./ComingSoon.tsx";
@@ -30,6 +30,8 @@ import { ComposeWelcome } from "./ComposeWelcome.tsx";
 import { SettingsPanel } from "./SettingsPanel.tsx";
 import { AiAssistPanel } from "./AiAssistPanel.tsx";
 import { SignInModal } from "./SignInModal.tsx";
+import { LangToggle } from "./LangToggle.tsx";
+import { useT, useLang } from "@/lib/i18n/context.tsx";
 import {
   fetchMe,
   toComposerIdentity,
@@ -43,23 +45,25 @@ const SALE_MODE = "sale";
 const SETTINGS_MODE = "settings";
 const AI_MODE = "ai";
 
-type ToolItem = { mode: string; labelEn: string; labelJa: string };
+// A tool is either a dictionary-keyed label (pack/settings/ai) or a category
+// (label sourced from categories.ts by active language).
+type ToolItem = { mode: string; tKey?: string; cat?: Category };
 
 // "Create" group: Send-a-pack first, then the eight categories in canonical
 // order (app/categories.ts).
 const CREATE: ToolItem[] = [
-  { mode: PACK_MODE, labelEn: "Send a pack", labelJa: "パックを送る" },
-  ...categories.map((c) => ({ mode: c.slug, labelEn: c.name, labelJa: c.ja })),
+  { mode: PACK_MODE, tKey: "nav.tool.pack" },
+  ...categories.map((c) => ({ mode: c.slug, cat: c })),
 ];
 
 // "Setup" group: settings and the AI assist, equal tools below the create types.
 const SETUP: ToolItem[] = [
-  { mode: SETTINGS_MODE, labelEn: "Settings", labelJa: "設定" },
-  { mode: AI_MODE, labelEn: "AI assist", labelJa: "AI 連携" },
+  { mode: SETTINGS_MODE, tKey: "nav.tool.settings" },
+  { mode: AI_MODE, tKey: "nav.tool.ai" },
 ];
 
 const ALL_ITEMS = [...CREATE, ...SETUP];
-const KNOWN = new Set<string>([WELCOME_MODE, ...ALL_ITEMS.map((t) => t.mode)]);
+const KNOWN = new Set<string>([WELCOME_MODE, ...ALL_ITEMS.map((i) => i.mode)]);
 // The seven category tools that are honest placeholders (every category except
 // "sale", which has a real composer; pack is not a category).
 const COMING = new Set(
@@ -73,6 +77,8 @@ function readModeFromUrl(): string | null {
 }
 
 export function ComposerShell() {
+  const t = useT();
+  const [lang] = useLang();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [identity, setIdentity] = useState<ComposerIdentity | null>(null);
 
@@ -85,7 +91,7 @@ export function ComposerShell() {
   // Inline sign-in: open state, an explanatory line, and a resolver so an action
   // that asked for sign-in can continue (or abort) once the modal closes.
   const [signInOpen, setSignInOpen] = useState(false);
-  const [signInReason, setSignInReason] = useState<string | undefined>(undefined);
+  const [signInReasonKey, setSignInReasonKey] = useState<string | undefined>(undefined);
   const pendingRef = useRef<((me: MeResponse | null) => void) | null>(null);
 
   // Honor a deep link (?mode=) once mounted (see the mode state note above).
@@ -117,8 +123,8 @@ export function ComposerShell() {
 
   // Open the inline modal and resolve when the ceremony ends. Returns the live
   // session on success, or null if the visitor dismissed it.
-  const requestSignIn = useCallback((reason?: string): Promise<MeResponse | null> => {
-    setSignInReason(reason);
+  const requestSignIn = useCallback((reasonKey?: string): Promise<MeResponse | null> => {
+    setSignInReasonKey(reasonKey);
     setSignInOpen(true);
     return new Promise((resolve) => {
       pendingRef.current = resolve;
@@ -144,17 +150,23 @@ export function ComposerShell() {
   // so a signed-out seller is asked to sign in first; on success the composer
   // gets the identity and continues.
   const saleRequireAuth = useCallback(async (): Promise<ComposerIdentity | null> => {
-    const m = await requestSignIn(
-      "Publishing a sale lists it under your name — sign in to attribute the offer.",
-    );
+    const m = await requestSignIn("signin.reasonSale");
     return m ? toComposerIdentity(m) : null;
   }, [requestSignIn]);
 
-  const active = ALL_ITEMS.find((t) => t.mode === mode) ?? CREATE[0];
   const isComingSoon = COMING.has(mode);
+  const activeCat = categories.find((c) => c.slug === mode);
 
   function renderItem(item: ToolItem) {
     const isActive = item.mode === mode;
+    // Single language per the toggle: dictionary label, or the category label
+    // in the active language (categories.ts).
+    const label = item.tKey
+      ? t(item.tKey)
+      : lang === "ja"
+        ? item.cat!.ja
+        : item.cat!.name;
+    const isJa = !item.tKey && lang === "ja";
     return (
       <li key={item.mode}>
         <button
@@ -163,9 +175,8 @@ export function ComposerShell() {
           aria-current={isActive ? "page" : undefined}
           onClick={() => selectMode(item.mode)}
         >
-          <span className="tools-item-en">{item.labelEn}</span>
-          <span className="tools-item-ja" lang="ja">
-            {item.labelJa}
+          <span className="tools-item-label" lang={isJa ? "ja" : undefined}>
+            {label}
           </span>
         </button>
       </li>
@@ -179,16 +190,19 @@ export function ComposerShell() {
           <a className="tools-brand" href="/">
             PX
           </a>
-          <span className="tools-panel-title">Tools</span>
+          <span className="tools-panel-title">{t("nav.title")}</span>
+        </div>
+        <div className="tools-langrow">
+          <LangToggle />
         </div>
 
         <div className="tools-group">
-          <p className="tools-group-label">Create</p>
+          <p className="tools-group-label">{t("nav.group.create")}</p>
           <ul className="tools-list">{CREATE.map(renderItem)}</ul>
         </div>
 
         <div className="tools-group">
-          <p className="tools-group-label">Setup</p>
+          <p className="tools-group-label">{t("nav.group.setup")}</p>
           <ul className="tools-list">{SETUP.map(renderItem)}</ul>
         </div>
 
@@ -207,7 +221,7 @@ export function ComposerShell() {
               className="tools-signin"
               onClick={() => void requestSignIn()}
             >
-              Sign in
+              {t("nav.signin")}
             </button>
           )}
         </div>
@@ -238,14 +252,14 @@ export function ComposerShell() {
           <SettingsPanel me={me} onRequireSignIn={() => void requestSignIn()} />
         )}
         {mode === AI_MODE && <AiAssistPanel onPick={selectMode} />}
-        {isComingSoon && (
-          <ComingSoon labelEn={active.labelEn} labelJa={active.labelJa} />
+        {isComingSoon && activeCat && (
+          <ComingSoon labelEn={activeCat.name} labelJa={activeCat.ja} />
         )}
       </div>
 
       <SignInModal
         open={signInOpen}
-        reason={signInReason}
+        reasonKey={signInReasonKey}
         onClose={() => settleSignIn(null)}
         onSignedIn={handleSignedIn}
       />

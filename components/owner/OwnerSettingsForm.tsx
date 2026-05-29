@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { categories } from "@/app/categories";
+import { useT, useLang } from "@/lib/i18n/context.tsx";
 
 type Save = "idle" | "saving" | "saved" | "error";
 
@@ -22,6 +23,8 @@ export function OwnerSettingsForm({
   initialCategory: string;
   onDisplayNameChange?: (v: string) => void;
 }) {
+  const t = useT();
+  const [lang] = useLang();
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [category, setCategory] = useState(initialCategory);
   const [save, setSave] = useState<Save>("idle");
@@ -52,7 +55,8 @@ export function OwnerSettingsForm({
     <div className="owner-settings">
       <label className="field">
         <span className="field-label">
-          Display name <span className="field-opt">optional</span>
+          {t("settings.form.displayName")}{" "}
+          <span className="field-opt">{t("common.optional")}</span>
         </span>
         <input
           className="field-input"
@@ -63,27 +67,32 @@ export function OwnerSettingsForm({
       </label>
       <label className="field">
         <span className="field-label">
-          Default category <span className="field-opt">optional</span>
+          {t("settings.form.defaultCategory")}{" "}
+          <span className="field-opt">{t("common.optional")}</span>
         </span>
         <select
           className="field-input"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         >
-          <option value="">No default</option>
+          <option value="">{t("settings.form.noDefault")}</option>
           {categories.map((c) => (
             <option key={c.slug} value={c.slug}>
-              {c.name}
+              {lang === "ja" ? c.ja : c.name}
             </option>
           ))}
         </select>
       </label>
       <button type="button" className="auth-btn" onClick={persist} disabled={save === "saving"}>
-        {save === "saving" ? "Saving…" : save === "saved" ? "Saved ✓" : "Save"}
+        {save === "saving"
+          ? t("settings.form.saving")
+          : save === "saved"
+            ? t("settings.form.saved")
+            : t("settings.form.save")}
       </button>
       {save === "error" && (
         <p className="auth-error" role="alert">
-          Could not save.
+          {t("settings.form.error")}
         </p>
       )}
     </div>

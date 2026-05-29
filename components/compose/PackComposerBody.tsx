@@ -45,6 +45,7 @@ import { traverseEntry, type DropFile } from "./folder-intake.ts";
 import { PackIdentityBar } from "./PackIdentityBar.tsx";
 import { ReceiverPreview } from "./ReceiverPreview.tsx";
 import { ShareBar } from "./ShareBar.tsx";
+import { useT } from "@/lib/i18n/context.tsx";
 import type { ComposerIdentity } from "@/lib/auth-client.ts";
 
 // Re-exported so existing importers (ComposePack) keep their import path; the
@@ -105,6 +106,7 @@ export function PackComposerBody({
   mode?: "mode1" | "mode2";
   identity?: ComposerIdentity | null;
 }) {
+  const t = useT();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [title, setTitle] = useState("");
   const [sender, setSender] = useState("");
@@ -462,17 +464,13 @@ export function PackComposerBody({
           pack" title + intro only render in Mode 1 (the standalone composer). */}
       {mode === "mode1" && (
         <header className="compose-head">
-          <h1 className="compose-h">Send a pack</h1>
-          <p className="compose-intro" lang="ja">
-            ファイルはまずブラウザで読まれ、ハッシュが計算されます。共有の方法はあなたが選びます。
-          </p>
+          <h1 className="compose-h">{t("pack.head.title")}</h1>
+          <p className="compose-intro">{t("pack.head.intro")}</p>
           {identity && (
             <p className="compose-signedin-hint">
-              Signed in as{" "}
-              <span className="signedin-handle">@{identity.handle}</span> — your
-              sender and domain are pre-filled below.{" "}
+              {t("pack.head.signedinHint", { handle: identity.handle })}{" "}
               <a className="compose-dashboard-link" href="/compose/?mode=pack">
-                Try the dashboard →
+                {t("pack.head.dashboardLink")}
               </a>
             </p>
           )}
@@ -489,21 +487,21 @@ export function PackComposerBody({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <p className="dropzone-line">Drop files or a folder</p>
+        <p className="dropzone-line">{t("pack.drop.line")}</p>
         <div className="dropzone-actions">
           <button
             type="button"
             className="dropzone-btn"
             onClick={() => filesRef.current?.click()}
           >
-            Choose files
+            {t("pack.drop.chooseFiles")}
           </button>
           <button
             type="button"
             className="dropzone-btn"
             onClick={() => folderRef.current?.click()}
           >
-            Add folder
+            {t("pack.drop.addFolder")}
           </button>
         </div>
         <input
@@ -529,13 +527,13 @@ export function PackComposerBody({
         />
       </div>
       {hashing > 0 && (
-        <p className="compose-note">Hashing {hashing} file(s) in your browser…</p>
+        <p className="compose-note">{t("pack.hashing", { n: hashing })}</p>
       )}
 
       {entries.length > 0 && (
         <section className="compose-contents">
           <h2 className="compose-sub-h">
-            Contents · {fileCount} {fileCount === 1 ? "file" : "files"}
+            {t("pack.contents.title")} · {fileCount} {t("pack.contents.unit")}
           </h2>
           <ul className="compose-entries">
             {entries.map((e) =>
@@ -549,32 +547,38 @@ export function PackComposerBody({
                       onClick={() => removeEntry(e.id)}
                       aria-label={`Remove ${e.name}`}
                     >
-                      remove
+                      {t("common.remove")}
                     </button>
                   </div>
-                  <NoteArea value={e.note} onChange={(v) => setLeafNote(e.id, v)} />
+                  <NoteArea
+                    value={e.note}
+                    onChange={(v) => setLeafNote(e.id, v)}
+                    placeholder={t("pack.note.leafPlaceholder")}
+                  />
                 </li>
               ) : (
                 <li className="compose-entry compose-entry-container" key={e.id}>
                   <div className="compose-entry-row">
                     <span className="file-name">{e.name}</span>
                     <span className="file-kind">
-                      {e.kind === "archive" ? "archive" : "folder"}
+                      {e.kind === "archive" ? t("pack.entry.archive") : t("pack.entry.folder")}
                     </span>
-                    <span className="file-size">{e.contents.length} files</span>
+                    <span className="file-size">
+                      {e.contents.length} {t("pack.entry.unit")}
+                    </span>
                     <button
                       type="button"
                       className="compose-file-rm"
                       onClick={() => removeEntry(e.id)}
                       aria-label={`Remove ${e.name}`}
                     >
-                      remove
+                      {t("common.remove")}
                     </button>
                   </div>
                   <NoteArea
                     value={e.note}
                     onChange={(v) => setContainerNote(e.id, v)}
-                    placeholder="Note for this folder…"
+                    placeholder={t("pack.note.folderPlaceholder")}
                   />
                   <ul className="compose-contained">
                     {[...e.contents]
@@ -589,12 +593,13 @@ export function PackComposerBody({
                               onClick={() => removeContained(e.id, c.path)}
                               aria-label={`Remove ${c.path}`}
                             >
-                              remove
+                              {t("common.remove")}
                             </button>
                           </div>
                           <NoteArea
                             value={c.note}
                             onChange={(v) => setContainedNote(e.id, c.path, v)}
+                            placeholder={t("pack.note.leafPlaceholder")}
                           />
                         </li>
                       ))}
@@ -609,48 +614,50 @@ export function PackComposerBody({
       {/* Metadata is secondary — folded away until wanted. Opened by default for
           a signed-in sender so the pre-filled sender/domain are visible. */}
       <details className="compose-details" open={!!identity}>
-        <summary>Pack details (optional)</summary>
+        <summary>{t("pack.details.summary")}</summary>
         <div className="compose-details-body">
           <label className="field">
-            <span className="field-label">Title</span>
+            <span className="field-label">{t("pack.field.title")}</span>
             <input
               className="field-input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="The Tide Tables — final files"
+              placeholder={t("pack.field.titlePlaceholder")}
             />
           </label>
           <div className="field-row">
             <label className="field">
-              <span className="field-label">Sender</span>
+              <span className="field-label">{t("pack.field.sender")}</span>
               <input
                 className="field-input"
                 value={sender}
                 onChange={(e) => setSender(e.target.value)}
-                placeholder="Asterism Books"
+                placeholder={t("pack.field.senderPlaceholder")}
               />
             </label>
             <label className="field">
               <span className="field-label">
-                Domain <span className="field-opt">optional</span>
+                {t("pack.field.domain")}{" "}
+                <span className="field-opt">{t("common.optional")}</span>
               </span>
               <input
                 className="field-input"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="asterism-books.example"
+                placeholder={t("pack.field.domainPlaceholder")}
               />
             </label>
           </div>
           <label className="field">
             <span className="field-label">
-              Cover note <span className="field-opt">optional</span>
+              {t("pack.field.coverNote")}{" "}
+              <span className="field-opt">{t("common.optional")}</span>
             </span>
             <textarea
               className="field-input field-area"
               value={coverNote}
               onChange={(e) => setCoverNote(e.target.value)}
-              placeholder="Everything you need to sign off is here — read the notes first."
+              placeholder={t("pack.field.coverNotePlaceholder")}
               rows={2}
             />
           </label>
@@ -659,8 +666,8 @@ export function PackComposerBody({
 
       {hasContent && (
         <>
-          <PackIdentityBar packId={packId} core={core} />
-          <ReceiverPreview pack={previewPack} />
+          <PackIdentityBar packId={packId} core={core} kind="pack" />
+          <ReceiverPreview pack={previewPack} kind="pack" />
           <ShareBar
             hasContent={hasContent}
             fileCount={fileCount}
@@ -673,6 +680,9 @@ export function PackComposerBody({
             onUploadAndShare={uploadAndShare}
             onCreateShareLink={createShareLink}
             onCopyLink={copyLink}
+            noun={t("pack.share.noun")}
+            uploadLabel={t("pack.share.upload")}
+            metadataLabel={t("pack.share.metadata")}
           />
         </>
       )}

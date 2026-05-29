@@ -39,6 +39,7 @@ import { traverseEntry, type DropFile } from "./folder-intake.ts";
 import { PackIdentityBar } from "./PackIdentityBar.tsx";
 import { ReceiverPreview } from "./ReceiverPreview.tsx";
 import { ShareBar } from "./ShareBar.tsx";
+import { useT } from "@/lib/i18n/context.tsx";
 import type { ComposerIdentity } from "@/lib/auth-client.ts";
 
 const SALE_CATEGORY = "sale";
@@ -70,6 +71,7 @@ export function SaleComposerBody({
    *  dismissed. Omitted in any host that doesn't gate (none today). */
   onRequireAuth?: () => Promise<ComposerIdentity | null>;
 }) {
+  const t = useT();
   const [title, setTitle] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
@@ -333,35 +335,35 @@ export function SaleComposerBody({
 
   return (
     <section className="compose compose-sale" data-mode="mode2">
-      <p className="compose-intro">
-        List one thing for sale as a verifiable offer. The price, title and
-        photos hash into the pack id — the terms can&rsquo;t change after the
-        fact. PX runs no payment; the sale happens on your own domain.
-      </p>
+      <p className="compose-intro">{t("sale.intro")}</p>
 
       <label className="field">
-        <span className="field-label">Title</span>
+        <span className="field-label">{t("sale.field.title")}</span>
         <input
           className="field-input"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Wheel-thrown stoneware mug"
+          placeholder={t("sale.field.titlePlaceholder")}
         />
       </label>
 
       <div className="field-row">
         <label className="field sale-price-field">
-          <span className="field-label">Price</span>
+          <span className="field-label">{t("sale.field.price")}</span>
           <input
             className="field-input"
             value={amountInput}
             onChange={(e) => setAmountInput(e.target.value)}
             inputMode="decimal"
-            placeholder={currency === "JPY" ? "4800" : "48.00"}
+            placeholder={
+              currency === "JPY"
+                ? t("sale.field.pricePlaceholderJPY")
+                : t("sale.field.pricePlaceholderOther")
+            }
           />
         </label>
         <label className="field sale-currency-field">
-          <span className="field-label">Currency</span>
+          <span className="field-label">{t("sale.field.currency")}</span>
           <select
             className="field-input"
             value={currency}
@@ -386,14 +388,14 @@ export function SaleComposerBody({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <p className="dropzone-line">Drop photos</p>
+        <p className="dropzone-line">{t("sale.drop.line")}</p>
         <div className="dropzone-actions">
           <button
             type="button"
             className="dropzone-btn"
             onClick={() => photoInputRef.current?.click()}
           >
-            Choose photos
+            {t("sale.drop.choose")}
           </button>
         </div>
         <input
@@ -409,14 +411,13 @@ export function SaleComposerBody({
         />
       </div>
       {hashing > 0 && (
-        <p className="compose-note">Hashing {hashing} photo(s) in your browser…</p>
+        <p className="compose-note">{t("sale.hashing", { n: hashing })}</p>
       )}
 
       {photos.length > 0 && (
         <section className="compose-contents">
           <h2 className="compose-sub-h">
-            Photos · {photos.length}{" "}
-            {photos.length === 1 ? "photo" : "photos"}
+            {t("sale.photos.title")} · {photos.length} {t("sale.photos.unit")}
           </h2>
           <ul className="sale-photo-edit">
             {photos.map((p) => (
@@ -429,7 +430,7 @@ export function SaleComposerBody({
                   onClick={() => removePhoto(p.id)}
                   aria-label={`Remove ${p.name}`}
                 >
-                  remove
+                  {t("common.remove")}
                 </button>
               </li>
             ))}
@@ -439,39 +440,41 @@ export function SaleComposerBody({
 
       <label className="field">
         <span className="field-label">
-          Description <span className="field-opt">optional</span>
+          {t("sale.field.description")}{" "}
+          <span className="field-opt">{t("common.optional")}</span>
         </span>
         <textarea
           className="field-input field-area"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="One mug, wood-fired. Glaze pools at the foot — small kiln marks on the base."
+          placeholder={t("sale.field.descriptionPlaceholder")}
           rows={3}
         />
       </label>
 
       <details className="compose-details" open={!!identity}>
-        <summary>Seller</summary>
+        <summary>{t("sale.seller.summary")}</summary>
         <div className="compose-details-body">
           <div className="field-row">
             <label className="field">
-              <span className="field-label">Seller</span>
+              <span className="field-label">{t("sale.field.seller")}</span>
               <input
                 className="field-input"
                 value={sender}
                 onChange={(e) => setSender(e.target.value)}
-                placeholder="Mariko Kiln"
+                placeholder={t("sale.field.sellerPlaceholder")}
               />
             </label>
             <label className="field">
               <span className="field-label">
-                Domain <span className="field-opt">optional</span>
+                {t("sale.field.domain")}{" "}
+                <span className="field-opt">{t("common.optional")}</span>
               </span>
               <input
                 className="field-input"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="mariko.example"
+                placeholder={t("sale.field.domainPlaceholder")}
               />
             </label>
           </div>
@@ -480,8 +483,8 @@ export function SaleComposerBody({
 
       {hasContent && (
         <>
-          <PackIdentityBar packId={packId} core={core} />
-          <ReceiverPreview pack={previewPack} label="Buyer’s view" />
+          <PackIdentityBar packId={packId} core={core} kind="sale" />
+          <ReceiverPreview pack={previewPack} kind="sale" />
           <ShareBar
             hasContent={hasContent}
             fileCount={photos.length}
@@ -494,9 +497,9 @@ export function SaleComposerBody({
             onUploadAndShare={uploadAndShare}
             onCreateShareLink={createShareLink}
             onCopyLink={copyLink}
-            noun="photo"
-            uploadLabel="Upload photos & create link"
-            metadataLabel="Share listing only (no photos)"
+            noun={t("sale.share.noun")}
+            uploadLabel={t("sale.share.upload")}
+            metadataLabel={t("sale.share.metadata")}
           />
         </>
       )}

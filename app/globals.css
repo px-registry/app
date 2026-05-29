@@ -1888,6 +1888,47 @@ body {
   font-size: 0.66rem;
   color: var(--fg-ghost);
 }
+/* Single-language label (the toggle governs language; no dual sub-line). */
+.tools-item-label {
+  font-size: 0.82rem;
+}
+.tools-item-label[lang="ja"] {
+  font-family: var(--font-serif);
+}
+
+/* EN / 日本語 toggle in the tools-panel header. */
+.tools-langrow {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+.lang-opt {
+  background: transparent;
+  border: none;
+  padding: 0.1rem 0.2rem;
+  cursor: pointer;
+  color: var(--fg-ghost);
+  transition: color 160ms ease;
+}
+.lang-opt:hover,
+.lang-opt:focus-visible {
+  color: var(--fg-muted);
+  outline: none;
+}
+.lang-opt.is-active {
+  color: var(--accent);
+}
+.lang-sep {
+  color: var(--fg-ghost);
+}
 
 .tools-foot {
   padding: 0.55rem;
@@ -2131,6 +2172,7 @@ body {
 }
 
 .ai-keys,
+.ai-config,
 .ai-preview {
   display: flex;
   flex-direction: column;
@@ -2139,6 +2181,13 @@ body {
   background: var(--bg-elev);
   border: 1px solid var(--hairline);
   border-radius: 0.5rem;
+}
+/* Inline help under a field (e.g. the Ollama endpoint note). */
+.field-help {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--fg-ghost);
+  margin-top: 0.2rem;
 }
 .ai-section-label {
   font-family: var(--font-mono);

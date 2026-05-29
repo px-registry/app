@@ -2,50 +2,52 @@
 
 // SignInModal — the passkey sign-in ceremony as an inline overlay, not a
 // navigation. The deferred-auth keystone of the composer dashboard: a visitor
-// explores the tools and builds a draft with no account, and only the final
-// attribution step (publishing a sale, saving settings) summons this. Because it
-// is an overlay over a still-mounted dashboard, the draft underneath is never
-// lost — sign in, and the action that asked for it continues.
+// explores tools and builds a draft with no account, and only the final
+// attributable step (publishing a sale, saving settings) summons this. Because
+// it overlays a still-mounted dashboard, the draft underneath is never lost —
+// sign in, and the action that asked for it continues.
 //
-// It runs the same three-step ceremony as the standalone /signin/ page (challenge
-// → navigator.credentials assertion → verify), then reads the fresh session so
-// the dashboard can fill in the owner's identity. No password ever exists.
+// Same three-step ceremony as the standalone /signin/ page (challenge →
+// navigator.credentials assertion → verify), then read the fresh session so the
+// dashboard can fill in the owner's identity. Copy is dictionary-sourced.
 
 import { useEffect, useRef, useState } from "react";
 import { assertPasskey, isWebAuthnSupported } from "@/lib/webauthn/index.ts";
 import { fetchMe, type MeResponse } from "@/lib/auth-client.ts";
+import { useT } from "@/lib/i18n/context.tsx";
 
-function friendlyError(e: unknown): string {
+function errorKey(e: unknown): string {
   const msg = e instanceof Error ? e.message : "";
-  if (msg === "assert_cancelled") return "Sign-in was cancelled.";
-  if (msg === "passkey_unsupported") return "This browser doesn’t support passkeys.";
-  return "Sign-in failed. Please try again.";
+  if (msg === "assert_cancelled") return "signin.errCancelled";
+  if (msg === "passkey_unsupported") return "signin.errUnsupported";
+  return "signin.errGeneric";
 }
 
 export function SignInModal({
   open,
-  reason,
+  reasonKey = "signin.reasonDefault",
   onClose,
   onSignedIn,
 }: {
   open: boolean;
-  /** A short line explaining why sign-in was asked for, shown under the title. */
-  reason?: string;
+  /** Dictionary key for the line explaining why sign-in was asked for. */
+  reasonKey?: string;
   onClose: () => void;
   onSignedIn: (me: MeResponse) => void;
 }) {
+  const t = useT();
   const [handle, setHandle] = useState("");
   const [working, setWorking] = useState(false);
+  // `error` holds a dictionary key (or a server-sent message, shown as-is).
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus the handle field whenever the modal opens; clear transient state.
   useEffect(() => {
     if (open) {
       setError(null);
       setWorking(false);
-      const t = setTimeout(() => inputRef.current?.focus(), 0);
-      return () => clearTimeout(t);
+      const tm = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(tm);
     }
   }, [open]);
 
@@ -53,14 +55,22 @@ export function SignInModal({
 
   const trimmed = handle.trim();
 
+  // Render an error: known dictionary keys translate; a server message (not a
+  // key) is shown verbatim.
+  const errorText = error
+    ? error.startsWith("signin.")
+      ? t(error)
+      : error
+    : null;
+
   async function signIn() {
     setError(null);
     if (!trimmed) {
-      setError("Enter your handle.");
+      setError("signin.errHandle");
       return;
     }
     if (!isWebAuthnSupported()) {
-      setError("This browser doesn’t support passkeys.");
+      setError("signin.errUnsupported");
       return;
     }
 
@@ -74,7 +84,7 @@ export function SignInModal({
       });
       const cj = await cRes.json();
       if (!cRes.ok || !cj.ok) {
-        setError(cj.error || "Could not start sign-in.");
+        setError(cj.error || "signin.errStart");
         setWorking(false);
         return;
       }
@@ -92,17 +102,15 @@ export function SignInModal({
       });
       const vj = await vRes.json();
       if (!vRes.ok || !vj.ok) {
-        setError(vj.error || "Sign-in failed.");
+        setError(vj.error || "signin.errFailed");
         setWorking(false);
         return;
       }
 
-      // Read the now-live session so the dashboard gets handle + display name +
-      // default category (the verify response carries only a redirect).
       const me = await fetchMe();
       onSignedIn(me);
     } catch (e) {
-      setError(friendlyError(e));
+      setError(errorKey(e));
       setWorking(false);
     }
   }
@@ -112,20 +120,19 @@ export function SignInModal({
       className="signin-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Sign in"
+      aria-label={t("signin.title")}
       onClick={(e) => {
         if (e.target === e.currentTarget && !working) onClose();
       }}
     >
       <div className="signin-card">
-        <h2 className="signin-h">Sign in to continue</h2>
+        <h2 className="signin-h">{t("signin.title")}</h2>
         <p className="signin-intro">
-          {reason ?? "Your handle and passkey — nothing to remember, nothing to phish."}{" "}
-          Your draft stays open behind this.
+          {t(reasonKey)} {t("signin.draftNote")}
         </p>
 
         <label className="field">
-          <span className="field-label">Handle</span>
+          <span className="field-label">{t("signin.handle")}</span>
           <input
             ref={inputRef}
             className="field-input"
@@ -142,9 +149,9 @@ export function SignInModal({
           />
         </label>
 
-        {error && (
+        {errorText && (
           <p className="auth-error" role="alert">
-            {error}
+            {errorText}
           </p>
         )}
 
@@ -155,7 +162,7 @@ export function SignInModal({
             onClick={signIn}
             disabled={working || !trimmed}
           >
-            {working ? "Waiting for passkey…" : "Sign in with passkey"}
+            {working ? t("signin.submitWorking") : t("signin.submit")}
           </button>
           <button
             type="button"
@@ -163,12 +170,12 @@ export function SignInModal({
             onClick={onClose}
             disabled={working}
           >
-            Not now
+            {t("signin.cancel")}
           </button>
         </div>
 
         <p className="auth-alt">
-          New here? <a href="/signup/">Create an identity →</a>
+          {t("signin.altNew")} <a href="/signup/">{t("signin.altCreate")}</a>
         </p>
       </div>
     </div>

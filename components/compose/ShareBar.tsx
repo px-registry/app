@@ -11,6 +11,7 @@
 
 import type { PxDelivery } from "@/lib/pack/index.ts";
 import type { FileProgress } from "./types.ts";
+import { useT } from "@/lib/i18n/context.tsx";
 
 export type ShareState = "idle" | "uploading" | "done" | "error";
 
@@ -48,6 +49,9 @@ export function ShareBar({
   /** Secondary (metadata-only) button label. */
   metadataLabel?: string;
 }) {
+  const t = useT();
+  // EN templates use {plural}/{Plural}; JA templates use {noun} only. Both are
+  // passed; each language's string references what it needs.
   const plural = `${noun}s`;
   const Plural = plural.charAt(0).toUpperCase() + plural.slice(1);
   // Aggregate upload progress for the status line.
@@ -67,14 +71,11 @@ export function ShareBar({
 
   return (
     <section className="compose-share">
-      <h2 className="compose-sub-h">Share</h2>
+      <h2 className="compose-sub-h">{t("share.heading")}</h2>
 
       {uploadState !== "done" && (
         <p className="delivery-articulation">
-          PX briefly relays your {plural} to delivery storage. PX does not read{" "}
-          {noun} contents. They are held for 30 days, then automatically deleted —
-          long-term storage is not PX&rsquo;s role. The receiver verifies each{" "}
-          {noun} against its hash.
+          {t("share.delivery", { noun, plural })}
         </p>
       )}
 
@@ -82,8 +83,12 @@ export function ShareBar({
       {uploadState === "uploading" && (
         <div className="upload-progress">
           <p className="compose-note">
-            Relaying {uploadDone}/{uploadTotal} {noun}(s) to delivery storage… (
-            {aggregatePct}%)
+            {t("share.progress", {
+              done: uploadDone,
+              total: uploadTotal,
+              noun,
+              pct: aggregatePct,
+            })}
           </p>
           <ul className="upload-list">
             {Object.entries(progress).map(([path, fp]) => (
@@ -103,7 +108,7 @@ export function ShareBar({
                   {fp.state === "done"
                     ? "✓"
                     : fp.state === "error"
-                      ? "failed"
+                      ? t("share.stateFailed")
                       : `${Math.round(fp.pct * 100)}%`}
                 </span>
               </li>
@@ -114,9 +119,9 @@ export function ShareBar({
 
       {uploadState === "error" && (
         <p className="upload-error" role="alert">
-          Upload failed: {uploadError}. Nothing was shared.{" "}
+          {t("share.uploadFailed", { error: uploadError ?? "" })}{" "}
           <button type="button" className="share-retry" onClick={onUploadAndShare}>
-            Try again
+            {t("share.retry")}
           </button>
         </p>
       )}
@@ -145,23 +150,18 @@ export function ShareBar({
       ) : (
         <div className="share-result">
           <p className={delivery ? "delivery-confirmed" : "metadata-only-note"}>
-            {delivery ? (
-              <>
-                {Plural} uploaded. This link delivers the bytes and expires{" "}
-                {new Date(delivery.expires_at).toLocaleDateString()} (30 days).
-                The receiver downloads and verifies each {noun}.
-              </>
-            ) : (
-              <>
-                Metadata-only link — the {noun} list and hashes travel in the
-                URL; no bytes were uploaded.
-              </>
-            )}
+            {delivery
+              ? t("share.resultDelivered", {
+                  Plural,
+                  noun,
+                  date: new Date(delivery.expires_at).toLocaleDateString(),
+                })
+              : t("share.resultMetadata", { noun })}
           </p>
           <div className="share-out">
             <input className="share-url" readOnly value={shareUrl} />
             <button type="button" className="share-copy" onClick={onCopyLink}>
-              {copied ? "Copied" : "Copy link"}
+              {copied ? t("share.copied") : t("share.copy")}
             </button>
           </div>
         </div>

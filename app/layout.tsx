@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthBadge } from "./AuthBadge";
+import { I18nProvider, LANG_INIT_SCRIPT } from "@/lib/i18n/context.tsx";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -35,11 +36,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${cormorant.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
     >
       <body>
-        <AuthBadge />
-        {children}
+        {/* Resolve the language preference and set <html lang> before paint. */}
+        <script dangerouslySetInnerHTML={{ __html: LANG_INIT_SCRIPT }} />
+        <I18nProvider>
+          <AuthBadge />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

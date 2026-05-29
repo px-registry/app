@@ -1,8 +1,9 @@
 "use client";
 
 // Identity bar — the live pack_id and the canonical manifest that produced it.
-// Shared between the send-a-pack composer (Mode 1) and the Day-8 dashboard
-// (Mode 2): a pack's identity is the same artifact wherever it is composed.
+// Shared between the send-a-pack composer and the sale composer; `kind` selects
+// the right hint ("pack's identity" vs "offer's identity"). Copy is
+// dictionary-sourced; the pack_id and canonical manifest are unchanged (b7c5).
 
 import {
   canonicalize,
@@ -10,21 +11,27 @@ import {
   type JsonValue,
   type PxManifestCoreV1,
 } from "@/lib/pack/index.ts";
+import { useT } from "@/lib/i18n/context.tsx";
 
 export function PackIdentityBar({
   packId,
   core,
+  kind = "pack",
 }: {
   packId: string | null;
   core: PxManifestCoreV1;
+  kind?: "pack" | "sale";
 }) {
+  const t = useT();
   return (
     <section className="compose-identity">
-      <h2 className="compose-sub-h">Identity</h2>
-      <p className="identity-hint">This is your pack&rsquo;s identity.</p>
-      <code className="identity-id">{packId ?? "computing…"}</code>
+      <h2 className="compose-sub-h">{t("identity.heading")}</h2>
+      <p className="identity-hint">
+        {kind === "sale" ? t("identity.hintSale") : t("identity.hintPack")}
+      </p>
+      <code className="identity-id">{packId ?? t("identity.computing")}</code>
       <details className="identity-manifest">
-        <summary>Canonical manifest (what gets hashed)</summary>
+        <summary>{t("identity.manifestSummary")}</summary>
         <pre className="identity-json">
           {canonicalize(stripDelivery(core) as unknown as JsonValue)}
         </pre>

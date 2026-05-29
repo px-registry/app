@@ -1,48 +1,33 @@
 "use client";
 
-// ComposeWelcome — the center workspace before any tool is chosen. The brief's
-// "pre-login = PX 簡単説明": a few plain lines on what PX is and what the tools
-// to the left do, then an invitation to touch one. No sign-in to read this, no
-// sign-in to explore — that's asked for only at the final, attributable step.
-// §2 subtraction: explain by showing the smallest true thing, no marketing.
+// ComposeWelcome — the center workspace before any tool is chosen: a plain PX
+// intro (the brief's "natural PX intro", not a "Welcome" splash). No sign-in to
+// read it, no sign-in to explore — that's asked for only at the final,
+// attributable step. §2 subtraction: the smallest true thing, no marketing.
+// Copy comes from the i18n dictionary so the toggle localizes it.
+
+import { useT } from "@/lib/i18n/context.tsx";
 
 export function ComposeWelcome({ onPick }: { onPick: (mode: string) => void }) {
+  const t = useT();
   return (
     <section className="welcome">
-      <p className="welcome-eyebrow" lang="ja">
-        はじめる
-      </p>
-      <h1 className="welcome-h">Make something verifiable.</h1>
-      <p className="welcome-lede">
-        PX turns what you make — a file delivery, an offer for sale — into a
-        record whose identity is its own contents. Change a price or a file and
-        the id changes with it, so the terms can’t quietly drift after the fact.
-      </p>
-      <p className="welcome-body">
-        Pick a tool on the left and start. Nothing is held by PX while you work —
-        files are read in your browser, the id is computed there. You only sign
-        in at the last step, when you publish something under your name.
-      </p>
+      <h1 className="welcome-h">{t("intro.heading")}</h1>
+      <p className="welcome-lede">{t("intro.lead")}</p>
+      <p className="welcome-body">{t("intro.body")}</p>
 
       <div className="welcome-picks">
         <button type="button" className="welcome-pick" onClick={() => onPick("pack")}>
-          <span className="welcome-pick-h">Send a pack</span>
-          <span className="welcome-pick-sub">
-            Deliver files with a note for each — they stay in your browser.
-          </span>
+          <span className="welcome-pick-h">{t("intro.pick.pack.title")}</span>
+          <span className="welcome-pick-sub">{t("intro.pick.pack.sub")}</span>
         </button>
         <button type="button" className="welcome-pick" onClick={() => onPick("sale")}>
-          <span className="welcome-pick-h">List a sale</span>
-          <span className="welcome-pick-sub">
-            One thing for sale as a verifiable offer — price and photos hashed in.
-          </span>
+          <span className="welcome-pick-h">{t("intro.pick.sale.title")}</span>
+          <span className="welcome-pick-sub">{t("intro.pick.sale.sub")}</span>
         </button>
       </div>
 
-      <p className="welcome-foot">
-        The other tools — auction, crowdfund, video, music, writing, service,
-        matching — arrive in upcoming days.
-      </p>
+      <p className="welcome-foot">{t("intro.foot")}</p>
     </section>
   );
 }
