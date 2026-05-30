@@ -2681,3 +2681,215 @@ body {
   color: var(--fg-muted);
   word-break: break-all;
 }
+
+/* ── Attested Board (/search/ + /board/) ──────────────────────────────────
+   The board surface and record detail. Reuses .listing* for rows; the bits
+   below are the filter chips, the intent tag, and the machine-readable
+   boundary block (shown as material — what PX does not do). */
+
+.board-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+}
+
+.board-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.board-filter-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-ghost);
+  width: 4.5rem;
+  flex-shrink: 0;
+}
+
+.board-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.board-chip:hover,
+.board-chip:focus-visible {
+  border-color: var(--accent);
+  color: var(--fg);
+  outline: none;
+}
+
+.board-chip-active {
+  border-color: var(--accent);
+  color: var(--bg);
+  background: var(--accent);
+}
+
+.board-chip-ja {
+  font-size: 0.66rem;
+  opacity: 0.75;
+}
+
+.board-search-input {
+  margin-top: 0.3rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+}
+
+.board-search-input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.board-intent {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+}
+
+.board-error {
+  color: var(--fg-ghost);
+}
+
+/* ── record detail ── */
+
+.board-detail {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.board-detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.board-detail-cat {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-ghost);
+}
+
+.board-detail-title {
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+.board-detail-summary {
+  color: var(--fg);
+  max-width: 42rem;
+}
+
+.board-detail-action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.board-action-link,
+.board-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.board-action-link:hover,
+.board-link:hover,
+.board-action-link:focus-visible,
+.board-link:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.board-action-note {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
+.board-boundary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem 1rem;
+  margin-top: 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-elev);
+}
+
+.board-boundary > div {
+  display: contents;
+}
+
+.board-boundary dt {
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+}
+
+.board-boundary dd {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-align: right;
+}
+
+.board-record-id {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--fg-ghost);
+}
+
+.board-record-id code {
+  color: var(--fg-muted);
+  word-break: break-all;
+}
+
+/* Quiet board entry on the top page (mirrors the composer entry's restraint). */
+.board-entry {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.board-entry a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  color: var(--fg-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 160ms ease;
+}
+
+.board-entry a:hover,
+.board-entry a:focus-visible {
+  color: var(--fg);
+  outline: none;
+}
+
+.board-entry-en {
+  color: var(--accent);
+}

@@ -33,3 +33,16 @@ id = "31c4f53ab2d54dea8a977fa7c719e229"
 # AUTH_SECRET is that HMAC key. Do NOT commit it: set it as a Pages secret so it
 # overrides the insecure local-dev fallback baked into functions/_auth.ts:
 #   wrangler pages secret put AUTH_SECRET
+
+# Stage A1 — the Attested Board spine. The public board records (the /search
+# board) live in this D1 database. Bound as "BOARD" to the /api/search Function.
+# The schema + canonical CHECK constraints and the seed are in migrations/:
+#   wrangler d1 create px-app-board          # then paste the id below
+#   wrangler d1 migrations apply px-app-board --remote
+# Local dev (wrangler pages dev) uses a local SQLite under .wrangler/ with the
+# same migrations: wrangler d1 migrations apply px-app-board --local
+[[d1_databases]]
+binding = "BOARD"
+database_name = "px-app-board"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"

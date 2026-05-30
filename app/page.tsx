@@ -30,6 +30,15 @@ export default async function Home() {
         ))}
       </ul>
 
+      {/* Quiet entry to the board — search owner activity across all surfaces
+          (offered / auction-like / matching / stand) on one /search/ route. */}
+      <p className="board-entry">
+        <a href="/search/">
+          <span lang="ja">ボードを見る</span>
+          <span className="board-entry-en">Search the board →</span>
+        </a>
+      </p>
+
       {/* Composer entry. The prompt field is a placeholder for the AI-assisted
           flow (a later phase) — pressing it, or any chip, opens /compose/. The
           field carries no name, so nothing it holds is submitted anywhere. */}
