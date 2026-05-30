@@ -3062,3 +3062,33 @@ body {
   border-radius: 6px;
   overflow-x: auto;
 }
+
+/* ── Stage B+1 · owner-side proposals (/proposals) ────────────────────────── */
+
+.prop-list {
+  margin-top: 1rem;
+}
+
+.prop-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0.5rem;
+}
+
+.prop-main {
+  text-decoration: none;
+  transition: transform 160ms ease;
+}
+
+.prop-row:hover .prop-main {
+  transform: translateX(4px);
+}
+
+.prop-reason {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  margin-top: 0.25rem;
+}

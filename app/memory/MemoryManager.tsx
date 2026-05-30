@@ -114,6 +114,9 @@ export function MemoryManager() {
         <button type="button" className="board-chip" onClick={clearAll}>
           Clear all
         </button>
+        <a className="board-link" href="/proposals/">
+          Your AI&rsquo;s suggestions →
+        </a>
       </div>
 
       {entries === null ? (
