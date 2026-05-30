@@ -3143,3 +3143,149 @@ body {
 .contact-tool {
   font-size: 0.78rem;
 }
+
+/* ── Board Templates v1 · stand a board (/board/stand) ─────────── */
+
+.stand-h2,
+.stand-h3 {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-ghost);
+  margin: 1.4rem 0 0.5rem;
+}
+
+.stand-template-list,
+.stand-draft-list,
+.stand-rows {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.stand-template {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.stand-template-label {
+  font-size: 0.92rem;
+  color: var(--fg);
+}
+
+.stand-drafts {
+  margin-top: 1.5rem;
+}
+
+.stand-draft-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  cursor: pointer;
+  text-align: left;
+  color: var(--fg);
+}
+
+.stand-draft-row.is-open {
+  background: var(--bg-elev);
+}
+
+.stand-state {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.stand-state-draft {
+  color: var(--fg-ghost);
+}
+
+.stand-state-public {
+  color: var(--accent);
+}
+
+.stand-editor {
+  padding: 1rem 0.5rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.stand-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.stand-label {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.stand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stand-row .board-search-input {
+  flex: 1;
+  margin-top: 0;
+}
+
+.stand-row-axes {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.stand-select {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.stand-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.stand-contact .board-search-input {
+  flex: 1;
+  margin-top: 0;
+}
+
+.stand-needs {
+  color: var(--fg-muted);
+}
+
+.stand-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.6rem;
+}
+
+.stand-publish:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

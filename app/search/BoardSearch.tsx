@@ -115,6 +115,9 @@ export function BoardSearch() {
           <button type="button" className="board-chip" onClick={saveFilter}>
             {saved ? "Saved on this device ✓" : "Save this filter"}
           </button>
+          <a className="board-link" href="/board/stand/">
+            Stand a board →
+          </a>
           <a className="board-link" href="/memory/">
             Your memory →
           </a>
