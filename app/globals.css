@@ -2965,3 +2965,100 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* ── Stage B · owner-local memory (/memory) ───────────────────────────────── */
+
+.mem-add {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+.mem-add-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mem-add-row .board-search-input {
+  flex: 1;
+  margin-top: 0;
+}
+
+.mem-note-warn {
+  color: var(--fg-muted);
+}
+
+.mem-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.mem-list {
+  margin-top: 1rem;
+}
+
+.mem-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.9rem 0.5rem;
+}
+
+.mem-entry-body {
+  flex: 1;
+  color: var(--fg);
+  font-size: 0.95rem;
+}
+
+.mem-del {
+  background: transparent;
+  border: none;
+  color: var(--fg-ghost);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.mem-del:hover,
+.mem-del:focus-visible {
+  color: var(--fg);
+  outline: none;
+}
+
+.mem-boundary {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+.mem-boundary summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-ghost);
+}
+
+.mem-boundary ul {
+  margin: 0.8rem 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mem-boundary-json {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--fg-ghost);
+  background: var(--bg-elev);
+  padding: 0.8rem;
+  border-radius: 6px;
+  overflow-x: auto;
+}

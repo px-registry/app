@@ -8,12 +8,14 @@
 // Static-export safe: a client component that fetches at runtime and reads its
 // initial filters from window.location (no useSearchParams/Suspense dance).
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { SURFACE_SHAPES, INTENTS } from "@/lib/board/canonical.ts";
 import { surfaceShapeLabel, intentLabel } from "@/lib/board/copy.ts";
 import { boardDetailPath } from "@/lib/board/href.ts";
 import type { SurfaceShape, Intent } from "@/lib/board/canonical.ts";
 import type { BoardRecordV1 } from "@/lib/board/types.ts";
+import { OwnerMemoryStore, type SavedFilterValue } from "@/lib/owner-memory/index.ts";
+import { IndexedDbBackend } from "@/lib/owner-memory/indexeddb.ts";
 
 type ShapeFilter = SurfaceShape | "all";
 type IntentFilter = Intent | "all";
@@ -24,6 +26,21 @@ export function BoardSearch() {
   const [q, setQ] = useState("");
   const [records, setRecords] = useState<BoardRecordV1[] | null>(null);
   const [error, setError] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Owner-local store. Saving a filter is an explicit owner action that writes
+  // ONLY to this device; the board itself stays neutral and server-blind.
+  const memory = useMemo(() => new OwnerMemoryStore(new IndexedDbBackend()), []);
+
+  const saveFilter = useCallback(async () => {
+    const value: SavedFilterValue = {};
+    if (shape !== "all") value.surfaceShape = shape;
+    if (intent !== "all") value.intent = intent;
+    if (q.trim()) value.query = q.trim();
+    await memory.create({ kind: "saved_filter", provenance: "owner_written", value });
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2000);
+  }, [shape, intent, q, memory]);
 
   // Seed filters from the URL once, so a shared /search/?surface_shape=… link
   // opens pre-filtered.
@@ -94,6 +111,14 @@ export function BoardSearch() {
           placeholder="Search the board…"
           aria-label="Search the board"
         />
+        <div className="board-filter-row">
+          <button type="button" className="board-chip" onClick={saveFilter}>
+            {saved ? "Saved on this device ✓" : "Save this filter"}
+          </button>
+          <a className="board-link" href="/memory/">
+            Your memory →
+          </a>
+        </div>
       </div>
 
       {records === null ? (

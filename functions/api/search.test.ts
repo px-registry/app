@@ -102,6 +102,21 @@ test("an unsafe externalActionUrl from D1 is sanitized out of the response (§4)
   assert.ok(!JSON.stringify(body).includes("javascript:"));
 });
 
+test("B-impl-3: same params → byte-identical /search regardless of which owner asks", async () => {
+  // Memory-blindness: the board is one neutral surface. Two different sessions,
+  // same query → identical response bytes (the handler never reads the cookie).
+  const make = (cookie: string) =>
+    onRequestGet({
+      request: new Request("https://app.px-registry.org/api/search?surface_shape=matching", {
+        headers: { Cookie: cookie },
+      }),
+      env: { BOARD: fakeD1() },
+    } as never);
+  const a = await (await make("__px_session=ownerA")).text();
+  const b = await (await make("__px_session=ownerB")).text();
+  assert.equal(a, b);
+});
+
 test("a D1 failure fails closed — no rows, no leaked error detail", async () => {
   const brokenDb = {
     prepare() {
