@@ -3092,3 +3092,54 @@ body {
   color: var(--accent);
   margin-top: 0.25rem;
 }
+
+/* ── Contact Kit v1 (/board detail · device-side connect) ──────────────────── */
+
+.contact-kit {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.contact-interstitial {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+
+.contact-tools-h {
+  margin-top: 0.4rem;
+}
+
+.contact-usecases {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.contact-tool-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+}
+
+.contact-tool {
+  font-size: 0.78rem;
+}

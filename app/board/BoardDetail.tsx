@@ -13,6 +13,7 @@ import { surfaceShapeLabel, intentLabel } from "@/lib/board/copy.ts";
 import { BOARD_SEARCH_PATH } from "@/lib/board/href.ts";
 import type { BoardRecordV1 } from "@/lib/board/types.ts";
 import { BoardTransaction } from "./BoardTransaction";
+import { ContactKit } from "./ContactKit";
 
 type State =
   | { status: "loading" }
@@ -69,21 +70,11 @@ export function BoardDetail() {
 
       {r.summary && <p className="board-detail-summary">{r.summary}</p>}
 
-      {r.externalActionUrl && (
-        <p className="board-detail-action">
-          <a
-            className="board-action-link"
-            href={r.externalActionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Continue on the owner&rsquo;s site →
-          </a>
-          <span className="board-action-note">
-            The owner controls this action. PX does not handle payment or settlement.
-          </span>
-        </p>
-      )}
+      {/* Contact Kit — device-side intro packet + owner-chosen external tool.
+          PX holds no contact/message body and generates no contact link. */}
+      <ContactKit
+        record={{ recordId: r.recordId, title: r.title, externalActionUrl: r.externalActionUrl }}
+      />
 
       {/* The machine-readable boundary, shown as material — what PX does not do. */}
       <dl className="board-boundary" aria-label="What PX does not do">

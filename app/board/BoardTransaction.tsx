@@ -67,16 +67,9 @@ export function BoardTransaction({ recordId }: { recordId: string }) {
     })();
   }, [loadTx]);
 
-  const openContact = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/board/contact?recordId=${encodeURIComponent(recordId)}`);
-      const body = (await res.json()) as { contactActionUrl: string | null };
-      if (body.contactActionUrl) window.open(body.contactActionUrl, "_blank", "noopener,noreferrer");
-      else setNote("This listing has no contact link.");
-    } catch {
-      setNote("Could not resolve the contact link.");
-    }
-  }, [recordId]);
+  // Contact is handled solely by the Contact Kit surface on this page (with the
+  // invite-key interstitial). The old direct external-opener here was removed to
+  // keep one contact boundary — no externalActionUrl opener outside Contact Kit.
 
   const postEvent = useCallback(
     async (payload: Record<string, unknown>) => {
@@ -108,12 +101,6 @@ export function BoardTransaction({ recordId }: { recordId: string }) {
 
   return (
     <section className="board-tx" aria-label="Transaction record">
-      <div className="board-tx-contact">
-        <button type="button" className="board-action-link" onClick={openContact}>
-          {TRANSACTION_COPY.contactAction.en} →
-        </button>
-        <span className="board-action-note">{TRANSACTION_COPY.contactNote.en}</span>
-      </div>
 
       <h2 className="board-tx-h">Record chain</h2>
       {tx === null ? (
