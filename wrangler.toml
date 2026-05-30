@@ -44,5 +44,5 @@ id = "31c4f53ab2d54dea8a977fa7c719e229"
 [[d1_databases]]
 binding = "BOARD"
 database_name = "px-app-board"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "0c323dfb-46d5-48b0-948f-3d2f1d850e93"
 migrations_dir = "migrations"

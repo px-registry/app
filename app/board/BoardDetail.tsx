@@ -56,6 +56,10 @@ export function BoardDetail() {
   const r = state.record;
   return (
     <article className="board-detail">
+      <p className="demo-banner" role="note">
+        Sample board (demo) — not a real seller or contact.{" "}
+        <span lang="ja">サンプルの板です（デモ）。実在の出品者・連絡先ではありません。</span>
+      </p>
       <div className="board-detail-badges">
         <span className="listing-type">{surfaceShapeLabel(r.surfaceShape).en}</span>
         <span className="board-intent" lang="ja">

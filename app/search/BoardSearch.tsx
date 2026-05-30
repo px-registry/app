@@ -76,6 +76,10 @@ export function BoardSearch() {
 
   return (
     <>
+      <p className="demo-banner" role="note">
+        Sample boards (demo) — not real sellers or contacts.{" "}
+        <span lang="ja">サンプルの板です（デモ）。実在の出品者・連絡先ではありません。</span>
+      </p>
       <div className="board-filters" role="group" aria-label="Board filters">
         <div className="board-filter-row">
           <span className="board-filter-label">Surface</span>

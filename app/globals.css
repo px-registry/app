@@ -3289,3 +3289,20 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Invite-first demo banner (px-final-shell preview) ───────────────────────── */
+
+.demo-banner {
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.demo-banner span[lang="ja"] {
+  color: var(--fg-ghost);
+}
