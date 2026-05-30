@@ -42,7 +42,42 @@ export {
   surfaceShapeLabel,
   intentLabel,
   allBoardLabelStrings,
+  TRANSACTION_EVENT_LABELS,
+  DECLARATION_KIND_LABELS,
+  TRANSACTION_COPY,
+  allTransactionLabelStrings,
   type Label,
 } from "./copy.ts";
 
 export { SEED_BOARD_RECORDS } from "./seed.ts";
+
+// ── A2: transaction loop ──────────────────────────────────────────────────────
+
+export { newOpaqueId, isOpaqueId, type OpaqueIdPrefix } from "./ids.ts";
+
+export { isPublicSafeOwnerRef, assertPublicSafeOwnerRef } from "./owner-ref.ts";
+
+export {
+  TRANSACTION_EVENT_KINDS,
+  isTransactionEventKind,
+  TRANSACTION_BOUNDARY,
+  buildTransactionObject,
+  planContactOpened,
+  planHandoffDraft,
+  type TransactionEventKindV1,
+  type TransactionBoundary,
+  type TransactionEventV1,
+  type TransactionObjectV1,
+} from "./transaction.ts";
+
+export {
+  DECLARATION_KINDS,
+  isDeclarationKind,
+  toPublicDeclaration,
+  attachDeclarationRef,
+  planDeclaration,
+  type DeclarationKindV1,
+  type StoredDeclarationRow,
+  type PublicDeclarationRow,
+  type DeclarationRecordV1,
+} from "./declaration.ts";

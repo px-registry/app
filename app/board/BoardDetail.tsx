@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { surfaceShapeLabel, intentLabel } from "@/lib/board/copy.ts";
 import { BOARD_SEARCH_PATH } from "@/lib/board/href.ts";
 import type { BoardRecordV1 } from "@/lib/board/types.ts";
+import { BoardTransaction } from "./BoardTransaction";
 
 type State =
   | { status: "loading" }
@@ -107,6 +108,8 @@ export function BoardDetail() {
       <p className="board-record-id">
         record · <code>{r.recordId}</code>
       </p>
+
+      <BoardTransaction recordId={r.recordId} />
 
       <p>
         <a className="board-link" href={BOARD_SEARCH_PATH}>
