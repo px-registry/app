@@ -29,13 +29,21 @@ export interface SearchParamsAllowlist {
 
 /**
  * Why a listing is proposed: a typed link to the NAMED memory entry that grounds
- * it. Two kinds only (Cbp1-3 — preference is not a basis for choosing a listing).
- * matches_saved_interest is a LOCAL deterministic match; the interest text is
+ * it. matches_saved_interest is a LOCAL deterministic match; the interest text is
  * never sent to a server.
+ *
+ * ★ #4 cross_intent_candidate (the meeting working the narrowed-out "matching"
+ * surface used to carry): a listing whose intent COMPLEMENTS the owner's saved
+ * position (a saved_filter's intent), surfaced as a CANDIDATE only. It is grounded
+ * in that saved_filter (named memoryRef) — the passive seam is preserved, no
+ * memory-selection gate is introduced. It NEVER implies a symmetric match: the
+ * candidate is "you might meet here", never "matched / 成立 / fit / settlement", and
+ * `ask` is treated as an open-call/inquiry, not a fulfilled offer (C1).
  */
 export type ProposalReason =
   | { kind: "matches_saved_filter"; memoryRef: string }
-  | { kind: "matches_saved_interest"; memoryRef: string };
+  | { kind: "matches_saved_interest"; memoryRef: string }
+  | { kind: "cross_intent_candidate"; memoryRef: string };
 
 /**
  * One proposal. `sourceSearchParams` records which neutral /search result set it
@@ -48,11 +56,15 @@ export interface ProposalV1 {
   sourceSearchParams: SearchParamsAllowlist;
 }
 
-/** The minimal listing shape the matcher needs (BoardRecordV1 satisfies it). */
+/** The minimal listing shape the matcher needs (BoardRecordV1 satisfies it).
+ *  surfaceShape/intent are OPTIONAL — they are read only by the cross-intent pass;
+ *  a listing without them simply takes no part in cross-intent (thin-honest). */
 export interface MatchableListing {
   recordId: string;
   title: string;
   summary?: string;
   category?: string;
   region?: string;
+  surfaceShape?: SurfaceShape;
+  intent?: Intent;
 }

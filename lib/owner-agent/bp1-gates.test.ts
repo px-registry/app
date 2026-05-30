@@ -61,8 +61,11 @@ test("matching-dependency-zero: no 'matching' literal in the proposal lib runtim
 
 // ── Cbp1-3: reason kinds are exactly two (preference dropped) ────────────────────
 
-test("Bplus1-impl-2: ProposalReason has exactly two kinds (no matches_preference)", () => {
+test("Bplus1-impl-2: ProposalReason kinds are the grounded set (no matches_preference)", () => {
+  // #4 added cross_intent_candidate (also grounded in a named memoryRef). preference
+  // is still NOT a basis for choosing a listing (Cbp1-3).
   assert.deepEqual(Object.keys(PROPOSAL_REASON_LABELS).sort(), [
+    "cross_intent_candidate",
     "matches_saved_filter",
     "matches_saved_interest",
   ]);

@@ -85,6 +85,9 @@ export function Proposals() {
   return (
     <>
       <p className="board-action-note">{PROPOSAL_COPY.note.en}</p>
+      {visible.some((p) => p.reason.kind === "cross_intent_candidate") && (
+        <p className="board-action-note prop-cross-note">{PROPOSAL_COPY.crossIntentNote.en}</p>
+      )}
 
       {proposals === null ? (
         <p className="entries">Composing on your device…</p>

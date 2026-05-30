@@ -16,6 +16,9 @@ export interface Label {
 export const PROPOSAL_REASON_LABELS: Record<ProposalReason["kind"], Label> = {
   matches_saved_filter: { en: "Matches your saved filter", ja: "あなたの保存条件に合う候補" },
   matches_saved_interest: { en: "Matches your interest", ja: "あなたのメモリに基づく候補" },
+  // ★ #4 — a candidate ACROSS intents (wanted ⇄ offered). "candidate", never a
+  // match/成立/fit; grounded in the owner's saved position.
+  cross_intent_candidate: { en: "A candidate across wanted ⇄ offered", ja: "wanted⇄offered を横断した候補" },
 };
 
 export const PROPOSAL_COPY = {
@@ -27,6 +30,11 @@ export const PROPOSAL_COPY = {
   note: {
     en: "Grounded in your own memory, composed on your device.",
     ja: "あなた自身のメモリに基づき、あなたの端末で作られた候補です。",
+  },
+  // The cross-intent framing: candidates to reach out to, never a PX-made meeting.
+  crossIntentNote: {
+    en: "Across wanted ⇄ offered — candidates to reach out to with your own tools. You decide; PX joins no one.",
+    ja: "wanted⇄offered を横断した候補です。あなたが判断し、自分のツールでつながります。PXは誰もつなぎません。",
   },
 } as const;
 
