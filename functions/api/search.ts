@@ -32,8 +32,13 @@ function json(body: unknown, status = 200): Response {
 export const onRequestGet: PagesFunction<BoardEnv> = async ({ request, env }) => {
   const url = new URL(request.url);
   try {
-    const records = await queryBoard(env.BOARD, url);
-    return json({ records, count: records.length });
+    const result = await queryBoard(env.BOARD, url);
+    if (!result.ok) {
+      // A non-canonical surface_shape/intent (e.g. the removed "matching") is
+      // rejected explicitly — fail-closed, not a silent empty result.
+      return json({ records: [], count: 0, error: "invalid_canonical" }, 400);
+    }
+    return json({ records: result.records, count: result.records.length });
   } catch {
     // Fail closed: never leak an internal error body; the board simply has no
     // rows to show rather than exposing a stack or a partial row.

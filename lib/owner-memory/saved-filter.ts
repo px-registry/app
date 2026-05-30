@@ -6,14 +6,27 @@
 // memory — so the same params give every owner the same response. This module is
 // the owner-side composition; it touches no server and infers nothing.
 
-import { BOARD_SEARCH_PATH } from "../board/index.ts";
+import { BOARD_SEARCH_PATH, isSurfaceShape, isIntent } from "../board/index.ts";
 import type { SavedFilterValue } from "./types.ts";
 
-/** Turn a saved filter into the explicit, neutral /search query params. */
+/**
+ * Whether a saved filter is still applicable under the current canonical
+ * (Option B for the narrowing): a stored filter carrying the removed "matching"
+ * surface_shape is INVALID and must be excluded from apply — fail-closed, never
+ * remapped. The UI marks such entries invalid; they never become /search params.
+ */
+export function isApplicableSavedFilter(value: SavedFilterValue): boolean {
+  if (value.surfaceShape !== undefined && !isSurfaceShape(value.surfaceShape)) return false;
+  if (value.intent !== undefined && !isIntent(value.intent)) return false;
+  return true;
+}
+
+/** Turn a saved filter into the explicit, neutral /search query params. Only
+ *  canonical values are emitted — a stale non-canonical value is dropped. */
 export function savedFilterToSearchParams(value: SavedFilterValue): URLSearchParams {
   const sp = new URLSearchParams();
-  if (value.surfaceShape) sp.set("surface_shape", value.surfaceShape);
-  if (value.intent) sp.set("intent", value.intent);
+  if (value.surfaceShape && isSurfaceShape(value.surfaceShape)) sp.set("surface_shape", value.surfaceShape);
+  if (value.intent && isIntent(value.intent)) sp.set("intent", value.intent);
   if (value.category) sp.set("category", value.category);
   if (value.region) sp.set("region", value.region);
   if (value.query) sp.set("q", value.query);

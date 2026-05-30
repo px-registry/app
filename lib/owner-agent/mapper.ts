@@ -7,12 +7,17 @@
 // proposal pass passes includeQuery:false, so owner-typed query text never leaves
 // the device automatically.
 
+import { isSurfaceShape, isIntent } from "../board/canonical.ts";
 import type { OwnerMemoryV1 } from "../owner-memory/index.ts";
 import type { SearchParamsAllowlist } from "./types.ts";
 
 /**
  * Map a memory entry to neutral /search params, or null if it must never become
  * a server param. saved_filter → canonical params; everything else → null.
+ *
+ * Fail-closed on the narrowing: a stale saved_filter carrying a non-canonical
+ * (removed) surface_shape such as "matching" — or a non-canonical intent — is
+ * rejected WHOLESALE (null). The agent never sends "matching" to /search.
  */
 export function memoryToSearchParams(
   entry: OwnerMemoryV1,
@@ -23,6 +28,8 @@ export function memoryToSearchParams(
     return null;
   }
   const v = entry.value;
+  if (v.surfaceShape !== undefined && !isSurfaceShape(v.surfaceShape)) return null;
+  if (v.intent !== undefined && !isIntent(v.intent)) return null;
   const params: SearchParamsAllowlist = {};
   if (v.surfaceShape) params.surface_shape = v.surfaceShape;
   if (v.intent) params.intent = v.intent;

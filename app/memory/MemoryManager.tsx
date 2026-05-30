@@ -13,6 +13,7 @@ import {
   OWNER_MEMORY_BOUNDARY,
   describeSavedFilter,
   savedFilterToSearchPath,
+  isApplicableSavedFilter,
   type OwnerMemoryV1,
 } from "@/lib/owner-memory/index.ts";
 import { IndexedDbBackend } from "@/lib/owner-memory/indexeddb.ts";
@@ -130,11 +131,14 @@ export function MemoryManager() {
               <div className="mem-entry">
                 <span className="listing-type">{e.kind}</span>
                 <span className="mem-entry-body">{summarize(e)}</span>
-                {e.kind === "saved_filter" && (
-                  <a className="board-link" href={savedFilterToSearchPath(e.value)}>
-                    apply →
-                  </a>
-                )}
+                {e.kind === "saved_filter" &&
+                  (isApplicableSavedFilter(e.value) ? (
+                    <a className="board-link" href={savedFilterToSearchPath(e.value)}>
+                      apply →
+                    </a>
+                  ) : (
+                    <span className="board-error">invalid (no longer a board filter)</span>
+                  ))}
                 <button type="button" className="mem-del" onClick={() => remove(e.memoryId)} aria-label="Delete">
                   ✕
                 </button>

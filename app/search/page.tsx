@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Footer } from "../Footer";
 import { BoardSearch } from "./BoardSearch";
 
-// The Attested Board surface. A single /search/ route across all four
-// surface_shapes (offered / auction-like / matching / stand) — N4: its own
+// The Attested Board surface. A single /search/ route across all three
+// surface_shapes (offered / auction-like / stand) — N4: its own
 // route, not a /category extension.
 export const metadata: Metadata = {
   title: "Board — PX Registry",

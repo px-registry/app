@@ -27,6 +27,7 @@ export {
   savedFilterToSearchParams,
   savedFilterToSearchPath,
   describeSavedFilter,
+  isApplicableSavedFilter,
 } from "./saved-filter.ts";
 
 export { OWNER_MEMORY_BOUNDARY, type OwnerMemoryBoundary } from "./boundary.ts";

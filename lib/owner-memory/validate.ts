@@ -10,14 +10,15 @@
 
 import { MEMORY_KINDS } from "./types.ts";
 import type { NewOwnerMemory, Provenance } from "./types.ts";
+// Import A1's canonical guards directly so saved_filter validation can never
+// drift from the board's surface_shape/intent (e.g. across a future narrowing).
+import { isSurfaceShape, isIntent } from "../board/canonical.ts";
 
 const PROVENANCES: ReadonlySet<string> = new Set<Provenance>([
   "owner_written",
   "owner_imported_confirmed",
 ]);
 
-const SURFACE_SHAPES = new Set(["offered", "auction_like", "matching", "stand"]);
-const INTENTS = new Set(["wanted", "offered", "ask"]);
 const DENSITIES = new Set(["compact", "comfortable"]);
 const VIEWS = new Set(["list", "cards"]);
 
@@ -34,9 +35,9 @@ function validateValue(kind: string, value: unknown): string | null {
   const v = value as Record<string, unknown>;
   switch (kind) {
     case "saved_filter":
-      if (v.surfaceShape !== undefined && !SURFACE_SHAPES.has(v.surfaceShape as string))
+      if (v.surfaceShape !== undefined && !isSurfaceShape(v.surfaceShape))
         return "saved_filter.surfaceShape must be A1 canonical";
-      if (v.intent !== undefined && !INTENTS.has(v.intent as string))
+      if (v.intent !== undefined && !isIntent(v.intent))
         return "saved_filter.intent must be A1 canonical";
       if (!optStr(v.category) || !optStr(v.region) || !optStr(v.query))
         return "saved_filter category/region/query must be strings";

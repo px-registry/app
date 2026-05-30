@@ -14,11 +14,12 @@ export interface Label {
   ja: string;
 }
 
-/** surface_shape labels. auction_like is N1-compliant (no bare "auction"). */
+/** surface_shape labels. auction_like is N1-compliant (no bare "auction").
+ *  No "matching" label — it was narrowed out of surface_shape (it's a working,
+ *  not a placement). */
 export const SURFACE_SHAPE_LABELS: Record<SurfaceShape, Label> = {
   offered: { en: "Offered", ja: "提供" },
   auction_like: { en: "Auction-like", ja: "入札型" },
-  matching: { en: "Matching", ja: "マッチング" },
   stand: { en: "Stand", ja: "常設" },
 };
 

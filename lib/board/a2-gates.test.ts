@@ -26,6 +26,7 @@ import {
   TRANSACTION_BOUNDARY,
   MACHINE_READABLE_BOUNDARY,
   allTransactionLabelStrings,
+  SEED_BOARD_RECORDS,
 } from "./index.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -121,6 +122,34 @@ test("A2-impl-3/4: declaration fills receiptRefs and the object chains it", () =
   assert.deepEqual(plan.newReceiptRefs, ["dec_1"]); // A2-impl-3
   const obj = buildTransactionObject("rec-x", plan.events); // A2-impl-4
   assert.deepEqual(obj.declarationRefs, ["dec_1"]);
+});
+
+// ── narrowing ripple: a remapped record stays whole through A2 ───────────────────
+
+test("ripple: a matching→stand remapped record resolves by the SAME record_id (receiptRefs attached)", () => {
+  // rec-minato-darkroom-time was matching+offered in A1; the narrowing remapped it
+  // to stand+offered. A2 references listings by record_id only, so the surface
+  // change must not break the chain — the declaration attaches and resolves under
+  // the same id, with the receiptRef still present (the "preserve" path goes
+  // through an actually-remapped record, not an untouched one).
+  const remapped = SEED_BOARD_RECORDS.find((r) => r.recordId === "rec-minato-darkroom-time");
+  assert.ok(remapped, "the remapped record must exist");
+  assert.equal(remapped!.surfaceShape, "stand"); // remapped, no longer matching
+
+  const plan = planDeclaration({
+    listingRecordId: remapped!.recordId,
+    ownerHandle: remapped!.ownerHandle,
+    ownerPublicRef: remapped!.ownerPublicRef,
+    kind: "handoff",
+    currentReceiptRefs: [],
+    ids: { declarationId: "dec_r", declEventId: "evt_d", attachEventId: "evt_a" },
+    at: "2026-05-31T00:00:00Z",
+  });
+  assert.deepEqual(plan.newReceiptRefs, ["dec_r"]); // attached on the remapped record
+
+  const obj = buildTransactionObject(remapped!.recordId, plan.events);
+  assert.equal(obj.listingRecordId, "rec-minato-darkroom-time"); // same id resolves
+  assert.deepEqual(obj.declarationRefs, ["dec_r"]); // receiptRef survives the remap
 });
 
 // ── A2-impl-8 + boundary compatibility ──────────────────────────────────────────

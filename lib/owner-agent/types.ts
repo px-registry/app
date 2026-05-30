@@ -18,6 +18,8 @@ import type { SurfaceShape, Intent } from "../board/canonical.ts";
  * when the owner explicitly applied a saved filter (never auto-sent).
  */
 export interface SearchParamsAllowlist {
+  // surface_shape is the A1 canonical (now the narrowed 3-value set); the type
+  // is sourced from board canonical, so "matching" cannot appear here.
   surface_shape?: SurfaceShape;
   intent?: Intent;
   category?: string;

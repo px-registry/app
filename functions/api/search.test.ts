@@ -78,10 +78,14 @@ test("GET /search honors the canonical surface_shape filter", async () => {
   assert.ok(body.records.every((r: { surfaceShape: string }) => r.surfaceShape === "auction_like"));
 });
 
-test("GET /search fails closed on a non-canonical filter (zero rows, not all)", async () => {
-  const res = await call("?surface_shape=auction");
-  const body = await res.json();
-  assert.equal(body.count, 0);
+test("GET /search rejects a non-canonical filter with an explicit 400 (§6)", async () => {
+  for (const q of ["?surface_shape=auction", "?surface_shape=matching", "?intent=buy"]) {
+    const res = await call(q);
+    assert.equal(res.status, 400, `${q} must be 400`);
+    const body = await res.json();
+    assert.equal(body.count, 0);
+    assert.equal(body.error, "invalid_canonical");
+  }
 });
 
 test("GET /search?recordId= returns exactly one record (detail surface)", async () => {
@@ -107,7 +111,7 @@ test("B-impl-3: same params → byte-identical /search regardless of which owner
   // same query → identical response bytes (the handler never reads the cookie).
   const make = (cookie: string) =>
     onRequestGet({
-      request: new Request("https://app.px-registry.org/api/search?surface_shape=matching", {
+      request: new Request("https://app.px-registry.org/api/search?surface_shape=stand", {
         headers: { Cookie: cookie },
       }),
       env: { BOARD: fakeD1() },

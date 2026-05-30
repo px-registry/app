@@ -31,7 +31,7 @@ export default async function Home() {
       </ul>
 
       {/* Quiet entry to the board — search owner activity across all surfaces
-          (offered / auction-like / matching / stand) on one /search/ route. */}
+          (offered / auction-like / stand) on one /search/ route. */}
       <p className="board-entry">
         <a href="/search/">
           <span lang="ja">ボードを見る</span>

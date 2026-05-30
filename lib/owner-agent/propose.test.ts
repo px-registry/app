@@ -31,12 +31,12 @@ test("listingMatchesInterest is a case-insensitive substring over public text", 
 
 test("a saved_filter result set grounds each listing in that filter", () => {
   const sets: ResultSet[] = [
-    { savedFilterId: "sf1", params: { surface_shape: "matching" }, listings: [L("r1", "a"), L("r2", "b")] },
+    { savedFilterId: "sf1", params: { surface_shape: "stand" }, listings: [L("r1", "a"), L("r2", "b")] },
   ];
   const proposals = composeProposals([], sets);
   assert.equal(proposals.length, 2);
   assert.ok(proposals.every((p) => p.reason.kind === "matches_saved_filter" && p.reason.memoryRef === "sf1"));
-  assert.deepEqual(proposals[0].sourceSearchParams, { surface_shape: "matching" });
+  assert.deepEqual(proposals[0].sourceSearchParams, { surface_shape: "stand" });
 });
 
 test("an interest grounds matching listings; non-matches are not proposed", () => {
@@ -48,6 +48,25 @@ test("an interest grounds matching listings; non-matches are not proposed", () =
   assert.equal(proposals.length, 1);
   assert.equal(proposals[0].listingRecordId, "r1");
   assert.deepEqual(proposals[0].reason, { kind: "matches_saved_interest", memoryRef: "i1" });
+});
+
+test("cross-intent meeting works WITHOUT a matching surface (matching→working)", () => {
+  // The owner seeks a "press operator" (wanted) and is interested in "letterpress".
+  // A wanted row and an offered row, both on surviving surfaces (stand/offered),
+  // both get grounded — the meeting working survives with zero matching surface.
+  const memory = [mem({ memoryId: "i1", kind: "interest", value: { label: "letterpress" } })];
+  const sets: ResultSet[] = [
+    {
+      params: {},
+      listings: [
+        L("seeker", "Looking for a letterpress operator", { region: "Kyoto" }), // a wanted-side listing
+        L("provider", "Letterpress calling cards"), // an offered-side listing
+      ],
+    },
+  ];
+  const ids = composeProposals(memory, sets).map((p) => p.listingRecordId);
+  assert.deepEqual(ids, ["seeker", "provider"]); // both surfaced, no matching surface anywhere
+  assert.ok(!sets.some((s) => (s.params as { surface_shape?: string }).surface_shape === "matching"));
 });
 
 test("thin memory → thin proposals (no fabrication)", () => {

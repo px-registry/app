@@ -6,9 +6,12 @@
 // directly (no live D1 in node:test); the deployed board serves the same rows
 // from D1.
 //
-// Coverage is deliberate: every surface_shape (offered/auction_like/matching/
-// stand) and every intent (wanted/offered/ask) appears at least once, so the
-// acceptance gates have real rows to find. Themes continue examples.json; every
+// Coverage is deliberate: every surface_shape (offered/auction_like/stand) and
+// every intent (wanted/offered/ask) appears at least once, so the acceptance
+// gates have real rows to find. The intent axis carries the "meeting" working
+// that the removed matching surface used to hold — wanted rows (e.g. the
+// letterpress-operator opening) meet offered/ask rows across stand/offered.
+// Themes continue examples.json; every
 // domain is a `.example` placeholder. `ownerHandle` is a PRIVATE auth-shaped
 // value (prefixed `auth:`) that must never appear in a public record — the
 // no-leak gate searches projected output for exactly these strings.
@@ -128,9 +131,10 @@ export const SEED_BOARD_RECORDS: StoredBoardRow[] = [
     recordId: "rec-hansei-press-operator",
     ownerHandle: "auth:hansei-press-1c88",
     ownerPublicRef: "Hansei Press · hansei-press.example",
-    surfaceShape: "matching",
+    // Canonical narrowing: matching+wanted → stand+wanted (§3 default). category
+    // "matching" dropped — the board carries no matching surface/label.
+    surfaceShape: "stand",
     intent: "wanted",
-    category: "matching",
     region: "Kyoto",
     title: "Looking for a letterpress operator, two days a month",
     summary: "A small studio looking for someone who knows platen presses. Quiet work, regular hours.",
@@ -144,9 +148,9 @@ export const SEED_BOARD_RECORDS: StoredBoardRow[] = [
     recordId: "rec-minato-darkroom-time",
     ownerHandle: "auth:minato-studio-3b9d",
     ownerPublicRef: "Minato Studio · minato-studio.example",
-    surfaceShape: "matching",
+    // matching+offered → stand+offered (§3 default — a standing availability).
+    surfaceShape: "stand",
     intent: "offered",
-    category: "matching",
     region: "Kyoto",
     title: "Offering darkroom time, central Kyoto",
     summary: "A shared darkroom with two enlargers, open to careful hands on weekday evenings.",
@@ -160,9 +164,9 @@ export const SEED_BOARD_RECORDS: StoredBoardRow[] = [
     recordId: "rec-tidecraft-field-collab",
     ownerHandle: "auth:tidecraft-5c63",
     ownerPublicRef: "Tidecraft · tidecraft.example",
-    surfaceShape: "matching",
+    // matching+ask → stand+ask (§3 default).
+    surfaceShape: "stand",
     intent: "ask",
-    category: "matching",
     title: "Coastal field-recording trade — who's nearby?",
     summary: "Asking other recordists on the coast whether anyone wants to swap a season of tapes.",
     externalActionUrl: "https://tidecraft.example/trade",

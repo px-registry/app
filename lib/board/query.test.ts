@@ -23,7 +23,7 @@ test("no params returns every seed row", () => {
 });
 
 test("surface_shape filter narrows to that shape only", () => {
-  for (const shape of ["offered", "auction_like", "matching", "stand"] as const) {
+  for (const shape of ["offered", "auction_like", "stand"] as const) {
     const rows = search(`surface_shape=${shape}`);
     assert.ok(rows.length > 0, `expected at least one ${shape} row`);
     assert.ok(rows.every((r) => r.surfaceShape === shape));
@@ -39,14 +39,17 @@ test("intent filter narrows to that intent only", () => {
 });
 
 test("surface_shape and intent compose (independent axes)", () => {
-  const rows = search("surface_shape=matching&intent=wanted");
+  // stand now carries the wanted intent (the remapped letterpress-operator row) —
+  // the "meeting" working the matching surface used to hold.
+  const rows = search("surface_shape=stand&intent=wanted");
   assert.ok(rows.length > 0);
-  assert.ok(rows.every((r) => r.surfaceShape === "matching" && r.intent === "wanted"));
+  assert.ok(rows.every((r) => r.surfaceShape === "stand" && r.intent === "wanted"));
 });
 
 test("a non-canonical surface_shape fails closed (zero rows, never all)", () => {
   assert.equal(search("surface_shape=auction").length, 0);
   assert.equal(search("surface_shape=sale").length, 0);
+  assert.equal(search("surface_shape=matching").length, 0); // narrowed out
   assert.equal(search("intent=offer").length, 0);
 });
 

@@ -12,13 +12,23 @@ import type { OwnerMemoryV1 } from "../owner-memory/index.ts";
 const base = { memoryId: "m1", createdAt: "t", updatedAt: "t", provenance: "owner_written" } as const;
 
 test("saved_filter maps to canonical params; query only with includeQuery", () => {
-  const sf: OwnerMemoryV1 = { ...base, kind: "saved_filter", value: { surfaceShape: "auction_like", intent: "wanted", category: "matching", region: "Kyoto", query: "press" } };
+  const sf: OwnerMemoryV1 = { ...base, kind: "saved_filter", value: { surfaceShape: "auction_like", intent: "wanted", category: "sale", region: "Kyoto", query: "press" } };
   const noQ = memoryToSearchParams(sf, { includeQuery: false });
-  assert.deepEqual(noQ, { surface_shape: "auction_like", intent: "wanted", category: "matching", region: "Kyoto" });
+  assert.deepEqual(noQ, { surface_shape: "auction_like", intent: "wanted", category: "sale", region: "Kyoto" });
   assert.ok(!("query" in noQ!), "query must NOT be present on the proactive pass");
 
   const withQ = memoryToSearchParams(sf, { includeQuery: true });
   assert.equal(withQ!.query, "press");
+});
+
+test("a stale 'matching' saved_filter is rejected wholesale (never sent to /search)", () => {
+  // The narrowing removed matching; a filter stored before it must not leak a
+  // matching param. The agent rejects the whole filter (fail-closed).
+  const stale: OwnerMemoryV1 = { ...base, kind: "saved_filter", value: { surfaceShape: "matching" } as never };
+  assert.equal(memoryToSearchParams(stale, { includeQuery: true }), null);
+  // A non-canonical intent is likewise rejected.
+  const staleIntent: OwnerMemoryV1 = { ...base, kind: "saved_filter", value: { intent: "buy" } as never };
+  assert.equal(memoryToSearchParams(staleIntent, { includeQuery: true }), null);
 });
 
 test("interest / note / preference NEVER become server params (return null)", () => {

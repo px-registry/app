@@ -19,9 +19,10 @@ export type Provenance = "owner_written" | "owner_imported_confirmed";
 export const MEMORY_KINDS = ["saved_filter", "preference", "interest", "note"] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 
-/** A saved board filter — only the A1 canonical, neutral /search params. */
+/** A saved board filter — only the A1 canonical, neutral /search params.
+ *  (surface_shape is the narrowed 3-value set; "matching" was removed.) */
 export interface SavedFilterValue {
-  surfaceShape?: "offered" | "auction_like" | "matching" | "stand";
+  surfaceShape?: "offered" | "auction_like" | "stand";
   intent?: "wanted" | "offered" | "ask";
   category?: string;
   region?: string;

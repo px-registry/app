@@ -57,7 +57,7 @@ test("update edits the typed value and bumps updatedAt", async () => {
 test("listByKind filters; remove deletes", async () => {
   const s = freshStore();
   await s.create({ kind: "interest", provenance: "owner_written", value: { label: "a" } });
-  const f = await s.create({ kind: "saved_filter", provenance: "owner_written", value: { surfaceShape: "matching" } });
+  const f = await s.create({ kind: "saved_filter", provenance: "owner_written", value: { surfaceShape: "stand" } });
   assert.equal((await s.listByKind("saved_filter")).length, 1);
   await s.remove(f.memoryId);
   assert.equal((await s.listByKind("saved_filter")).length, 0);

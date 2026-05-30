@@ -87,15 +87,25 @@ function rawToPublicRow(r: RawPublicRow): PublicBoardRow {
   };
 }
 
+/** Result of a board search: ok with rows, or a rejected non-canonical filter. */
+export type BoardSearchResult =
+  | { ok: true; records: BoardRecordV1[] }
+  | { ok: false; reason: "invalid_canonical" };
+
 /**
  * Run a board search against D1 and return public records. Fetch public columns
  * + filter in lib/board is exact and simple at seed scale; the equality filters
  * move into SQL WHERE + the migration's indices when the board grows (Stage A2+).
+ *
+ * A non-canonical surface_shape/intent (e.g. the narrowed-out "matching") is
+ * rejected explicitly — fail-closed at the param boundary — so the handler can
+ * answer 400 rather than a silent empty 200 (§6).
  */
-export async function queryBoard(db: D1Database, url: URL): Promise<BoardRecordV1[]> {
+export async function queryBoard(db: D1Database, url: URL): Promise<BoardSearchResult> {
   const params = parseSearchParams(url.searchParams);
+  if (params.invalid) return { ok: false, reason: "invalid_canonical" };
   const stmt = db.prepare(`SELECT ${PUBLIC_COLUMNS} FROM board_records`);
   const { results } = await stmt.all<RawPublicRow>();
   const rows = (results ?? []).map(rawToPublicRow);
-  return filterBoard(rows, params).map(toPublicRecord);
+  return { ok: true, records: filterBoard(rows, params).map(toPublicRecord) };
 }

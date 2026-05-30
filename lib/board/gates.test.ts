@@ -7,7 +7,7 @@
 //   9A-1  /search route exists ............. functions/api/search.test.ts
 //   9A-2  GET /search returns D1 rows ....... functions/api/search.test.ts
 //   9A-3  auction_like row appears .......... here
-//   9A-4  matching row appears .............. here
+//   9A-4  matching ABSENT + 9A-4b cross-intent meeting .. here
 //   9A-5  offered/stand row appears ......... here
 //   9A-6  wanted row appears ................ here
 //   9A-7  all rows route to detail/surface .. here
@@ -48,8 +48,25 @@ test("9A-3: an auction_like row appears in /search", () => {
   assert.ok(search("surface_shape=auction_like").length > 0);
 });
 
-test("9A-4: a matching row appears in /search", () => {
-  assert.ok(search("surface_shape=matching").length > 0);
+test("9A-4: the matching surface_shape is ABSENT from the API, rows, seed, and copy", () => {
+  // Narrowed out. No row carries it; no filter returns it; no label names it.
+  assert.equal(search("surface_shape=matching").length, 0);
+  assert.ok(!SEED_BOARD_RECORDS.some((r) => (r.surfaceShape as string) === "matching"));
+  assert.ok(!SEED_BOARD_RECORDS.some((r) => r.category === "matching"));
+  assert.ok(!allBoardLabelStrings().some((l) => l.toLowerCase().includes("matching")));
+  assert.ok(!allBoardLabelStrings().some((l) => l.includes("マッチング")));
+});
+
+test("9A-4b: cross-intent meeting survives without a matching surface", () => {
+  // The "working" matching used to hold now lives on the intent axis: wanted rows
+  // and offered/ask rows coexist across offered/auction_like/stand, so the owner's
+  // AI can pair them (B+1) without any matching surface_shape.
+  const wanted = search("intent=wanted");
+  const offered = search("intent=offered");
+  const ask = search("intent=ask");
+  assert.ok(wanted.length > 0 && offered.length > 0 && ask.length > 0);
+  // The wanted row(s) sit on a surviving surface, ready to meet offered/ask.
+  assert.ok(wanted.every((r) => (SURFACE_SHAPES as readonly string[]).includes(r.surfaceShape)));
 });
 
 test("9A-5: offered and stand rows appear in /search", () => {
@@ -163,7 +180,7 @@ test("9A-9/N1: no PX-as-seller/auctioneer wording; auction shown as auction-like
 
 // ── cross-surface e2e (9A-11) ───────────────────────────────────────────────────
 
-test("9A-11: cross-surface search is green (all four shapes, filter→project→route)", () => {
+test("9A-11: cross-surface search is green (all three shapes, filter→project→route)", () => {
   // Browser e2e is out of node:test scope; this exercises the full chain —
   // parse → filter → project → route — across every surface_shape in one pass.
   const all = search("").map(toPublicRecord);
@@ -183,25 +200,28 @@ test("9A-11: cross-surface search is green (all four shapes, filter→project→
 
 // ── canonical enforced at the DB layer (9A-13) ──────────────────────────────────
 
-test("9A-13: the migration enforces canonical surface_shape/intent via CHECK", () => {
-  const ddl = readMigration("0001_board_records.sql");
-  // CHECK constraints must pin exactly the canonical sets — no extra values.
+test("9A-13: the NARROWED canonical (3 shapes) is enforced at the DB layer", () => {
+  // The effective CHECK is the narrowing migration's — surface_shape ∈ 3 values,
+  // matching removed. (0001's 4-value CHECK is historical, superseded by 0005.)
+  const narrow = readMigration("0005_narrow_surface_shape.sql");
   assert.match(
-    ddl,
-    /CHECK\s*\(\s*surface_shape\s+IN\s*\(\s*'offered',\s*'auction_like',\s*'matching',\s*'stand'\s*\)\s*\)/,
+    narrow,
+    /CHECK\s*\(\s*surface_shape\s+IN\s*\(\s*'offered',\s*'auction_like',\s*'stand'\s*\)\s*\)/,
   );
   assert.match(
-    ddl,
+    narrow,
     /CHECK\s*\(\s*intent\s+IN\s*\(\s*'wanted',\s*'offered',\s*'ask'\s*\)\s*\)/,
   );
-  // The closed road must not have grown a public kind at the DB layer either.
-  for (const banned of ["'sale'", "'auction'", "'match'", "'collaborate'", "'bid'"]) {
-    assert.ok(!ddl.includes(`CHECK (surface_shape IN (${banned}`));
+  // The narrowed CHECK must NOT list matching (or any other kind).
+  const checkClause = narrow.match(/surface_shape\s+IN\s*\(([^)]*)\)/)![1];
+  for (const banned of ["matching", "sale", "auction'", "match'", "collaborate", "bid"]) {
+    assert.ok(!checkClause.includes(banned), `narrowed CHECK must not list ${banned}`);
   }
-  // No pack_id column on board rows (9A-14, schema side). Strip `--` comments
-  // first — the schema documents pack_id's deliberate ABSENCE in prose.
-  const ddlNoComments = ddl.replace(/--.*$/gm, "");
-  assert.ok(!/\bpack_id\b/.test(ddlNoComments));
+  // The rebuild copies columns explicitly (no SELECT *) and never resurrects
+  // pack_id. Strip `--` comments first (the migration documents "NO SELECT *").
+  const narrowNoComments = narrow.replace(/--.*$/gm, "");
+  assert.ok(!/SELECT\s+\*/i.test(narrowNoComments), "rebuild must use explicit column copy");
+  assert.ok(!/\bpack_id\b/.test(narrowNoComments));
 });
 
 // ── seed ↔ migration sync (no drift) ────────────────────────────────────────────
@@ -223,4 +243,21 @@ test("seed covers every surface_shape and every intent (gates have rows to find)
   const intents = new Set(SEED_BOARD_RECORDS.map((r) => r.intent));
   for (const s of SURFACE_SHAPES) assert.ok(shapes.has(s), `seed missing shape ${s}`);
   for (const i of INTENTS) assert.ok(intents.has(i), `seed missing intent ${i}`);
+});
+
+test("seed gate: meeting persists with ZERO matching surface (1-to-1 AND 1-to-many)", () => {
+  // The removed matching surface must not leave "meeting" degraded into a pile of
+  // listings. The intent axis carries it, with no matching surface_shape:
+  assert.ok(!SEED_BOARD_RECORDS.some((r) => (r.surfaceShape as string) === "matching"));
+
+  // 1-to-1: a seeker and a provider exist that an owner-side proposal can pair —
+  // a `wanted` row and an `offered` row, on surviving surfaces.
+  const wanted = SEED_BOARD_RECORDS.filter((r) => r.intent === "wanted");
+  const offered = SEED_BOARD_RECORDS.filter((r) => r.intent === "offered");
+  assert.ok(wanted.length > 0 && offered.length > 0, "need a seeker + a provider to pair");
+
+  // 1-to-many: a standing, open gathering point — a `stand` row inviting many
+  // responses (an `ask`), so a group can form around it.
+  const gathering = SEED_BOARD_RECORDS.filter((r) => r.surfaceShape === "stand" && r.intent === "ask");
+  assert.ok(gathering.length > 0, "need a standing open call (1-to-many gathering)");
 });

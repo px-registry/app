@@ -29,6 +29,8 @@ test("unknown kinds and missing values are rejected", () => {
 
 test("saved_filter only accepts A1 canonical surfaceShape/intent", () => {
   assert.ok(!validateNewMemory({ kind: "saved_filter", provenance: "owner_written", value: { surfaceShape: "auction" } }).ok);
+  // "matching" was narrowed out — a new saved_filter can no longer carry it.
+  assert.ok(!validateNewMemory({ kind: "saved_filter", provenance: "owner_written", value: { surfaceShape: "matching" } }).ok);
   assert.ok(!validateNewMemory({ kind: "saved_filter", provenance: "owner_written", value: { intent: "buy" } }).ok);
   assert.ok(validateNewMemory({ kind: "saved_filter", provenance: "owner_written", value: { surfaceShape: "stand" } }).ok);
 });

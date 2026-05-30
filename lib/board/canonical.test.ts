@@ -15,8 +15,8 @@ import {
   MACHINE_READABLE_BOUNDARY,
 } from "./index.ts";
 
-test("surface_shape is exactly the four canonical values (no drift)", () => {
-  assert.deepEqual([...SURFACE_SHAPES], ["offered", "auction_like", "matching", "stand"]);
+test("surface_shape is exactly the three canonical values (matching narrowed out)", () => {
+  assert.deepEqual([...SURFACE_SHAPES], ["offered", "auction_like", "stand"]);
 });
 
 test("intent is exactly the three canonical values (no drift)", () => {
@@ -27,8 +27,9 @@ test("the guards accept canonical values and reject everything else", () => {
   for (const s of SURFACE_SHAPES) assert.ok(isSurfaceShape(s));
   for (const i of INTENTS) assert.ok(isIntent(i));
 
-  // Strategy words and GPT's rejected extensions must NOT pass as public vocab.
-  for (const bad of ["sale", "auction", "match", "collaborate", "hire", "sell", "bid", ""]) {
+  // Strategy words, GPT's rejected extensions, AND the narrowed-out "matching"
+  // must NOT pass as public vocab.
+  for (const bad of ["sale", "auction", "match", "matching", "collaborate", "hire", "sell", "bid", ""]) {
     assert.ok(!isSurfaceShape(bad), `surface_shape must reject "${bad}"`);
   }
   for (const bad of ["want", "offer", "asking", "sale", "", "WANTED"]) {

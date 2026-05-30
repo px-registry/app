@@ -51,6 +51,14 @@ test("Bplus1-impl-4: interest/note/preference never become /search params", () =
   for (const e of nonFilter) assert.equal(memoryToSearchParams(e, { includeQuery: true }), null);
 });
 
+// ── narrowing: zero matching dependency in the proposal road ────────────────────
+
+test("matching-dependency-zero: no 'matching' literal in the proposal lib runtime", () => {
+  // Comment-stripped: the agent road carries no matching surface anywhere.
+  const src = agentSources().join("\n").toLowerCase();
+  assert.ok(!src.includes("matching"), "proposal lib must not reference matching");
+});
+
 // ── Cbp1-3: reason kinds are exactly two (preference dropped) ────────────────────
 
 test("Bplus1-impl-2: ProposalReason has exactly two kinds (no matches_preference)", () => {
