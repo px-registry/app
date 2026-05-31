@@ -12,7 +12,7 @@
 // result is `unknown`, never public (the owner is told it may have duplicated). PX
 // still judges no content and ranks no board — publishing is a structural gate.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DraftBoardStore,
   BOARD_TEMPLATES,
@@ -23,6 +23,8 @@ import {
   meetsPublicCriteria,
   rowServerStateKind,
   publishedRecordIdOf,
+  isRowPublishable,
+  isUnknownRetryable,
   TEMPLATE_COPY,
   WIRING_COPY,
   ROW_STATE_LABELS,
@@ -199,10 +201,20 @@ function DraftEditor({
   const criteria = evaluatePublicCriteria(draft);
   const canPublish = meetsPublicCriteria(draft);
   const live = liveCount(draft);
+  // Are there any rows that are not already live? When every row is public (or
+  // edited-from-public), there is nothing new to publish — the button disables, so
+  // a second primary publish can never re-send already-live rows (idempotent).
+  const hasPublishable = draft.rows.some(isRowPublishable);
+  // Unknown (ambiguous-result) rows are sent ONLY via the explicit, warned retry.
+  const hasUnknown = draft.rows.some(isUnknownRetryable);
 
-  // A single in-flight guard for every server call (MF2: no double-submit).
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [retryArmed, setRetryArmed] = useState(false);
+  // A SYNCHRONOUS in-flight latch. React state (`busy`) can't block a SAME-TICK
+  // double-fire — its closure is stale until the next render — so the ref is set
+  // before any await and a second same-tick call exits immediately.
+  const inFlight = useRef(false);
 
   const contactKind: ContactReadinessKind | "" = draft.contact?.kind ?? "";
   const contactUrl =
@@ -215,72 +227,89 @@ function DraftEditor({
     return act(() => store.setContact(draft.draftId, next));
   };
 
-  // ── server publish (server-confirmed only, fail-closed) ───────────────────────
+  // ── server publish core (server-confirmed only, fail-closed, idempotent) ──────
+  // Sends exactly the rows it is handed. The SYNCHRONOUS latch guards re-entry; the
+  // CALLER decides which rows (primary = {local,retired}; retry = {unknown}).
+  const submitPublish = async (rowsToSend: DraftBoardV1["rows"]) => {
+    if (inFlight.current || !rowsToSend.length) return; // same-tick re-entry exits BEFORE fetch
+    inFlight.current = true;
+    setBusy(true);
+    setNotice(null);
+    const attempted = rowsToSend.map((r) => r.rowId);
+    try {
+      const payload = {
+        boardTitle: draft.boardTitle,
+        ...(draft.contact ? { contact: draft.contact } : {}),
+        rows: rowsToSend.map((r) => ({
+          surfaceShape: r.surfaceShape,
+          intent: r.intent,
+          title: r.title,
+          ...(r.summary != null ? { summary: r.summary } : {}),
+          localRowId: r.rowId, // reconciliation key — echoed back, never stored server-side
+        })),
+      };
+      let res: Response;
+      try {
+        res = await fetch("/api/owner/board/publish", {
+          method: "POST",
+          credentials: "include", // session cookie; the Origin guard verifies same-origin
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        // Network/timeout — result UNKNOWN (MF2). Do NOT treat as public.
+        await act(() => store.markRowsUnknown(draft.draftId, attempted));
+        setNotice({ tone: "warn", text: W.unknownResult.en });
+        return;
+      }
+      if (res.status === 401) {
+        setNotice({ tone: "error", text: W.signInToPublish.en }); // session gone — never auto-signin
+        return;
+      }
+      if (!res.ok) {
+        // 400 (cap/canonical) / 403 / 500 — fail-closed: nothing becomes public.
+        setNotice({ tone: "error", text: W.publishFailed.en });
+        return;
+      }
+      let out: { published?: Array<{ localRowId?: unknown; recordId?: unknown }> };
+      try {
+        out = await res.json();
+      } catch {
+        await act(() => store.markRowsUnknown(draft.draftId, attempted)); // 2xx but unreadable → unknown
+        setNotice({ tone: "warn", text: W.unknownResult.en });
+        return;
+      }
+      const confirmed = (out.published ?? []).filter(
+        (p): p is { localRowId: string; recordId: string } =>
+          typeof p?.localRowId === "string" && typeof p?.recordId === "string",
+      );
+      await act(() => store.applyPublishResult(draft.draftId, confirmed));
+      const confirmedIds = new Set(confirmed.map((c) => c.localRowId));
+      const missing = attempted.filter((id) => !confirmedIds.has(id));
+      if (missing.length) await act(() => store.markRowsUnknown(draft.draftId, missing));
+      setNotice(missing.length ? { tone: "warn", text: W.unknownResult.en } : { tone: "ok", text: W.publishedOk.en });
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
+
+  // Primary publish — only rows with no live record AND not unknown ({local,retired}).
+  // Re-sending a public/edited row would duplicate + orphan; unknown is retry-only.
   const publishToBoard = async () => {
-    if (busy || !canPublish) return;
+    if (!canPublish) return;
     if (signedIn === false) {
       setNotice({ tone: "error", text: W.signInToPublish.en });
       return;
     }
-    setBusy(true);
-    setNotice(null);
-    const attempted = draft.rows.map((r) => r.rowId);
-    const payload = {
-      boardTitle: draft.boardTitle,
-      ...(draft.contact ? { contact: draft.contact } : {}),
-      rows: draft.rows.map((r) => ({
-        surfaceShape: r.surfaceShape,
-        intent: r.intent,
-        title: r.title,
-        ...(r.summary != null ? { summary: r.summary } : {}),
-        localRowId: r.rowId, // reconciliation key — echoed back, never stored server-side
-      })),
-    };
-    let res: Response;
-    try {
-      res = await fetch("/api/owner/board/publish", {
-        method: "POST",
-        credentials: "include", // session cookie; the Origin guard verifies same-origin
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      // Network/timeout — result UNKNOWN (MF2). Do NOT treat as public.
-      await act(() => store.markRowsUnknown(draft.draftId, attempted));
-      setNotice({ tone: "warn", text: W.unknownResult.en });
-      setBusy(false);
-      return;
-    }
-    if (res.status === 401) {
-      setNotice({ tone: "error", text: W.signInToPublish.en }); // session gone — never auto-signin
-      setBusy(false);
-      return;
-    }
-    if (!res.ok) {
-      // 400 (cap/canonical) / 403 / 500 — fail-closed: nothing becomes public.
-      setNotice({ tone: "error", text: W.publishFailed.en });
-      setBusy(false);
-      return;
-    }
-    let out: { published?: Array<{ localRowId?: unknown; recordId?: unknown }> };
-    try {
-      out = await res.json();
-    } catch {
-      await act(() => store.markRowsUnknown(draft.draftId, attempted)); // 2xx but unreadable → unknown
-      setNotice({ tone: "warn", text: W.unknownResult.en });
-      setBusy(false);
-      return;
-    }
-    const confirmed = (out.published ?? []).filter(
-      (p): p is { localRowId: string; recordId: string } =>
-        typeof p?.localRowId === "string" && typeof p?.recordId === "string",
-    );
-    await act(() => store.applyPublishResult(draft.draftId, confirmed));
-    const confirmedIds = new Set(confirmed.map((c) => c.localRowId));
-    const missing = attempted.filter((id) => !confirmedIds.has(id));
-    if (missing.length) await act(() => store.markRowsUnknown(draft.draftId, missing));
-    setNotice(missing.length ? { tone: "warn", text: W.unknownResult.en } : { tone: "ok", text: W.publishedOk.en });
-    setBusy(false);
+    await submitPublish(draft.rows.filter(isRowPublishable));
+  };
+
+  // Explicit, warned retry of unknown (ambiguous-result) rows — armed via the
+  // two-step confirm so the orphan/duplicate warning is always shown first.
+  const retryUnknown = async () => {
+    setRetryArmed(false);
+    await submitPublish(draft.rows.filter(isUnknownRetryable));
   };
 
   // ── server unpublish (only retire on a confirmed 200) ─────────────────────────
@@ -304,26 +333,36 @@ function DraftEditor({
   };
 
   const unpublishRow = async (recordId: string) => {
-    if (busy) return;
+    if (inFlight.current) return; // same-tick / concurrent guard
+    inFlight.current = true;
     setBusy(true);
     setNotice(null);
-    const r = await unpublishOne(recordId);
-    if (!r.ok) setNotice({ tone: "error", text: r.status === 403 ? W.notYourRow.en : W.unpublishFailed.en });
-    setBusy(false);
+    try {
+      const r = await unpublishOne(recordId);
+      if (!r.ok) setNotice({ tone: "error", text: r.status === 403 ? W.notYourRow.en : W.unpublishFailed.en });
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   };
 
   const unpublishBoard = async () => {
-    if (busy) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setNotice(null);
-    const recs = draft.rows.map((r) => publishedRecordIdOf(r)).filter((x): x is string => x !== undefined);
-    let failed = 0;
-    for (const rec of recs) {
-      const r = await unpublishOne(rec);
-      if (!r.ok) failed += 1;
+    try {
+      const recs = draft.rows.map((r) => publishedRecordIdOf(r)).filter((x): x is string => x !== undefined);
+      let failed = 0;
+      for (const rec of recs) {
+        const r = await unpublishOne(rec);
+        if (!r.ok) failed += 1;
+      }
+      if (failed) setNotice({ tone: "error", text: W.unpublishFailed.en });
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
     }
-    if (failed) setNotice({ tone: "error", text: W.unpublishFailed.en });
-    setBusy(false);
   };
 
   return (
@@ -457,11 +496,37 @@ function DraftEditor({
         <span lang="ja">{BLOCK6_COPY.takedownOwner.ja[0]}</span>
       </p>
 
+      {/* Unknown (ambiguous-result) rows: explicit retry, gated by the orphan warning
+          (MF2). The warning is ALWAYS shown before the retry can run. */}
+      {hasUnknown && (
+        <div className="stand-retry">
+          <p className="board-action-note stand-notice stand-notice-warn">
+            {W.unknownResult.en}
+            <br />
+            <span lang="ja">{W.unknownResult.ja}</span>
+          </p>
+          {retryArmed ? (
+            <div className="stand-row-actions">
+              <button type="button" className="board-chip" disabled={busy} onClick={() => void retryUnknown()}>
+                {W.retryConfirm.en}
+              </button>
+              <button type="button" className="board-chip" onClick={() => setRetryArmed(false)}>
+                {W.retryCancel.en}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="board-chip" disabled={busy} onClick={() => setRetryArmed(true)}>
+              {W.retryUnknown.en}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="stand-actions">
         <button
           type="button"
           className="board-chip stand-publish"
-          disabled={busy || !canPublish || signedIn === false}
+          disabled={busy || !canPublish || signedIn === false || !hasPublishable}
           onClick={() => void publishToBoard()}
         >
           {busy ? W.publishing.en : W.publishToBoard.en}

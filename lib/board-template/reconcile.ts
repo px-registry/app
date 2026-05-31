@@ -38,6 +38,31 @@ export function publishedRecordIdOf(row: Pick<DraftBoardRow, "server">): string 
   return s.kind === "public" || s.kind === "local-edits-not-published" ? s.recordId : undefined;
 }
 
+/**
+ * Whether a row goes on a PRIMARY publish. Publishable iff it has no live server
+ * record AND is not `unknown` — i.e. `local` (never published) or `retired` (taken
+ * down, re-publishable as a fresh row). Deliberately EXCLUDES `unknown`: an
+ * ambiguous-result row may already be public, so re-sending it on the primary path
+ * could silently duplicate + orphan; it is sent only via the explicit, warned retry
+ * (isUnknownRetryable). `public` / `local-edits-not-published` already have a live
+ * server row, so re-sending would mint a duplicate (edit reflect path is unpublish
+ * → edit → re-publish).
+ */
+export function isRowPublishable(row: Pick<DraftBoardRow, "server">): boolean {
+  return publishedRecordIdOf(row) === undefined && rowServerStateKind(row) !== "unknown";
+}
+
+/**
+ * Whether a row is an `unknown` (ambiguous-result) row eligible for the EXPLICIT
+ * retry action. Separated from the primary path so an unknown row is never
+ * re-published silently — the UI must show the orphan/duplicate warning before it
+ * is sent. (An unknown row has no confirmed record, so publishedRecordIdOf is
+ * undefined.)
+ */
+export function isUnknownRetryable(row: Pick<DraftBoardRow, "server">): boolean {
+  return rowServerStateKind(row) === "unknown" && publishedRecordIdOf(row) === undefined;
+}
+
 // ── transitions (server-confirmed only) ──────────────────────────────────────
 
 export function serverPublished(recordId: string): RowServerState {

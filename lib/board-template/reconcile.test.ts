@@ -11,11 +11,16 @@ import assert from "node:assert/strict";
 import {
   rowServerStateKind,
   publishedRecordIdOf,
+  isRowPublishable,
+  isUnknownRetryable,
   serverAfterEdit,
   rowContentChanged,
 } from "./reconcile.ts";
 import { DraftBoardStore } from "./draft-store.ts";
 import { InMemoryDraftBackend } from "./backend.ts";
+import type { RowServerState } from "./types.ts";
+
+type TestRow = { rowId: string; server?: RowServerState };
 
 function newStore() {
   let n = 0;
@@ -141,4 +146,39 @@ test("UIW-impl-10: a live (public) row cannot be removed — unpublish first (or
   await store.applyUnpublishResult(d.draftId, "rec_A");
   const after = await store.removeRow(d.draftId, d.rows[0].rowId);
   assert.equal(after.rows.length, 1);
+});
+
+// ── republish idempotency: publish selects only non-live rows (no re-send) ────────
+
+const MIXED: TestRow[] = [
+  { rowId: "r-local" },
+  { rowId: "r-public", server: { kind: "public", recordId: "rec_2" } },
+  { rowId: "r-edited", server: { kind: "local-edits-not-published", recordId: "rec_3" } },
+  { rowId: "r-retired", server: { kind: "retired", recordId: "rec_4" } },
+  { rowId: "r-unknown", server: { kind: "unknown" } },
+];
+
+test("UIW-impl-13: PRIMARY publish selects ONLY {local, retired} — excludes unknown (and public/edited)", () => {
+  // The orphan/duplicate-prone `unknown` is deliberately NOT on the primary path.
+  assert.deepEqual(MIXED.filter(isRowPublishable).map((r) => r.rowId), ["r-local", "r-retired"]);
+});
+
+test("UIW-impl-14: unknown rows are RETRY-ONLY — selected by isUnknownRetryable, never by primary publish", () => {
+  assert.deepEqual(MIXED.filter(isUnknownRetryable).map((r) => r.rowId), ["r-unknown"]);
+  // The two predicates are disjoint: a row is never both primary-publishable and retryable.
+  for (const r of MIXED) assert.ok(!(isRowPublishable(r) && isUnknownRetryable(r)));
+});
+
+test("UIW-impl-16 (regression): retired republishable; public / local-edits-not-published are NOT; all-live disables", () => {
+  assert.equal(isRowPublishable({ server: { kind: "retired", recordId: "r" } }), true); // re-publish path open
+  assert.equal(isRowPublishable({}), true); // local
+  assert.equal(isRowPublishable({ server: { kind: "public", recordId: "r" } }), false);
+  assert.equal(isRowPublishable({ server: { kind: "local-edits-not-published", recordId: "r" } }), false); // MF4 reflect path
+  // A board whose rows are ALL live has nothing on the primary path (button disables).
+  const allLive: TestRow[] = [
+    { rowId: "a", server: { kind: "public", recordId: "x" } },
+    { rowId: "b", server: { kind: "local-edits-not-published", recordId: "y" } },
+  ];
+  assert.equal(allLive.some(isRowPublishable), false);
+  assert.equal([...allLive, { rowId: "c" } as TestRow].some(isRowPublishable), true);
 });

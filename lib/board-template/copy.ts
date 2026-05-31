@@ -91,11 +91,15 @@ export const WIRING_COPY = {
     en: "This row belongs to another owner — you cannot unpublish it.",
     ja: "この行は別の所有者のものです。取り下げできません。",
   },
-  // MF2 — the most dangerous case, said plainly.
+  // MF2 — the most dangerous case, said plainly (orphan/duplicate warning).
   unknownResult: {
-    en: "We could not confirm the publish state. Re-running may create a duplicate — reload /board to check, and unpublish any extra row.",
-    ja: "公開状態を確認できませんでした。再実行すると重複する可能性があります。/board を再読み込みして確認し、余分な行は取り下げてください。",
+    en: "We couldn't confirm whether this was published. It may already be public. Running it again could duplicate the same content, and you may not be able to take the old row down from this screen. Please check the public board first.",
+    ja: "公開できたか確認できませんでした。すでに公開されている可能性があります。もう一度実行すると、同じ内容が重複し、古い行をこの画面から取り下げられない場合があります。先に公開面を確認してください。",
   },
+  // The explicit, warned retry for an unknown (unconfirmed) row.
+  retryUnknown: { en: "Retry unconfirmed rows", ja: "未確認の行を再実行" },
+  retryConfirm: { en: "Retry anyway", ja: "それでも再実行" },
+  retryCancel: { en: "Cancel", ja: "やめる" },
   // MF4 — published row edited locally.
   editsNotPublishedNote: {
     en: "Edited on this device — not yet on the server. To reflect it: unpublish, edit, then publish again.",

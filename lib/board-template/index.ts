@@ -28,6 +28,8 @@ export {
   ROW_SERVER_STATES,
   rowServerStateKind,
   publishedRecordIdOf,
+  isRowPublishable,
+  isUnknownRetryable,
   type RowServerStateKind,
 } from "./reconcile.ts";
 

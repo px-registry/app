@@ -3377,6 +3377,17 @@ body {
   cursor: not-allowed;
 }
 
+/* Unknown-row retry block (explicit, warned). */
+.stand-retry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+  padding: 0.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+
 /* ── Invite-first demo banner (px-final-shell preview) ───────────────────────── */
 
 .demo-banner {
