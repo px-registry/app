@@ -104,7 +104,12 @@ export type BoardSearchResult =
 export async function queryBoard(db: D1Database, url: URL): Promise<BoardSearchResult> {
   const params = parseSearchParams(url.searchParams);
   if (params.invalid) return { ok: false, reason: "invalid_canonical" };
-  const stmt = db.prepare(`SELECT ${PUBLIC_COLUMNS} FROM board_records`);
+  // publication_state filter (req 13): the public board serves ONLY public rows.
+  // Retired rows (owner-unpublished) never leave D1 — they cannot appear on
+  // /search, /board, or /proposals, which all read through this one query.
+  const stmt = db.prepare(
+    `SELECT ${PUBLIC_COLUMNS} FROM board_records WHERE publication_state = 'public'`,
+  );
   const { results } = await stmt.all<RawPublicRow>();
   const rows = (results ?? []).map(rawToPublicRow);
   return { ok: true, records: filterBoard(rows, params).map(toPublicRecord) };

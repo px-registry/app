@@ -81,3 +81,13 @@ export {
   type PublicDeclarationRow,
   type DeclarationRecordV1,
 } from "./declaration.ts";
+
+// ── Owner Board Publish v0: owner-write input validation ──────────────────────
+
+export {
+  PUBLISH_CAPS,
+  validatePublishInput,
+  type ValidPublishRow,
+  type PublishValidation,
+  type PublishReject,
+} from "./owner-publish.ts";

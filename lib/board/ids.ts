@@ -1,12 +1,16 @@
 // Attested Board — opaque public-safe identifiers.
 //
-// Transaction events and declarations are referenced from public responses and
-// from BoardRecordV1.receiptRefs, so their ids must be public-safe and
-// non-reversible: a random opaque token, never derived from the owner's auth
-// identity, email, or any private handle. crypto.getRandomValues is available in
-// both the Workers runtime and Node.
+// Transaction events, declarations, and SERVER-MINTED board records are
+// referenced from public responses and from BoardRecordV1.receiptRefs, so their
+// ids must be public-safe and non-reversible: a random opaque token, never
+// derived from the owner's auth identity, email, or any private handle.
+// crypto.getRandomValues is available in both the Workers runtime and Node.
+//
+// "rec" is the prefix the owner-publish lane mints for a new board record
+// (server-side, never body-provided) — the same opaque, non-reversible shape, so
+// record_id leaks nothing about the owning auth identity (req 12 / req 18).
 
-const PREFIXES = ["evt", "dec"] as const;
+const PREFIXES = ["evt", "dec", "rec"] as const;
 export type OpaqueIdPrefix = (typeof PREFIXES)[number];
 
 function toB64Url(bytes: Uint8Array): string {

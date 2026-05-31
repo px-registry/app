@@ -160,9 +160,12 @@ test("BoardTemplate-impl-9: the publish projection REUSES the A1 machineReadable
   assert.equal(projected.rows[0].externalActionUrl, "https://x.test/a"); // sanitized via A1 policy
 });
 
-test("BoardTemplate-impl-9: no migration is added/changed by this stage (no new D1 table)", () => {
-  // The migration set stays exactly the A1..Canonical files — no board_template /
-  // draft / board-state table is introduced.
+test("BoardTemplate-impl-9: Board Templates added no migration; no board-template / draft table exists", () => {
+  // Board Templates introduced NO migration of its own (owner-local scaffold). The
+  // only migration added after Canonical is 0006 — a LATER, separately sanctioned
+  // stage (Owner Board Publish v0) that adds a publication_state COLUMN to the
+  // existing board_records (the A1 public table), not a board_template / draft /
+  // board-state table. The set is locked so any surprise migration still trips.
   const files = readdirSync(here("../../migrations")).filter((f) => f.endsWith(".sql")).sort();
   assert.deepEqual(files, [
     "0001_board_records.sql",
@@ -170,15 +173,21 @@ test("BoardTemplate-impl-9: no migration is added/changed by this stage (no new 
     "0003_transaction_events.sql",
     "0004_declarations.sql",
     "0005_narrow_surface_shape.sql",
+    "0006_publication_state.sql",
   ]);
 });
 
 // ── impl-10: owner-local — no server table/route/state for drafts or templates ───
 
 test("BoardTemplate-impl-10: no migration defines a board-template / draft / board-state table", () => {
+  // The real invariant: drafts/templates never get a server table — owner-local
+  // state never lands in D1. `publication_state` is NOT banned here: it is the
+  // Owner Board Publish public-row lifecycle (public/retired) on board_records, the
+  // already-public A1 table — a row only gets it AFTER the owner publishes it, so
+  // owner-local DRAFT state still never reaches the server.
   for (const ent of readdirSync(here("../../migrations"))) {
     const sql = stripJs(readFileSync(here(`../../migrations/${ent}`), "utf8")).toLowerCase();
-    for (const banned of ["board_template", "board_draft", "draft_board", "create table draft", "create table template", "publication_state"]) {
+    for (const banned of ["board_template", "board_draft", "draft_board", "create table draft", "create table template"]) {
       assert.ok(!sql.includes(banned), `${ent} must not define ${banned}`);
     }
   }

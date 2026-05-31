@@ -66,14 +66,17 @@ test("B-impl-10: no server route imports owner-memory or receives a memory body"
     assert.ok(!/owner-memory/.test(src), "a Function imports owner-memory");
     assert.ok(!/OwnerMemoryV1/.test(src), "a Function references OwnerMemoryV1");
   }
-  // There is no /api/owner/memory route on disk at all.
-  let hasOwnerDir = true;
+  // There is no owner-MEMORY route on disk. The banned thing is a server route for
+  // owner memory (functions/api/owner/memory) — NOT the whole owner namespace:
+  // functions/api/owner/board (Owner Board Publish v0) is a sanctioned public-write
+  // route, and the import scans above already prove no Function touches owner-memory.
+  let hasMemoryRoute = true;
   try {
-    readdirSync(root("functions/api/owner"));
+    readdirSync(root("functions/api/owner/memory"));
   } catch {
-    hasOwnerDir = false;
+    hasMemoryRoute = false;
   }
-  assert.equal(hasOwnerDir, false, "no functions/api/owner memory route should exist");
+  assert.equal(hasMemoryRoute, false, "no functions/api/owner/memory route should exist");
 });
 
 test("B-impl-10/11: the owner-memory lib never calls a network (no fetch/sync)", () => {
