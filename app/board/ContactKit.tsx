@@ -22,6 +22,7 @@ import {
   type ToolKind,
 } from "@/lib/contact/index.ts";
 import { sanitizeExternalActionUrl } from "@/lib/board/index.ts";
+import { BLOCK6_COPY } from "@/lib/public-copy/index.ts";
 
 export function ContactKit({
   record,
@@ -69,6 +70,12 @@ export function ContactKit({
     <section className="contact-kit" aria-label="Contact">
       <h2 className="board-tx-h">{CONTACT_COPY.heading.en}</h2>
       <p className="board-action-note">{CONTACT_COPY.intro.en}</p>
+      {/* Block #6 E — Contact Kit is device-side; PX is not in the loop. */}
+      <p className="board-action-note">
+        {BLOCK6_COPY.contact.en[0]}
+        <br />
+        <span lang="ja">{BLOCK6_COPY.contact.ja[0]}</span>
+      </p>
 
       <div className="contact-actions">
         <button type="button" className="board-chip" onClick={copyPacket}>

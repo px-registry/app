@@ -3302,6 +3302,44 @@ body {
   color: var(--accent);
 }
 
+/* ── Block #6 public copy framing ─────────────────────────────────────────────── */
+
+.board-framing {
+  margin: 0 0 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.board-framing-h {
+  font-family: var(--font-display, var(--font-serif));
+  font-size: 1.05rem;
+  color: var(--fg);
+  margin: 0;
+}
+.board-framing-h [lang="ja"] {
+  color: var(--fg-muted);
+  font-size: 0.92rem;
+}
+.board-framing-body {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.board-framing-body[lang="ja"] {
+  color: var(--fg-ghost);
+}
+.board-boundary [lang="ja"] {
+  color: var(--fg-muted);
+}
+.stand-friend-honesty,
+.stand-takedown-note {
+  color: var(--fg-muted);
+}
+.stand-friend-honesty [lang="ja"],
+.stand-takedown-note [lang="ja"] {
+  color: var(--fg-ghost);
+}
+
 .stand-select {
   font-size: 0.85rem;
   padding: 0.4rem 0.5rem;

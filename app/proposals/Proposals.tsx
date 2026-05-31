@@ -23,6 +23,7 @@ import {
 import { OwnerMemoryStore, describeSavedFilter, type OwnerMemoryV1 } from "@/lib/owner-memory/index.ts";
 import { IndexedDbBackend } from "@/lib/owner-memory/indexeddb.ts";
 import { boardDetailPath } from "@/lib/board/href.ts";
+import { BLOCK6_COPY } from "@/lib/public-copy/index.ts";
 import type { BoardRecordV1 } from "@/lib/board/types.ts";
 
 export function Proposals() {
@@ -116,13 +117,15 @@ export function Proposals() {
         </ul>
       )}
 
+      {/* Block #6 D — browser-local limits (no model claim; suggestions, not recommendations). */}
       <details className="mem-boundary">
         <summary>How these are made</summary>
-        <ul>
-          <li>Read from your on-device memory; the board is asked only with neutral filters.</li>
-          <li>Your interests and notes are matched on your device and never sent to PX.</li>
-          <li>PX ranks nothing. Your AI proposes; you decide.</li>
-        </ul>
+        {BLOCK6_COPY.browserLocal.en.map((l, i) => (
+          <p key={i} className="board-action-note">{l}</p>
+        ))}
+        {BLOCK6_COPY.browserLocal.ja.map((l, i) => (
+          <p key={`ja-${i}`} className="board-action-note" lang="ja">{l}</p>
+        ))}
         <pre className="mem-boundary-json">{JSON.stringify(PROPOSAL_BOUNDARY, null, 2)}</pre>
       </details>
     </>

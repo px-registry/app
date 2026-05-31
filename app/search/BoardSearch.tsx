@@ -16,6 +16,7 @@ import type { SurfaceShape, Intent } from "@/lib/board/canonical.ts";
 import type { BoardRecordV1 } from "@/lib/board/types.ts";
 import { OwnerMemoryStore, type SavedFilterValue } from "@/lib/owner-memory/index.ts";
 import { IndexedDbBackend } from "@/lib/owner-memory/indexeddb.ts";
+import { BLOCK6_COPY } from "@/lib/public-copy/index.ts";
 
 type ShapeFilter = SurfaceShape | "all";
 type IntentFilter = Intent | "all";
@@ -80,6 +81,17 @@ export function BoardSearch() {
         Sample boards (demo) — not real sellers or contacts.{" "}
         <span lang="ja">サンプルの板です（デモ）。実在の出品者・連絡先ではありません。</span>
       </p>
+
+      {/* Block #6 A — the board's framing (frozen public copy). */}
+      <header className="board-framing">
+        <p className="board-framing-h">
+          {BLOCK6_COPY.boardHeading.en[0]}{" "}
+          <span lang="ja">{BLOCK6_COPY.boardHeading.ja[0]}</span>
+        </p>
+        <p className="board-framing-body">{BLOCK6_COPY.boardBody.en.join(" ")}</p>
+        <p className="board-framing-body" lang="ja">{BLOCK6_COPY.boardBody.ja.join("")}</p>
+      </header>
+
       <div className="board-filters" role="group" aria-label="Board filters">
         <div className="board-filter-row">
           <span className="board-filter-label">Surface</span>
@@ -137,7 +149,7 @@ export function BoardSearch() {
             {records.length === 1 ? "record" : "records"}
             {error && <span className="board-error"> · the board is unavailable</span>}
           </p>
-          {records.length > 0 && (
+          {records.length > 0 ? (
             <ul className="listings">
               {records.map((r) => (
                 <li key={r.recordId}>
@@ -156,9 +168,34 @@ export function BoardSearch() {
                 </li>
               ))}
             </ul>
+          ) : (
+            !error && (
+              /* Block #6 A — empty state (frozen). */
+              <p className="board-action-note">
+                {BLOCK6_COPY.boardEmpty.en[0]}{" "}
+                <span lang="ja">{BLOCK6_COPY.boardEmpty.ja[0]}</span>
+              </p>
+            )
           )}
         </>
       )}
+
+      {/* Block #6 B + F — what PX does (and does not) do, and the closed-beta report stance. */}
+      <details className="mem-boundary board-boundary">
+        <summary>What PX does (and does not) do</summary>
+        <ul>
+          {BLOCK6_COPY.boundary.en.map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+        <ul lang="ja">
+          {BLOCK6_COPY.boundary.ja.map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+        <p className="board-action-note">{BLOCK6_COPY.report.en[0]}</p>
+        <p className="board-action-note" lang="ja">{BLOCK6_COPY.report.ja[0]}</p>
+      </details>
     </>
   );
 }

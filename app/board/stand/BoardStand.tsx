@@ -35,6 +35,7 @@ import {
   type PublicContactReadinessV1,
 } from "@/lib/board-template/index.ts";
 import { IndexedDbDraftBackend } from "@/lib/board-template/indexeddb.ts";
+import { BLOCK6_COPY } from "@/lib/public-copy/index.ts";
 import { fetchMe } from "@/lib/auth-client.ts";
 import { SURFACE_SHAPES, INTENTS, surfaceShapeLabel, intentLabel } from "@/lib/board/index.ts";
 
@@ -93,6 +94,13 @@ export function BoardStand() {
   return (
     <>
       <p className="board-action-note">{C.sub.en}</p>
+
+      {/* Block #6 C — friend-smoke honesty (this beta is an experiment). */}
+      <p className="board-action-note stand-friend-honesty">
+        {BLOCK6_COPY.friendHonesty.en[0]}
+        <br />
+        <span lang="ja">{BLOCK6_COPY.friendHonesty.ja[0]}</span>
+      </p>
 
       {/* Starting points — fixed neutral order, never a ranking. */}
       <section className="stand-templates">
@@ -441,6 +449,13 @@ function DraftEditor({
           <a href="/signin/?next=/board/stand/">{W.signInLink.en}</a>
         </p>
       )}
+
+      {/* Block #6 C — takedown copy (matches the real unpublish behaviour). */}
+      <p className="board-action-note stand-takedown-note">
+        {BLOCK6_COPY.takedownOwner.en[0]}
+        <br />
+        <span lang="ja">{BLOCK6_COPY.takedownOwner.ja[0]}</span>
+      </p>
 
       <div className="stand-actions">
         <button
