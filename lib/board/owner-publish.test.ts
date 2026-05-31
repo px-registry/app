@@ -131,3 +131,37 @@ test("OBP-impl-9: a blank or non-string row title is rejected (existence, not qu
   assert.deepEqual(validatePublishInput(goodBody({ rows: [{ surfaceShape: "stand", intent: "wanted", title: "  " }] })), { ok: false, reason: "invalid_row" });
   assert.deepEqual(validatePublishInput(goodBody({ rows: [{ surfaceShape: "stand", intent: "wanted", title: 5 }] })), { ok: false, reason: "invalid_row" });
 });
+
+test("OBP-UI-impl-1: localRowId travels in a PARALLEL channel, never inside a content row", () => {
+  const v = validatePublishInput(
+    goodBody({
+      rows: [
+        { surfaceShape: "stand", intent: "wanted", title: "A", localRowId: "row_aaa" },
+        { surfaceShape: "offered", intent: "offered", title: "B", localRowId: "row_bbb" },
+      ],
+    }),
+  );
+  assert.equal(v.ok, true);
+  if (!v.ok) return;
+  // Parallel, index-aligned with rows.
+  assert.deepEqual(v.localRowIds, ["row_aaa", "row_bbb"]);
+  // It is NOT folded into the content rows (so it can never reach toPublicRecord).
+  for (const row of v.rows) {
+    assert.ok(!("localRowId" in row));
+    assert.deepEqual(Object.keys(row).sort(), ["externalActionUrl", "intent", "surfaceShape", "title"].sort());
+  }
+});
+
+test("OBP-UI-impl-2: an oversized or non-string localRowId is dropped to undefined (never rejects the publish)", () => {
+  const v = validatePublishInput(
+    goodBody({
+      rows: [
+        { surfaceShape: "stand", intent: "wanted", title: "A", localRowId: "x".repeat(PUBLISH_CAPS.maxLocalRowIdLen + 1) },
+        { surfaceShape: "offered", intent: "offered", title: "B", localRowId: 42 },
+      ],
+    }),
+  );
+  assert.equal(v.ok, true);
+  if (!v.ok) return;
+  assert.deepEqual(v.localRowIds, [undefined, undefined]);
+});

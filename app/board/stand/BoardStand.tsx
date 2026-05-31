@@ -1,14 +1,16 @@
 "use client";
 
-// Board Templates v1 — the owner-local "stand a board" surface (/board/stand).
+// Board Templates v1 + UI Wiring v0 — the owner-local "stand a board" surface
+// (/board/stand), now WIRED to the server publish lane.
 //
-// Everything here happens on the owner's own device. Drafts live in IndexedDB; PX
-// holds no draft and no board/draft state. A template is a SCAFFOLD — a starting
-// point the owner edits, ignores, or skips (start blank). The structural gate (a
-// title + at least one row + a way to be contacted) is the ONLY thing standing
-// between a draft and publish; PX judges no content and ranks no board. The firmness
-// is in the gate; the surface stays light — stand a board easily, you decide what to
-// collect.
+// Drafts still live on the owner's device (IndexedDB); PX holds no draft. What
+// changes here: the publish / unpublish buttons now call the hardened owner-write
+// endpoints (POST /api/owner/board/{publish,unpublish}) with same-origin
+// credentials, and the UI shows each row's SERVER-CONFIRMED state. The reconciliation
+// rule is "server-confirmed only": a row is shown public ONLY after the server
+// confirms it; a local edit never silently updates the server; an ambiguous publish
+// result is `unknown`, never public (the owner is told it may have duplicated). PX
+// still judges no content and ranks no board — publishing is a structural gate.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -19,7 +21,11 @@ import {
   placeholdersFor,
   evaluatePublicCriteria,
   meetsPublicCriteria,
+  rowServerStateKind,
+  publishedRecordIdOf,
   TEMPLATE_COPY,
+  WIRING_COPY,
+  ROW_STATE_LABELS,
   CRITERION_COPY,
   CONTACT_READINESS_LABELS,
   CONTACT_READINESS_KINDS,
@@ -29,14 +35,23 @@ import {
   type PublicContactReadinessV1,
 } from "@/lib/board-template/index.ts";
 import { IndexedDbDraftBackend } from "@/lib/board-template/indexeddb.ts";
+import { fetchMe } from "@/lib/auth-client.ts";
 import { SURFACE_SHAPES, INTENTS, surfaceShapeLabel, intentLabel } from "@/lib/board/index.ts";
 
 const C = TEMPLATE_COPY;
+const W = WIRING_COPY;
+
+/** How many of a draft's rows are LIVE on the server (public or edited-from-public). */
+function liveCount(draft: DraftBoardV1): number {
+  return draft.rows.filter((r) => publishedRecordIdOf(r) !== undefined).length;
+}
 
 export function BoardStand() {
   const store = useMemo(() => new DraftBoardStore(new IndexedDbDraftBackend()), []);
   const [drafts, setDrafts] = useState<DraftBoardV1[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // null = still checking; the publish path is gated on a real session.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   const refresh = useCallback(async () => {
     const all = await store.list();
@@ -46,9 +61,8 @@ export function BoardStand() {
 
   useEffect(() => {
     void refresh();
+    void fetchMe().then((m) => setSignedIn(m.signed_in));
   }, [refresh]);
-
-  const selected = (drafts ?? []).find((d) => d.draftId === selectedId) ?? null;
 
   const startFromTemplate = useCallback(
     async (templateId: string) => {
@@ -67,7 +81,7 @@ export function BoardStand() {
     setSelectedId(created.draftId);
   }, [store, refresh]);
 
-  // ── editor actions (all owner-local) ──────────────────────────────────────────
+  // ── editor actions (owner-local store mutations) ──────────────────────────────
   const act = useCallback(
     async (fn: () => Promise<unknown>) => {
       await fn();
@@ -110,21 +124,35 @@ export function BoardStand() {
           <p className="board-action-note">Nothing yet — start from an example or a blank board above.</p>
         ) : (
           <ul className="listings stand-draft-list">
-            {drafts.map((d) => (
-              <li key={d.draftId}>
-                <button
-                  type="button"
-                  className={`stand-draft-row${d.draftId === selectedId ? " is-open" : ""}`}
-                  onClick={() => setSelectedId(d.draftId === selectedId ? null : d.draftId)}
-                >
-                  <span className="listing-title">{d.boardTitle || "(untitled board)"}</span>
-                  <span className={`stand-state stand-state-${d.publicationState}`}>
-                    {d.publicationState === "public" ? C.publicBadge.en : C.draftBadge.en}
-                  </span>
-                </button>
-                {d.draftId === selectedId && <DraftEditor store={store} draft={d} act={act} onRemoved={() => { setSelectedId(null); void refresh(); }} />}
-              </li>
-            ))}
+            {drafts.map((d) => {
+              const live = liveCount(d);
+              return (
+                <li key={d.draftId}>
+                  <button
+                    type="button"
+                    className={`stand-draft-row${d.draftId === selectedId ? " is-open" : ""}`}
+                    onClick={() => setSelectedId(d.draftId === selectedId ? null : d.draftId)}
+                  >
+                    <span className="listing-title">{d.boardTitle || "(untitled board)"}</span>
+                    <span className={`stand-state stand-state-${live > 0 ? "public" : "draft"}`}>
+                      {live > 0 ? `${live} ${ROW_STATE_LABELS.public.en}` : C.draftBadge.en}
+                    </span>
+                  </button>
+                  {d.draftId === selectedId && (
+                    <DraftEditor
+                      store={store}
+                      draft={d}
+                      act={act}
+                      signedIn={signedIn}
+                      onRemoved={() => {
+                        setSelectedId(null);
+                        void refresh();
+                      }}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -134,8 +162,8 @@ export function BoardStand() {
         <ul>
           <li>Your draft boards live on this device. PX holds no draft and no board state.</li>
           <li>A template is a starting point — PX ranks no board and judges no content.</li>
-          <li>Becoming publish-ready needs a title, at least one row, and a way to be contacted — a structural check, not a verdict.</li>
-          <li>Publish-ready is on this device only; appearing on the public board is a later server step, not yet wired.</li>
+          <li>Publishing needs a title, at least one row, and a way to be contacted — a structural check, not a verdict.</li>
+          <li>A row is shown “{ROW_STATE_LABELS.public.en}” only after the server confirms it. Unpublishing takes it down.</li>
         </ul>
         <pre className="mem-boundary-json">{JSON.stringify(TEMPLATE_BOUNDARY, null, 2)}</pre>
       </details>
@@ -143,21 +171,30 @@ export function BoardStand() {
   );
 }
 
+type Notice = { tone: "error" | "warn" | "ok"; text: string };
+
 function DraftEditor({
   store,
   draft,
   act,
+  signedIn,
   onRemoved,
 }: {
   store: DraftBoardStore;
   draft: DraftBoardV1;
   act: (fn: () => Promise<unknown>) => Promise<void>;
+  signedIn: boolean | null;
   onRemoved: () => void;
 }) {
   const template = draft.templateId ? findTemplate(draft.templateId) : undefined;
   const placeholders = template ? placeholdersFor(template) : [];
   const criteria = evaluatePublicCriteria(draft);
   const canPublish = meetsPublicCriteria(draft);
+  const live = liveCount(draft);
+
+  // A single in-flight guard for every server call (MF2: no double-submit).
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const contactKind: ContactReadinessKind | "" = draft.contact?.kind ?? "";
   const contactUrl =
@@ -168,6 +205,117 @@ function DraftEditor({
     const next: PublicContactReadinessV1 =
       kind === "manual_copy" ? { kind } : { kind, externalActionUrl: url };
     return act(() => store.setContact(draft.draftId, next));
+  };
+
+  // ── server publish (server-confirmed only, fail-closed) ───────────────────────
+  const publishToBoard = async () => {
+    if (busy || !canPublish) return;
+    if (signedIn === false) {
+      setNotice({ tone: "error", text: W.signInToPublish.en });
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    const attempted = draft.rows.map((r) => r.rowId);
+    const payload = {
+      boardTitle: draft.boardTitle,
+      ...(draft.contact ? { contact: draft.contact } : {}),
+      rows: draft.rows.map((r) => ({
+        surfaceShape: r.surfaceShape,
+        intent: r.intent,
+        title: r.title,
+        ...(r.summary != null ? { summary: r.summary } : {}),
+        localRowId: r.rowId, // reconciliation key — echoed back, never stored server-side
+      })),
+    };
+    let res: Response;
+    try {
+      res = await fetch("/api/owner/board/publish", {
+        method: "POST",
+        credentials: "include", // session cookie; the Origin guard verifies same-origin
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Network/timeout — result UNKNOWN (MF2). Do NOT treat as public.
+      await act(() => store.markRowsUnknown(draft.draftId, attempted));
+      setNotice({ tone: "warn", text: W.unknownResult.en });
+      setBusy(false);
+      return;
+    }
+    if (res.status === 401) {
+      setNotice({ tone: "error", text: W.signInToPublish.en }); // session gone — never auto-signin
+      setBusy(false);
+      return;
+    }
+    if (!res.ok) {
+      // 400 (cap/canonical) / 403 / 500 — fail-closed: nothing becomes public.
+      setNotice({ tone: "error", text: W.publishFailed.en });
+      setBusy(false);
+      return;
+    }
+    let out: { published?: Array<{ localRowId?: unknown; recordId?: unknown }> };
+    try {
+      out = await res.json();
+    } catch {
+      await act(() => store.markRowsUnknown(draft.draftId, attempted)); // 2xx but unreadable → unknown
+      setNotice({ tone: "warn", text: W.unknownResult.en });
+      setBusy(false);
+      return;
+    }
+    const confirmed = (out.published ?? []).filter(
+      (p): p is { localRowId: string; recordId: string } =>
+        typeof p?.localRowId === "string" && typeof p?.recordId === "string",
+    );
+    await act(() => store.applyPublishResult(draft.draftId, confirmed));
+    const confirmedIds = new Set(confirmed.map((c) => c.localRowId));
+    const missing = attempted.filter((id) => !confirmedIds.has(id));
+    if (missing.length) await act(() => store.markRowsUnknown(draft.draftId, missing));
+    setNotice(missing.length ? { tone: "warn", text: W.unknownResult.en } : { tone: "ok", text: W.publishedOk.en });
+    setBusy(false);
+  };
+
+  // ── server unpublish (only retire on a confirmed 200) ─────────────────────────
+  const unpublishOne = async (recordId: string): Promise<{ ok: boolean; status?: number }> => {
+    let res: Response;
+    try {
+      res = await fetch("/api/owner/board/unpublish", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recordId }),
+      });
+    } catch {
+      return { ok: false };
+    }
+    if (res.ok) {
+      await act(() => store.applyUnpublishResult(draft.draftId, recordId));
+      return { ok: true };
+    }
+    return { ok: false, status: res.status }; // 403/404/500 → row stays public (fail-closed)
+  };
+
+  const unpublishRow = async (recordId: string) => {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    const r = await unpublishOne(recordId);
+    if (!r.ok) setNotice({ tone: "error", text: r.status === 403 ? W.notYourRow.en : W.unpublishFailed.en });
+    setBusy(false);
+  };
+
+  const unpublishBoard = async () => {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    const recs = draft.rows.map((r) => publishedRecordIdOf(r)).filter((x): x is string => x !== undefined);
+    let failed = 0;
+    for (const rec of recs) {
+      const r = await unpublishOne(rec);
+      if (!r.ok) failed += 1;
+    }
+    if (failed) setNotice({ tone: "error", text: W.unpublishFailed.en });
+    setBusy(false);
   };
 
   return (
@@ -184,41 +332,64 @@ function DraftEditor({
 
       <h3 className="stand-h3">{C.rowsHeading.en}</h3>
       <ul className="stand-rows">
-        {draft.rows.map((r, i) => (
-          <li key={r.rowId} className="stand-row">
-            <div className="stand-row-axes">
-              <select
-                className="stand-select"
-                defaultValue={r.surfaceShape}
-                aria-label="surface shape"
-                onChange={(e) => act(() => store.updateRow(draft.draftId, r.rowId, { surfaceShape: e.target.value as DraftBoardV1["rows"][number]["surfaceShape"] }))}
-              >
-                {SURFACE_SHAPES.map((s) => (
-                  <option key={s} value={s}>{surfaceShapeLabel(s).en}</option>
-                ))}
-              </select>
-              <select
-                className="stand-select"
-                defaultValue={r.intent}
-                aria-label="intent"
-                onChange={(e) => act(() => store.updateRow(draft.draftId, r.rowId, { intent: e.target.value as DraftBoardV1["rows"][number]["intent"] }))}
-              >
-                {INTENTS.map((it) => (
-                  <option key={it} value={it}>{intentLabel(it).en}</option>
-                ))}
-              </select>
-            </div>
-            <input
-              className="board-search-input"
-              defaultValue={r.title}
-              placeholder={placeholders[i] ?? C.rowTitlePlaceholder.en}
-              onBlur={(e) => act(() => store.updateRow(draft.draftId, r.rowId, { title: e.target.value }))}
-            />
-            <button type="button" className="mem-del" aria-label={C.removeRow.en} onClick={() => act(() => store.removeRow(draft.draftId, r.rowId))}>
-              ✕
-            </button>
-          </li>
-        ))}
+        {draft.rows.map((r, i) => {
+          const stateKind = rowServerStateKind(r);
+          const liveRecordId = publishedRecordIdOf(r);
+          return (
+            <li key={r.rowId} className="stand-row">
+              <div className="stand-row-axes">
+                <select
+                  className="stand-select"
+                  defaultValue={r.surfaceShape}
+                  aria-label="surface shape"
+                  onChange={(e) => act(() => store.updateRow(draft.draftId, r.rowId, { surfaceShape: e.target.value as DraftBoardV1["rows"][number]["surfaceShape"] }))}
+                >
+                  {SURFACE_SHAPES.map((s) => (
+                    <option key={s} value={s}>{surfaceShapeLabel(s).en}</option>
+                  ))}
+                </select>
+                <select
+                  className="stand-select"
+                  defaultValue={r.intent}
+                  aria-label="intent"
+                  onChange={(e) => act(() => store.updateRow(draft.draftId, r.rowId, { intent: e.target.value as DraftBoardV1["rows"][number]["intent"] }))}
+                >
+                  {INTENTS.map((it) => (
+                    <option key={it} value={it}>{intentLabel(it).en}</option>
+                  ))}
+                </select>
+                <span className={`stand-rowstate stand-rowstate-${stateKind}`}>{ROW_STATE_LABELS[stateKind].en}</span>
+              </div>
+              <input
+                className="board-search-input"
+                defaultValue={r.title}
+                placeholder={placeholders[i] ?? C.rowTitlePlaceholder.en}
+                onBlur={(e) => act(() => store.updateRow(draft.draftId, r.rowId, { title: e.target.value }))}
+              />
+              {stateKind === "local-edits-not-published" && (
+                <p className="board-action-note stand-needs">{W.editsNotPublishedNote.en}</p>
+              )}
+              <div className="stand-row-actions">
+                {liveRecordId && (
+                  <button type="button" className="board-chip" disabled={busy} onClick={() => void unpublishRow(liveRecordId)}>
+                    {W.unpublishRow.en}
+                  </button>
+                )}
+                {/* A live row can't be removed (it would orphan a public row) — unpublish first. */}
+                <button
+                  type="button"
+                  className="mem-del"
+                  aria-label={C.removeRow.en}
+                  disabled={liveRecordId !== undefined}
+                  title={liveRecordId ? W.unpublishRow.en : undefined}
+                  onClick={() => act(() => store.removeRow(draft.draftId, r.rowId))}
+                >
+                  ✕
+                </button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
       <button
         type="button"
@@ -253,31 +424,49 @@ function DraftEditor({
         )}
       </div>
 
-      {/* Empty-board prevention, shown plainly. */}
+      {/* Empty-board prevention, shown plainly (structural, never a verdict). */}
       {!canPublish && (
         <p className="board-action-note stand-needs">
           {C.needsBeforePublish.en} {criteria.missing.map((k) => CRITERION_COPY[k].en).join(" · ")}
         </p>
       )}
 
-      {/* S3: publish-ready ≠ live on the public board. */}
-      <p className="board-action-note stand-needs">{C.publishReadyNote.en}</p>
+      {/* Server reconciliation notice (error / unknown / ok). */}
+      {notice && <p className={`board-action-note stand-notice stand-notice-${notice.tone}`}>{notice.text}</p>}
+
+      {/* Not signed in → guide to the existing passkey sign-in (no auto-signin / account creation). */}
+      {signedIn === false && (
+        <p className="board-action-note stand-needs">
+          {W.signInToPublish.en}{" "}
+          <a href="/signin/?next=/board/stand/">{W.signInLink.en}</a>
+        </p>
+      )}
 
       <div className="stand-actions">
-        {draft.publicationState === "draft" ? (
-          <button type="button" className="board-chip stand-publish" disabled={!canPublish} onClick={() => act(() => store.publish(draft.draftId))}>
-            {C.publish.en}
-          </button>
-        ) : (
-          <button type="button" className="board-chip" onClick={() => act(() => store.unpublish(draft.draftId))}>
-            {C.unpublish.en}
+        <button
+          type="button"
+          className="board-chip stand-publish"
+          disabled={busy || !canPublish || signedIn === false}
+          onClick={() => void publishToBoard()}
+        >
+          {busy ? W.publishing.en : W.publishToBoard.en}
+        </button>
+        {live > 0 && (
+          <button type="button" className="board-chip" disabled={busy} onClick={() => void unpublishBoard()}>
+            {W.unpublishBoard.en}
           </button>
         )}
         <button
           type="button"
           className="mem-del"
           onClick={() => {
-            if (window.confirm("Delete this draft from this device? PX holds no copy.")) void act(() => store.remove(draft.draftId)).then(onRemoved);
+            if (liveCount(draft) > 0) {
+              window.alert("Take this board down first — it still has rows on the public board.");
+              return;
+            }
+            if (window.confirm("Delete this draft from this device? PX holds no copy.")) {
+              void act(() => store.remove(draft.draftId)).then(onRemoved);
+            }
           }}
         >
           delete

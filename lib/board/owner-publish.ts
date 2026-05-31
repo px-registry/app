@@ -37,6 +37,8 @@ export const PUBLISH_CAPS = {
   maxSummaryLen: 2_000,
   /** Max length of an owner-provided external action URL string. */
   maxUrlLen: 2_048,
+  /** Max length of a client localRowId (reconciliation metadata, never stored). */
+  maxLocalRowIdLen: 128,
 } as const;
 
 // The contact-readiness kinds the publish body accepts. Closed 3-set, restated
@@ -80,7 +82,7 @@ export type PublishReject =
   | "invalid_contact";
 
 export type PublishValidation =
-  | { ok: true; rows: ValidPublishRow[] }
+  | { ok: true; rows: ValidPublishRow[]; localRowIds: (string | undefined)[] }
   | { ok: false; reason: PublishReject };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -153,6 +155,11 @@ export function validatePublishInput(raw: unknown): PublishValidation {
   const externalActionUrl = contact.url;
 
   const rows: ValidPublishRow[] = [];
+  // localRowId is RECONCILIATION metadata only — it identifies which owner-local
+  // draft row a minted record_id maps back to. It is carried PARALLEL to the
+  // content rows (same index), never folded into ValidPublishRow, so it can never
+  // reach the stored row, the public BoardRecord, or toPublicRecord. UI Wiring v0.
+  const localRowIds: (string | undefined)[] = [];
   for (const r of rawRows) {
     if (!isObject(r)) return { ok: false, reason: "invalid_row" };
     // Canonical 3×3 — outside the closed set is rejected (never widened).
@@ -180,7 +187,12 @@ export function validatePublishInput(raw: unknown): PublishValidation {
       ...(summary !== undefined ? { summary } : {}),
       ...(externalActionUrl !== undefined ? { externalActionUrl } : {}),
     });
+    localRowIds.push(
+      typeof r.localRowId === "string" && r.localRowId.length <= PUBLISH_CAPS.maxLocalRowIdLen
+        ? r.localRowId
+        : undefined,
+    );
   }
 
-  return { ok: true, rows };
+  return { ok: true, rows, localRowIds };
 }

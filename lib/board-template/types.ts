@@ -75,6 +75,27 @@ export const PUBLICATION_STATES = ["draft", "public"] as const;
 export type PublicationState = (typeof PUBLICATION_STATES)[number];
 
 /**
+ * Per-row SERVER reconciliation state (owner-local, **server-confirmed ONLY** —
+ * UI Wiring v0). A row gets a `server` value only after the server confirms a
+ * publish or unpublish; an absent `server` means the row is purely local. This is
+ * the source of truth for "what is actually on the public board", kept separate
+ * from the board-level publish-READY intent (`publicationState`, S3). `recordId`
+ * is the A1 server-minted `rec_…` — the handle the owner uses to unpublish.
+ *
+ *   public                     — server-confirmed live on the board
+ *   local-edits-not-published  — was public, then edited locally; the edits are NOT
+ *                                on the server (reflect via unpublish → edit → re-publish)
+ *   retired                    — server-confirmed unpublished (hidden from the board)
+ *   unknown                    — a publish attempt whose result never reached us;
+ *                                NOT treated as public (re-publishing may duplicate)
+ */
+export type RowServerState =
+  | { kind: "public"; recordId: string }
+  | { kind: "local-edits-not-published"; recordId: string }
+  | { kind: "retired"; recordId: string }
+  | { kind: "unknown" };
+
+/**
  * One row the owner is articulating ("what I'm collecting"). Canonical-typed on
  * both axes — a row is a CONCRETE slot (a chosen surface_shape + intent), which is
  * the structural answer to "誰か来て" emptiness (§4). The `title` is the owner's
@@ -86,6 +107,13 @@ export interface DraftBoardRow {
   intent: Intent;
   title: string; // owner-authored; never a leftover titleHint (C6)
   summary?: string;
+  /**
+   * Server reconciliation state — OWNER-LOCAL, set only on server-confirmed
+   * publish/unpublish (UI Wiring v0). Absent = purely local. The `rowId` doubles
+   * as the publish request's `localRowId`; PX stores neither this field nor the
+   * rowId server-side.
+   */
+  server?: RowServerState;
 }
 
 /**

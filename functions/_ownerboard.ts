@@ -73,18 +73,43 @@ const INSERT_SQL =
   "created_at, updated_at, publication_state) " +
   "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+/** One reconciliation pair: which owner-local draft row a minted record maps to. */
+export interface PublishedRowRef {
+  /** The client's localRowId, echoed back so the owner can reconcile (UI Wiring v0). */
+  localRowId?: string;
+  /** The server-minted record_id. */
+  recordId: string;
+}
+
 /**
  * Insert an owner's published board as N public board_records rows under one
  * server-derived owner_public_ref. record_id is SERVER-MINTED per row (req 12) —
  * a body-provided id can never overwrite an existing row, because no id from the
- * body is ever bound. Returns the created PUBLIC records (owner_handle is never
- * projected) so the response carries exactly what /search would serve.
+ * body is ever bound.
+ *
+ * ★ all-or-nothing: every row is inserted in a single D1 `batch()`, which runs as
+ * one transaction — all rows commit or none do (no partial board).
+ *
+ * Returns the created PUBLIC records (owner_handle never projected) AND a
+ * `published` reconciliation mapping. The `localRowId` lives ONLY in that mapping
+ * (echoed to its owner); it is never bound into a column and never appears in a
+ * public record — so it cannot leak to D1 or to /search.
  */
 export async function insertPublishedBoard(
   db: D1Database,
-  args: { ownerHandle: string; ownerPublicRef: string; rows: ValidPublishRow[]; at: string },
-): Promise<BoardRecordV1[]> {
-  const built = args.rows.map((r) => ({ recordId: newOpaqueId("rec"), row: r }));
+  args: {
+    ownerHandle: string;
+    ownerPublicRef: string;
+    rows: ValidPublishRow[];
+    localRowIds?: (string | undefined)[];
+    at: string;
+  },
+): Promise<{ records: BoardRecordV1[]; published: PublishedRowRef[] }> {
+  const built = args.rows.map((r, i) => ({
+    recordId: newOpaqueId("rec"),
+    row: r,
+    localRowId: args.localRowIds?.[i],
+  }));
 
   const stmts = built.map(({ recordId, row }) =>
     db
@@ -111,8 +136,8 @@ export async function insertPublishedBoard(
   await db.batch(stmts);
 
   // Public projection — owner_handle is never included. toPublicRecord stamps the
-  // machine-readable boundary and re-sanitizes the action URL.
-  return built.map(({ recordId, row }) =>
+  // machine-readable boundary and re-sanitizes the action URL. localRowId is NOT here.
+  const records = built.map(({ recordId, row }) =>
     toPublicRecord({
       recordId,
       ownerPublicRef: args.ownerPublicRef,
@@ -127,6 +152,14 @@ export async function insertPublishedBoard(
       updatedAt: args.at,
     }),
   );
+
+  // Reconciliation mapping — localRowId ↔ minted recordId (the only place localRowId appears).
+  const published: PublishedRowRef[] = built.map(({ localRowId, recordId }) => ({
+    ...(localRowId !== undefined ? { localRowId } : {}),
+    recordId,
+  }));
+
+  return { records, published };
 }
 
 // ── unpublish (ownership-checked retire) ───────────────────────────────────────

@@ -9,6 +9,7 @@
 
 import { CONTACT_READINESS_KINDS, type ContactReadinessKind } from "./types.ts";
 import type { CriterionKey } from "./criteria.ts";
+import { ROW_SERVER_STATES, type RowServerStateKind } from "./reconcile.ts";
 
 export interface Label {
   en: string;
@@ -59,6 +60,58 @@ export const TEMPLATE_COPY = {
   },
 } as const;
 
+// ── UI Wiring v0: server publish/unpublish + per-row reconciliation copy ─────────
+//
+// Plain, non-judgmental, and HONEST about state — "server-confirmed only". No copy
+// here claims a board is ranked/recommended/good (held to the same forbidden-phrase
+// gate as the rest of this module).
+export const WIRING_COPY = {
+  publishToBoard: { en: "Publish to the board", ja: "公開する" },
+  publishing: { en: "Publishing…", ja: "公開中…" },
+  unpublishRow: { en: "Unpublish", ja: "取り下げる" },
+  unpublishBoard: { en: "Take the whole board down", ja: "板ごと取り下げる" },
+  signInToPublish: {
+    en: "Sign in to publish your board to the public board.",
+    ja: "板を公開するにはサインインしてください。",
+  },
+  signInLink: { en: "Sign in", ja: "サインイン" },
+  publishedOk: {
+    en: "Published. Your rows are on the public board.",
+    ja: "公開しました。行が public board に出ています。",
+  },
+  publishFailed: {
+    en: "Publish failed — nothing was published. Please review and try again.",
+    ja: "公開に失敗しました。何も公開されていません。内容を確認して再試行してください。",
+  },
+  unpublishFailed: {
+    en: "Could not unpublish this row. It is unchanged on the server.",
+    ja: "この行を取り下げできませんでした。サーバー上は変わっていません。",
+  },
+  notYourRow: {
+    en: "This row belongs to another owner — you cannot unpublish it.",
+    ja: "この行は別の所有者のものです。取り下げできません。",
+  },
+  // MF2 — the most dangerous case, said plainly.
+  unknownResult: {
+    en: "We could not confirm the publish state. Re-running may create a duplicate — reload /board to check, and unpublish any extra row.",
+    ja: "公開状態を確認できませんでした。再実行すると重複する可能性があります。/board を再読み込みして確認し、余分な行は取り下げてください。",
+  },
+  // MF4 — published row edited locally.
+  editsNotPublishedNote: {
+    en: "Edited on this device — not yet on the server. To reflect it: unpublish, edit, then publish again.",
+    ja: "この端末で編集済み（サーバー未反映）。反映するには、取り下げ→編集→再公開してください。",
+  },
+} as const;
+
+/** Per-row state chip labels — honest, neutral; never a ranking/quality word. */
+export const ROW_STATE_LABELS: Record<RowServerStateKind, Label> = {
+  local: { en: "Draft (this device)", ja: "下書き（この端末）" },
+  public: { en: "On the board", ja: "公開中" },
+  "local-edits-not-published": { en: "Edited — not published", ja: "編集あり（未公開）" },
+  retired: { en: "Taken down", ja: "取り下げ済" },
+  unknown: { en: "Unconfirmed", ja: "未確認" },
+};
+
 /** The one-line reason a structural criterion is unmet — existence/count, no verdict. */
 export const CRITERION_COPY: Record<CriterionKey, Label> = {
   title: { en: "a board title", ja: "板のタイトル" },
@@ -80,6 +133,8 @@ export const CONTACT_READINESS_LABELS: Record<ContactReadinessKind, Label> = {
 export function allBoardTemplateCopyStrings(): string[] {
   const out: string[] = [];
   for (const v of Object.values(TEMPLATE_COPY)) out.push(v.en, v.ja);
+  for (const v of Object.values(WIRING_COPY)) out.push(v.en, v.ja);
+  for (const k of ROW_SERVER_STATES) out.push(ROW_STATE_LABELS[k].en, ROW_STATE_LABELS[k].ja);
   for (const v of Object.values(CRITERION_COPY)) out.push(v.en, v.ja);
   for (const k of CONTACT_READINESS_KINDS) out.push(CONTACT_READINESS_LABELS[k].en, CONTACT_READINESS_LABELS[k].ja);
   return out;

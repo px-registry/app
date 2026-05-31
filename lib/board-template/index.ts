@@ -17,11 +17,19 @@ export {
   type PublicContactReadinessV1,
   type ContactReadinessKind,
   type PublicationState,
+  type RowServerState,
   type DraftBoardV1,
   type DraftBoardRow,
   type NewDraftBoard,
   type NewDraftBoardRow,
 } from "./types.ts";
+
+export {
+  ROW_SERVER_STATES,
+  rowServerStateKind,
+  publishedRecordIdOf,
+  type RowServerStateKind,
+} from "./reconcile.ts";
 
 export { BOARD_TEMPLATES, findTemplate, blankDraft } from "./catalog.ts";
 
@@ -49,6 +57,8 @@ export { TEMPLATE_BOUNDARY, type TemplateBoundary } from "./boundary.ts";
 
 export {
   TEMPLATE_COPY,
+  WIRING_COPY,
+  ROW_STATE_LABELS,
   CRITERION_COPY,
   CONTACT_READINESS_LABELS,
   allBoardTemplateCopyStrings,

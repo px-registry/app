@@ -52,15 +52,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return json({ ok: false, error: "owner_ref_unavailable" }, 400);
   }
 
-  // 5. Insert with server-minted ids, publication_state = 'public'.
+  // 5. Insert (all-or-nothing batch) with server-minted ids, publication_state =
+  //    'public'. The response carries a localRowId → recordId reconciliation
+  //    mapping so the owner-local UI marks ONLY server-confirmed rows public.
   try {
-    const records = await insertPublishedBoard(env.BOARD, {
+    const { records, published } = await insertPublishedBoard(env.BOARD, {
       ownerHandle: session.handle,
       ownerPublicRef,
       rows: v.rows,
+      localRowIds: v.localRowIds,
       at: new Date().toISOString(),
     });
-    return json({ ok: true, count: records.length, records }, 201);
+    return json({ ok: true, count: records.length, published, records }, 201);
   } catch {
     // Fail closed: never leak an internal error body.
     return json({ ok: false, error: "publish_failed" }, 500);

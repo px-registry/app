@@ -161,3 +161,40 @@ test("OBP-impl-16: no GET handler is exported — a mutation cannot ride a GET",
   assert.equal(typeof onRequestPost, "function");
   assert.equal((publishModule as Record<string, unknown>).onRequestGet, undefined);
 });
+
+test("OBP-UI-impl-3: the response returns a localRowId → recordId reconciliation mapping", async () => {
+  const db = fakeD1();
+  const body = {
+    ...BODY,
+    rows: [
+      { surfaceShape: "stand", intent: "wanted", title: "A", localRowId: "row_aaa" },
+      { surfaceShape: "offered", intent: "offered", title: "B", localRowId: "row_bbb" },
+    ],
+  };
+  const res = await postPublish(db, body, { handle: "aoi-bonsai", owner: null });
+  assert.equal(res.status, 201);
+  const out = await res.json();
+  assert.equal(out.published.length, 2);
+  // Each entry pairs the client's localRowId with a server-minted recordId.
+  const byLocal = new Map(out.published.map((p: { localRowId: string; recordId: string }) => [p.localRowId, p.recordId]));
+  assert.match(byLocal.get("row_aaa"), /^rec_/);
+  assert.match(byLocal.get("row_bbb"), /^rec_/);
+  assert.notEqual(byLocal.get("row_aaa"), byLocal.get("row_bbb"));
+});
+
+test("OBP-UI-impl-4 (leak): localRowId is never stored in D1 nor present in any public record", async () => {
+  const db = fakeD1();
+  const body = {
+    ...BODY,
+    rows: [{ surfaceShape: "stand", intent: "wanted", title: "A", localRowId: "row_SECRET_LOCAL" }],
+  };
+  const res = await postPublish(db, body, { handle: "aoi-bonsai", owner: null });
+  const out = await res.json();
+  // Not in the stored row (never bound to a column).
+  assert.ok(!JSON.stringify(db._state.records).includes("row_SECRET_LOCAL"));
+  // Not in any public record returned.
+  assert.ok(!JSON.stringify(out.records).includes("row_SECRET_LOCAL"));
+  for (const rec of out.records) assert.ok(!("localRowId" in rec));
+  // It appears ONLY in the reconciliation mapping (the owner's own echo).
+  assert.equal(out.published[0].localRowId, "row_SECRET_LOCAL");
+});

@@ -3239,8 +3239,11 @@ body {
 
 .stand-row {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px dotted var(--hairline);
 }
 
 .stand-row .board-search-input {
@@ -3250,7 +3253,53 @@ body {
 
 .stand-row-axes {
   display: flex;
+  align-items: center;
   gap: 0.35rem;
+}
+
+.stand-row-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Per-row server-confirmed state chip (mono, neutral; colour by state). */
+.stand-rowstate {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  white-space: nowrap;
+  color: var(--fg-ghost);
+}
+.stand-rowstate-public {
+  color: var(--accent);
+}
+.stand-rowstate-local-edits-not-published,
+.stand-rowstate-unknown {
+  color: var(--warn, #b5731e);
+}
+.stand-rowstate-retired {
+  color: var(--fg-ghost);
+  text-decoration: line-through;
+}
+
+.mem-del:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Reconciliation notice (error / unknown-warn / ok). */
+.stand-notice {
+  font-size: 0.8rem;
+}
+.stand-notice-error {
+  color: var(--danger, #b3261e);
+}
+.stand-notice-warn {
+  color: var(--warn, #b5731e);
+}
+.stand-notice-ok {
+  color: var(--accent);
 }
 
 .stand-select {
