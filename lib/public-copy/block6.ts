@@ -71,12 +71,8 @@ export const BLOCK6_COPY = {
     ],
   },
   friendHonesty: {
-    en: [
-      "The boards in this beta are an experiment. They go away later. Anything you do in an external tool (such as Signal) is yours — PX is not involved.",
-    ],
-    ja: [
-      "このベータの板は実験です。あとで消えます。外部ツール（Signal など）でのやり取りは、あなたたちのものです——PX は関与しません。",
-    ],
+    en: ["Your board is yours. Keeping it up or taking it down is always yours to decide."],
+    ja: ["あなたの板はあなたのもの。残すのも取り下げるのも、いつでもあなたが決められます"],
   },
 
   // ── D. Browser-local limits (no model claim) ──────────────────────────────────
