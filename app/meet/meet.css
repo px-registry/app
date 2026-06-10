@@ -127,6 +127,10 @@
   color: var(--shu-deep);
   border-top-color: var(--shu);
 }
+/* desktop header nav — hidden until the desktop layer turns it on */
+.m-nav-top {
+  display: none;
+}
 
 /* ── type ──────────────────────────────────────────────────────────────────── */
 
@@ -438,5 +442,102 @@ textarea.m-field {
   }
   .m-h1 {
     font-size: 1.6rem;
+  }
+}
+
+/* ── desktop (第5便, ≥64rem): the paper widens — mobile below stays as-is ────
+ *
+ * Additive only: same tokens, same type, no new colour. The thumb bar becomes
+ * a header line, the single column becomes columns, reading width stays
+ * editorial (~65ch caps where prose flows).
+ */
+@media (min-width: 64rem) {
+  .m-top-inner,
+  .m-main {
+    max-width: 72rem;
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+  .m-main {
+    padding-top: 3rem;
+    padding-bottom: 4.5rem; /* no bottom tab bar at this width */
+  }
+
+  /* nav: the thumb bar yields to the header row */
+  .m-nav {
+    display: none;
+  }
+  .m-nav-top {
+    display: block;
+    margin-left: auto;
+  }
+  .m-nav-top .m-nav-inner {
+    max-width: none;
+    display: flex;
+    gap: 1.75rem;
+  }
+  .m-nav-top .m-nav-item {
+    padding: 0.15rem 0;
+    font-size: 0.85rem;
+    margin-top: 0;
+    border-top: none;
+    border-bottom: 2px solid transparent;
+  }
+  .m-nav-top .m-nav-item[aria-current="page"],
+  .m-nav-top .m-nav-item[data-active="true"] {
+    border-top-color: transparent;
+    border-bottom-color: var(--shu);
+  }
+
+  /* home: the question side keeps the left hand, proposals stream right */
+  .m-home {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: 3.5rem;
+    align-items: start;
+  }
+  .m-home-right .m-item {
+    max-width: 65ch;
+  }
+
+  /* 記憶: main column + quiet right rail (候補に出す / 控え) */
+  .m-mem {
+    display: grid;
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    column-gap: 3rem;
+    align-items: start;
+  }
+  /* memory cards in two columns; an open editor takes the full row */
+  .m-grid2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .m-grid2 > li:has(.m-form) {
+    grid-column: 1 / -1;
+  }
+
+  /* はじめかた: 1・2・3 side by side */
+  .m-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+  .m-steps .m-card + .m-card {
+    margin-top: 0;
+  }
+
+  /* 進行役: 候補プール＋ながれ left, 提案と読み right */
+  .m-host {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 3rem;
+    align-items: start;
+  }
+
+  /* prose blocks keep an editorial measure on the wide paper */
+  .m-boundary,
+  .m-lede {
+    max-width: 65ch;
   }
 }

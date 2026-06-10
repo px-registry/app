@@ -10,10 +10,13 @@ const ITEMS = [
   { href: "/meet/start/", label: MEET.nav.start },
 ] as const;
 
-export function MeetNav() {
+export function MeetNav({ variant = "bar" }: { variant?: "bar" | "top" }) {
   const pathname = usePathname();
+  // 第5便: two renderings of the same nav — the mobile thumb bar (fixed; must
+  // NOT sit inside the backdrop-filtered header, which would become its
+  // containing block) and the desktop header row. CSS shows exactly one.
   return (
-    <nav className="m-nav" aria-label={MEET.title}>
+    <nav className={variant === "top" ? "m-nav-top" : "m-nav"} aria-label={MEET.title}>
       <div className="m-nav-inner">
         {ITEMS.map((it) => (
           <Link

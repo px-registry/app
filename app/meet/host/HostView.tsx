@@ -127,9 +127,11 @@ export function HostView() {
 
   return (
     <>
+      <h1 className="m-h1">{MEET.host.title}</h1>
+      {/* 第5便: plain wrapper — invisible on mobile; pool+flow left, 提案と
+          読み right at desktop width. Layout only. */}
+      <div className="m-host">
       <section className="m-section">
-        <h1 className="m-h1">{MEET.host.title}</h1>
-
         <h2 className="m-h2">{MEET.host.poolHeading}</h2>
         {pool.length === 0 ? (
           <div className="m-empty">{MEET.host.empty}</div>
@@ -212,6 +214,7 @@ export function HostView() {
           ))
         )}
       </section>
+      </div>
     </>
   );
 }

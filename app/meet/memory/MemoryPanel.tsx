@@ -515,6 +515,10 @@ export function MemoryPanel() {
 
   return (
     <>
+      {/* 第5便: block wrappers — invisible on mobile, main/side columns at
+          desktop width (publish + backup become the right rail). Layout only. */}
+      <div className="m-mem">
+        <div className="m-mem-main">
       <section className="m-section">
         <h2 className="m-h2">{MEET.profile.heading}</h2>
         <div className="m-card">
@@ -553,7 +557,7 @@ export function MemoryPanel() {
         {entries.length === 0 && editing !== "new" && (
           <div className="m-empty">{MEET.memory.empty}</div>
         )}
-        <ul className="m-itemlist">
+        <ul className="m-itemlist m-grid2">
           {entries.map((e) => (
             <li key={e.entryId} className="m-item">
               {editing === e.entryId ? (
@@ -654,6 +658,9 @@ export function MemoryPanel() {
         )}
       </section>
 
+        </div>
+
+        <div className="m-mem-side">
       <section className="m-section">
         <h2 className="m-h2">{MEET.publish.heading}</h2>
         <div className="m-card">
@@ -715,6 +722,8 @@ export function MemoryPanel() {
         {report && <p className="m-note">{report}</p>}
         <p className="m-note">{MEET.memory.durability}</p>
       </section>
+        </div>
+      </div>
 
       <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.disclosure]} />
     </>

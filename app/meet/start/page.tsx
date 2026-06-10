@@ -14,27 +14,31 @@ export default function MeetStart() {
         <h1 className="m-h1">{MEET.start.title}</h1>
         <p className="m-lede">{MEET.start.lede}</p>
 
-        <div className="m-card">
-          <h2 className="m-h2 m-stepnum">{MEET.start.step1.heading}</h2>
-          <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step1.body}</p>
-          <KeyConnect />
-        </div>
+        {/* 第5便: plain wrapper — invisible on mobile; the three steps sit
+            side by side at desktop width. Layout only. */}
+        <div className="m-steps">
+          <div className="m-card">
+            <h2 className="m-h2 m-stepnum">{MEET.start.step1.heading}</h2>
+            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step1.body}</p>
+            <KeyConnect />
+          </div>
 
-        <div className="m-card">
-          <h2 className="m-h2 m-stepnum">{MEET.start.step2.heading}</h2>
-          <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
-          <ColdStartIntake />
-        </div>
+          <div className="m-card">
+            <h2 className="m-h2 m-stepnum">{MEET.start.step2.heading}</h2>
+            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
+            <ColdStartIntake />
+          </div>
 
-        <div className="m-card">
-          <h2 className="m-h2 m-stepnum">{MEET.start.step3.heading}</h2>
-          <p style={{ margin: 0, color: "var(--text)" }}>{MEET.start.step3.body}</p>
-          <p className="m-note" style={{ marginTop: "0.6rem" }}>
-            <Link href="/meet/memory/" style={{ color: "var(--shu-deep)" }}>
-              {MEET.nav.memory}
-            </Link>
-            で項目ごとに選び、「{MEET.publish.action}」で出します。
-          </p>
+          <div className="m-card">
+            <h2 className="m-h2 m-stepnum">{MEET.start.step3.heading}</h2>
+            <p style={{ margin: 0, color: "var(--text)" }}>{MEET.start.step3.body}</p>
+            <p className="m-note" style={{ marginTop: "0.6rem" }}>
+              <Link href="/meet/memory/" style={{ color: "var(--shu-deep)" }}>
+                {MEET.nav.memory}
+              </Link>
+              で項目ごとに選び、「{MEET.publish.action}」で出します。
+            </p>
+          </div>
         </div>
       </section>
 

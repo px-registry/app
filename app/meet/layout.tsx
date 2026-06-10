@@ -28,9 +28,13 @@ export default function MeetLayout({ children }: { children: React.ReactNode }) 
           <a href="/meet/" className="m-wordmark">
             {MEET.title}
           </a>
+          {/* desktop-only header row (hidden under 64rem) */}
+          <MeetNav variant="top" />
         </div>
       </header>
       <main className="m-main">{children}</main>
+      {/* mobile thumb bar (hidden at ≥64rem); lives OUTSIDE the blurred header
+          so position:fixed keeps the viewport as its containing block */}
       <MeetNav />
     </div>
   );

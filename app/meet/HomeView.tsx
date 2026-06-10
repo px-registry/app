@@ -334,6 +334,10 @@ export function HomeView() {
 
   return (
     <>
+      {/* 第5便: plain block wrappers — invisible on mobile, a 2-column grid
+          (question side / proposal stream) at desktop width. Layout only. */}
+      <div className="m-home">
+        <div className="m-home-left">
       <section className="m-section">
         {/* 第3便 B-1: the tagline IS the heading — no 「問い」 label above it. */}
         <h1 className="m-h1" style={{ fontSize: "1.15rem", lineHeight: 1.6 }}>
@@ -532,7 +536,9 @@ export function HomeView() {
       )}
 
       <SignalsSection inbox={inbox} onTalkBack={talkBack} onSaveContact={saveContact} />
+        </div>
 
+        <div className="m-home-right">
       <section className="m-section">
         <h2 className="m-h2">{MEET.home.proposals.heading}</h2>
         {received.length === 0 ? (
@@ -557,6 +563,8 @@ export function HomeView() {
           </>
         )}
       </section>
+        </div>
+      </div>
 
       <BoundaryNote
         lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.order, MEET.boundary.disclosure]}
