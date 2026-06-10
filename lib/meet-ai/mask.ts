@@ -1,19 +1,21 @@
-// R1.5 第2便 B — 伏せ版の下書き (AI draft for 候補に出すときの書き方). Pure
-// prompt + parse only; the call itself goes through generate.ts (this lane's
-// single fetch file) with the owner's own model and key — PX runs no model,
-// and the private body goes only to the owner's OWN AI, exactly like the SELF
-// grounding block. The owner edits and confirms before anything is saved.
+// R1.5 第4便 B — 固有名の検出 (the inversion of masking). The owner never
+// pre-registers words; the owner's OWN AI reads the OUTGOING text and OFFERS
+// detected proper nouns with replacement suggestions — the owner taps to
+// decide. Pure prompt + parse only; the call goes through generate.ts (this
+// lane's single fetch file) with the owner's model and key — PX runs no model.
+// Downstream, every detection passes the deterministic presence filter
+// (lib/meet-memory/mask-check.ts): a model can point only at what is there.
 
-export function buildMaskPrompt(title: string, text: string, maskWords: string[] = []): string {
-  const words = maskWords.map((w) => w.trim()).filter((w) => w !== "");
+import type { MaskPair } from "../meet-memory/mask-check.ts";
+
+export function buildDetectPrompt(title: string, text: string): string {
   return [
-    "次の項目を、固有名を伏せて内容だけが伝わる言い方に書き換えてください。",
-    "伏せるもの：会社名・サービス名・ブランド名・人名・地名の細部（市区町村より細かいもの）。",
-    // 補遺 E: the owner's explicit list rides along — and is then VERIFIED
-    // deterministically on save (model obedience is not assumed).
-    ...(words.length > 0 ? [`次の語は必ず言い換える（そのまま残さない）：${words.join("／")}`] : []),
-    "内容と経験の中身は保ち、誇張しない。",
-    '返答は次の形のJSONだけ（前後に説明文を付けない）：{"title": "短い言い換え", "text": "本文の言い換え"}',
+    "次の文に含まれる、特定につながる言葉だけを見つけてください。",
+    "対象：会社名・製品名・サービス名・人名・細かい地名・学校名・固有のプロジェクト名。",
+    "一般的な言葉は拾わない。確信が持てない言葉は出さない。",
+    "見つけた言葉ごとに、内容が伝わる言い換え（伏せ語）をひとつ添えてください。",
+    '返答は次の形のJSONだけ（前後に説明文を付けない）：[{"word":"見つけた言葉","mask":"言い換え"}]',
+    "見つからなければ [] を返してください。",
     "",
     `title: ${title}`,
     `text: ${text}`,
@@ -21,18 +23,18 @@ export function buildMaskPrompt(title: string, text: string, maskWords: string[]
 }
 
 /**
- * Fail-closed parse of the mask reply (fences stripped, surrounding prose
- * removed). Returns null when no usable phrasing came back — the UI then says
- * so honestly and the owner writes by hand; nothing is auto-saved.
+ * Fail-closed parse of the detection reply (fences stripped, surrounding
+ * prose removed). Junk → [] — the UI quietly offers nothing and the owner
+ * edits by hand; nothing is ever auto-applied from a broken reply.
  */
-export function parseMaskReply(raw: string): { title: string; text: string } | null {
+export function parseDetectReply(raw: string): MaskPair[] {
   const stripped = raw.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, "");
   let parsed: unknown = null;
   try {
     parsed = JSON.parse(stripped.trim());
   } catch {
-    const a = stripped.indexOf("{");
-    const b = stripped.lastIndexOf("}");
+    const a = stripped.indexOf("[");
+    const b = stripped.lastIndexOf("]");
     if (a >= 0 && b > a) {
       try {
         parsed = JSON.parse(stripped.slice(a, b + 1));
@@ -41,10 +43,15 @@ export function parseMaskReply(raw: string): { title: string; text: string } | n
       }
     }
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-  const r = parsed as Record<string, unknown>;
-  const title = typeof r.title === "string" ? r.title.trim() : "";
-  const text = typeof r.text === "string" ? r.text.trim() : "";
-  if (title === "" && text === "") return null;
-  return { title, text };
+  if (!Array.isArray(parsed)) return [];
+  const out: MaskPair[] = [];
+  for (const p of parsed) {
+    if (typeof p !== "object" || p === null || Array.isArray(p)) continue;
+    const r = p as Record<string, unknown>;
+    const word = typeof r.word === "string" ? r.word.trim() : "";
+    const mask = typeof r.mask === "string" ? r.mask.trim() : "";
+    if (word === "") continue; // a pair without a word is nothing to offer
+    out.push({ word, mask });
+  }
+  return out;
 }

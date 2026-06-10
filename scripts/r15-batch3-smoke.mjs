@@ -106,43 +106,7 @@ try {
   check("note blur auto-saves", await page.getByText("記録しました").first().isVisible());
   await page.screenshot({ path: `${SHOT_DIR}/r15e-04-readings-autosave.png`, fullPage: true });
 
-  // ── E. 伏せたい言葉 → 検知 → 直す → 消滅 ─────────────────────────────────────
-  await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
-  await page.getByPlaceholder("例：PX、Protocol X、○○株式会社").fill("PX、Protocol X");
-  await page.getByRole("button", { name: "保存", exact: true }).nth(1).click();
-  await page.getByText("保存しました").waitFor({ timeout: 5000 });
-
-  await page.getByRole("button", { name: "項目を足す" }).click();
-  const form = page.locator(".m-itemlist .m-form");
-  await form.locator("input.m-field").first().fill("PXの実装");
-  await form.locator("textarea.m-field").first().fill("Protocol X を仲間に浸透させたい");
-  await form.getByRole("button", { name: "出さない" }).click(); // → 出す
-  await form.getByText("伏せたい言葉が残っています", { exact: false }).waitFor({ timeout: 5000 });
-  const warn = await form.locator("p.m-note", { hasText: "伏せたい言葉が残っています" }).innerText();
-  check("deterministic leak warning names the words", warn.includes("PX") && warn.includes("Protocol X"));
-  await page.screenshot({ path: `${SHOT_DIR}/r15e-05-mask-leak-warning.png`, fullPage: true });
-  await form.getByRole("button", { name: "保存", exact: true }).click();
-  const leakChip = page.getByRole("button", { name: "固有名が出ます → 直す" });
-  await leakChip.waitFor({ timeout: 5000 });
-  check("list shows the 固有名が出ます chip (routes into 直す)", true);
-
-  // fix it through the chip: a public phrasing without the listed words
-  await leakChip.click();
-  const form2 = page.locator(".m-itemlist .m-form");
-  await form2.getByText("候補に出すときの書き方").click();
-  await form2.locator("input.m-field").nth(2).fill("分散台帳の実装");
-  await form2.locator("textarea.m-field").nth(1).fill("非カストディアルな仕組みを仲間に浸透させたい");
-  await page.waitForTimeout(300);
-  check(
-    "warning gone once the OUTGOING text is clean (private body untouched)",
-    (await form2.locator("p.m-note", { hasText: "伏せたい言葉が残っています" }).count()) === 0,
-  );
-  await form2.getByRole("button", { name: "保存", exact: true }).click();
-  await page.getByText("候補に出る書き方", { exact: false }).first().waitFor({ timeout: 5000 });
-  check("chip replaced by the outgoing-phrasing badge", (await page.getByRole("button", { name: "固有名が出ます → 直す" }).count()) === 0);
-  // C: an unset-書き方 public item shows the gentle hint
-  check("hint chip on public items without 書き方", (await page.getByRole("button", { name: "固有名を伏せた書き方にできます → 直す" }).count()) >= 1);
-  await page.screenshot({ path: `${SHOT_DIR}/r15e-06-mask-fixed-badge.png`, fullPage: true });
+  // ── E (第4便で反転): 伏せ語の検出→差し出し→適用は scripts/r15-batch4-smoke.mjs
 } catch (e) {
   console.log("SMOKE ERROR: " + e.message.split("\n")[0]);
   await page.screenshot({ path: `${SHOT_DIR}/r15e-99-error.png`, fullPage: true }).catch(() => {});

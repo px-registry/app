@@ -4,7 +4,7 @@
 // Read / edit / export / import / delete all run on this device; the boundary
 // block at the bottom states only what is true in code.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
 import {
   openMeetMemory,
@@ -12,6 +12,11 @@ import {
   hasPublicVariant,
   parseMaskWords,
   findMaskLeaks,
+  filterDetections,
+  applyMasks,
+  mergeMaskWords,
+  normalizeMaskText,
+  type MaskPair,
   type MeetMemoryEntryV1,
   type MeetRigItemV1,
 } from "@/lib/meet-memory";
@@ -21,8 +26,8 @@ import {
   getEndpoint,
   isConnected,
   generateProposals,
-  buildMaskPrompt,
-  parseMaskReply,
+  buildDetectPrompt,
+  parseDetectReply,
 } from "@/lib/meet-ai";
 import {
   getOrMintOwnerToken,
@@ -52,46 +57,95 @@ function publicFace(item: MeetRigItemV1): string {
   return v.title.trim() !== "" ? `${v.title} — ${v.text}` : v.text;
 }
 
+type DetectState =
+  | { phase: "idle" }
+  | { phase: "busy" }
+  | { phase: "offered"; pairs: MaskPair[] }
+  | { phase: "failed" }
+  | { phase: "done" }; // applied or このまま出す — quiet until the text changes
+
+type PickRow = { word: string; mask: string; use: boolean };
+
 function ItemForm({
   initial,
   maskWords,
+  onUpdateMaskWords,
   onSave,
   onCancel,
 }: {
   initial: MeetRigItemV1;
-  /** 補遺 E: the owner's 伏せたい言葉 — drives the prompt AND the live check. */
+  /** The byproduct list (これまでに伏せた言葉) — the deterministic check's vocabulary. */
   maskWords: string[];
+  onUpdateMaskWords: (words: string[]) => Promise<void>;
   onSave: (item: MeetRigItemV1) => void;
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<MeetRigItemV1>(initial);
   const [tagsText, setTagsText] = useState(initial.tags.join("、"));
   const [connected] = useState(() => isConnected());
-  const [aiState, setAiState] = useState<"idle" | "busy" | "failed">("idle");
+  const [detect, setDetect] = useState<DetectState>({ phase: "idle" });
+  const [pick, setPick] = useState<PickRow[] | null>(null);
+  const [histEdit, setHistEdit] = useState(false);
+  const [histInput, setHistInput] = useState("");
+  const lastDetectKey = useRef("");
 
-  // 伏せ版の下書き — the owner's OWN AI rewrites with proper nouns masked
-  // (browser-direct, same lane as proposals); the owner edits, then 保存.
-  const aiDraft = async () => {
-    setAiState("busy");
+  // 第4便 B — the inversion: on 「出す」 or opening 書き方, the owner's OWN AI
+  // reads the OUTGOING text and OFFERS detections; the owner taps to decide.
+  // Every offer passes the deterministic presence filter (no hallucinated
+  // word survives), and a junk reply quietly offers nothing (fail-closed).
+  const runDetect = async (item: MeetRigItemV1) => {
+    if (!connected) return;
+    const v = toPublicView(item);
+    const key = `${v.title}\n${v.text}`;
+    if (v.text.trim() === "" || detect.phase === "busy") return;
+    // Same text + an open offer → don't re-ask. A quiet/failed round may be
+    // retried by re-opening (the owner's explicit gesture).
+    if (key === lastDetectKey.current && detect.phase === "offered") return;
+    lastDetectKey.current = key;
+    setDetect({ phase: "busy" });
     const model = getModel();
     const r = await generateProposals({
       model,
       apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
       endpoint: getEndpoint(),
-      prompt: buildMaskPrompt(draft.title, draft.text, maskWords),
+      prompt: buildDetectPrompt(v.title, v.text),
     });
-    const masked = r.ok ? parseMaskReply(r.text) : null;
-    if (masked === null) {
-      setAiState("failed");
+    if (!r.ok) {
+      setDetect({ phase: "failed" });
       return;
     }
-    setDraft((d) => ({
-      ...d,
-      publicTitle: masked.title !== "" ? masked.title : d.publicTitle,
-      publicText: masked.text !== "" ? masked.text : d.publicText,
-    }));
-    setAiState("idle");
+    const pairs = filterDetections(parseDetectReply(r.text), v.title, v.text);
+    setDetect(pairs.length > 0 ? { phase: "offered", pairs } : { phase: "done" });
   };
+
+  // Tap-apply: rewrite the PUBLIC view only (the private body never changes)
+  // and grow the byproduct list — from now on these words are checked
+  // deterministically on every item.
+  const applyPairs = (pairs: MaskPair[]) => {
+    if (pairs.length > 0) {
+      const v = toPublicView(draft);
+      const r = applyMasks(v.title, v.text, pairs);
+      setDraft((d) => ({ ...d, publicTitle: r.title, publicText: r.text }));
+      void onUpdateMaskWords(mergeMaskWords(maskWords, pairs.map((p) => p.word)));
+      lastDetectKey.current = "";
+    }
+    setDetect({ phase: "done" });
+    setPick(null);
+  };
+
+  // [→ 伏せる] on the leak warning: that word only, mask from the AI's offer
+  // when one exists, else the plain ●● default.
+  const maskOne = (word: string) => {
+    const offered = detect.phase === "offered" ? detect.pairs : [];
+    const match = offered.find((p) => normalizeMaskText(p.word) === normalizeMaskText(word));
+    const v = toPublicView(draft);
+    const r = applyMasks(v.title, v.text, [{ word, mask: match?.mask ?? "" }]);
+    setDraft((d) => ({ ...d, publicTitle: r.title, publicText: r.text }));
+    lastDetectKey.current = "";
+  };
+
+  const view = toPublicView(draft);
+  const leaks = draft.private ? [] : findMaskLeaks(maskWords, view.title, view.text);
 
   return (
     <div className="m-form">
@@ -122,7 +176,13 @@ function ItemForm({
       />
       <label className="m-note">{MEET.memory.tagsLabel}</label>
       <input className="m-field" value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
-      <details style={{ marginTop: "0.6rem" }} open={hasPublicVariant(draft)}>
+      <details
+        style={{ marginTop: "0.6rem" }}
+        open={hasPublicVariant(draft)}
+        onToggle={(e) => {
+          if ((e.target as HTMLDetailsElement).open) void runDetect(draft);
+        }}
+      >
         <summary className="m-note" style={{ cursor: "pointer" }}>
           {MEET.publicWriting.summary}
         </summary>
@@ -142,33 +202,147 @@ function ItemForm({
           value={draft.publicText ?? ""}
           onChange={(e) => setDraft((d) => ({ ...d, publicText: e.target.value }))}
         />
-        {connected && (
-          <button
-            type="button"
-            className="m-btn m-btn-quiet"
-            style={{ marginTop: "0.4rem" }}
-            disabled={aiState === "busy" || draft.text.trim() === ""}
-            onClick={() => void aiDraft()}
-          >
-            {aiState === "busy" ? MEET.publicWriting.aiBusy : MEET.publicWriting.aiDraft}
-          </button>
-        )}
-        {aiState === "failed" && (
-          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-            {MEET.publicWriting.aiFailed}
+        {!connected && (
+          <p className="m-note" style={{ marginTop: "0.4rem" }}>
+            {MEET.maskWords.connectHint}
           </p>
+        )}
+        {maskWords.length > 0 && !histEdit && (
+          <p className="m-note" style={{ marginTop: "0.5rem" }}>
+            {MEET.maskWords.historyLine(maskWords.join(", "))}（
+            <button
+              type="button"
+              className="m-link"
+              onClick={() => {
+                setHistInput(maskWords.join("、"));
+                setHistEdit(true);
+              }}
+            >
+              {MEET.maskWords.historyEdit}
+            </button>
+            ）
+          </p>
+        )}
+        {histEdit && (
+          <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.4rem" }}>
+            <input
+              className="m-field"
+              value={histInput}
+              onChange={(e) => setHistInput(e.target.value)}
+            />
+            <button
+              type="button"
+              className="m-btn m-btn-quiet"
+              onClick={() => {
+                void onUpdateMaskWords(parseMaskWords(histInput));
+                setHistEdit(false);
+              }}
+            >
+              {MEET.maskWords.historySave}
+            </button>
+          </div>
         )}
       </details>
       <div className="m-item-head" style={{ marginTop: "0.5rem" }}>
         <button
           type="button"
           className={`m-toggle ${draft.private ? "" : "m-toggle-on"}`}
-          onClick={() => setDraft((d) => ({ ...d, private: !d.private }))}
+          onClick={() => {
+            const turningPublic = draft.private;
+            setDraft((d) => ({ ...d, private: !d.private }));
+            if (turningPublic) void runDetect({ ...draft, private: false });
+          }}
           aria-pressed={!draft.private}
         >
           {draft.private ? MEET.intake.privateLabel : MEET.intake.publicLabel}
         </button>
       </div>
+
+      {detect.phase === "busy" && <p className="m-note">{MEET.maskWords.detectBusy}</p>}
+      {detect.phase === "failed" && (
+        <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+          {MEET.maskWords.detectFailed}
+        </p>
+      )}
+      {detect.phase === "offered" && pick === null && (
+        <div className="m-card" style={{ marginTop: "0.5rem" }} aria-live="polite">
+          <p className="m-note" style={{ margin: 0 }}>
+            {MEET.maskWords.offerLead}
+          </p>
+          <p className="m-item-text" style={{ margin: "0.3rem 0" }}>
+            {detect.pairs
+              .map((p) => MEET.maskWords.offerPair(p.word, p.mask !== "" ? p.mask : "●●"))
+              .join(" ／ ")}
+          </p>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="m-btn m-btn-primary"
+              onClick={() => applyPairs(detect.pairs)}
+            >
+              {MEET.maskWords.maskAll}
+            </button>
+            <button
+              type="button"
+              className="m-btn m-btn-quiet"
+              onClick={() => setPick(detect.pairs.map((p) => ({ ...p, use: true })))}
+            >
+              {MEET.maskWords.pickEach}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => applyPairs([])}>
+              {MEET.maskWords.keepAsIs}
+            </button>
+          </div>
+        </div>
+      )}
+      {pick !== null && (
+        <div className="m-card" style={{ marginTop: "0.5rem" }}>
+          <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
+            {MEET.maskWords.offerLead}
+          </p>
+          {pick.map((row, i) => (
+            <div key={row.word} style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.35rem" }}>
+              <button
+                type="button"
+                className={`m-chip m-chip-pick ${row.use ? "m-chip-active" : ""}`}
+                aria-pressed={row.use}
+                onClick={() =>
+                  setPick((rows) =>
+                    rows === null ? rows : rows.map((r, j) => (j === i ? { ...r, use: !r.use } : r)),
+                  )
+                }
+              >
+                {row.word}
+              </button>
+              <input
+                className="m-field"
+                value={row.mask}
+                placeholder="●●"
+                onChange={(e) =>
+                  setPick((rows) =>
+                    rows === null
+                      ? rows
+                      : rows.map((r, j) => (j === i ? { ...r, mask: e.target.value } : r)),
+                  )
+                }
+              />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="m-btn m-btn-primary"
+              onClick={() => applyPairs(pick.filter((r) => r.use).map(({ word, mask }) => ({ word, mask })))}
+            >
+              {MEET.maskWords.applyPicked}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => applyPairs([])}>
+              {MEET.maskWords.keepAsIs}
+            </button>
+          </div>
+        </div>
+      )}
+
       {!draft.private && draft.text.trim() !== "" && (
         // 顔 preview — which words would actually go out, said plainly.
         <p className="m-note" style={{ marginTop: "0.4rem" }}>
@@ -176,18 +350,23 @@ function ItemForm({
           {publicFace(draft)}
         </p>
       )}
-      {!draft.private &&
-        (() => {
-          // 補遺 E: deterministic check on the OUTGOING text — warns while a
-          // listed word survives; never blocks (the owner may send it out).
-          const view = toPublicView(draft);
-          const leaks = findMaskLeaks(maskWords, view.title, view.text);
-          return leaks.length > 0 ? (
-            <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-              {MEET.maskWords.leakWarn(leaks.join("、"))}
-            </p>
-          ) : null;
-        })()}
+      {leaks.length > 0 && (
+        // Deterministic check on the OUTGOING text (byproduct-list vocabulary).
+        // Warns while a word survives; [→ 伏せる] replaces that word only.
+        // Never blocks — the owner may still send it out deliberately.
+        <div aria-live="polite" style={{ marginTop: "0.4rem" }}>
+          <p className="m-note" style={{ color: "var(--shu-deep)", margin: 0 }}>
+            {MEET.maskWords.leakWarn(leaks.join("、"))}
+          </p>
+          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+            {leaks.map((w) => (
+              <button key={w} type="button" className="m-link" onClick={() => maskOne(w)}>
+                {MEET.maskWords.maskOne(w)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
         <button
           type="button"
@@ -221,16 +400,14 @@ export function MemoryPanel() {
   const [editing, setEditing] = useState<string | null>(null); // entryId | "new"
   const [report, setReport] = useState("");
   const [maskWords, setMaskWords] = useState<string[]>([]);
-  const [maskInput, setMaskInput] = useState("");
-  const [savedMask, setSavedMask] = useState(false);
 
   const reload = useCallback(async () => {
     setEntries(toRigEntries(await store.list()));
     const profile = await store.getProfile();
     if (profile) setDisplayName(profile.displayName);
-    const words = await store.getMaskWords();
-    setMaskWords(words);
-    setMaskInput(words.join("、"));
+    // 第4便: the byproduct list (a pre-registered list, if any, just keeps
+    // living in the same singleton — nothing is thrown away).
+    setMaskWords(await store.getMaskWords());
   }, [store]);
 
   useEffect(() => {
@@ -243,13 +420,10 @@ export function MemoryPanel() {
     setTimeout(() => setSavedName(false), 2000);
   };
 
-  const saveMask = async () => {
-    const words = parseMaskWords(maskInput);
+  /** The byproduct list grows from 伏せる taps (and shrinks via 編集). */
+  const updateMaskWords = async (words: string[]) => {
     await store.setMaskWords(words);
     setMaskWords(words);
-    setMaskInput(words.join("、"));
-    setSavedMask(true);
-    setTimeout(() => setSavedMask(false), 2000);
   };
 
   const saveItem = async (entryId: string | "new", item: MeetRigItemV1) => {
@@ -386,6 +560,7 @@ export function MemoryPanel() {
                 <ItemForm
                   initial={e.item}
                   maskWords={maskWords}
+                  onUpdateMaskWords={updateMaskWords}
                   onSave={(item) => void saveItem(e.entryId, item)}
                   onCancel={() => setEditing(null)}
                 />
@@ -460,6 +635,7 @@ export function MemoryPanel() {
               <ItemForm
                 initial={BLANK}
                 maskWords={maskWords}
+                onUpdateMaskWords={updateMaskWords}
                 onSave={(item) => void saveItem("new", item)}
                 onCancel={() => setEditing(null)}
               />
@@ -476,26 +652,6 @@ export function MemoryPanel() {
             {MEET.memory.addItem}
           </button>
         )}
-      </section>
-
-      <section className="m-section">
-        <h2 className="m-h2">{MEET.maskWords.heading}</h2>
-        <div className="m-card">
-          <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
-            {MEET.maskWords.note}
-          </p>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input
-              className="m-field"
-              value={maskInput}
-              onChange={(e) => setMaskInput(e.target.value)}
-              placeholder={MEET.maskWords.placeholder}
-            />
-            <button type="button" className="m-btn m-btn-quiet" onClick={() => void saveMask()}>
-              {savedMask ? MEET.maskWords.saved : MEET.maskWords.save}
-            </button>
-          </div>
-        </div>
       </section>
 
       <section className="m-section">

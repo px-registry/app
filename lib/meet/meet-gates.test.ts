@@ -156,3 +156,23 @@ test("M-7: the generate verb is 探しに行く; the 聞く-era wording is extin
     assert.ok(!code.includes("いま聞く"), `${rel} carries 聞く-era wording`);
   }
 });
+
+// ── M-8 (第4便): 登録UI の絶滅 — masking is offer-and-tap, never pre-listing ────
+
+test("M-8: no mask-registration wording or keys survive (the list is a byproduct)", () => {
+  const mw = MEET.maskWords as Record<string, unknown>;
+  for (const dead of ["heading", "note", "placeholder", "save", "saved"]) {
+    assert.ok(!(dead in mw), `maskWords.${dead} is registration-era and must not exist`);
+  }
+  for (const alive of ["offerLead", "maskAll", "pickEach", "keepAsIs", "leakWarn", "historyLine"]) {
+    assert.ok(alive in mw, `maskWords.${alive} must exist (offer-and-tap)`);
+  }
+  for (const s of allMeetCopyStrings()) {
+    assert.ok(s !== "伏せたい言葉", `the registration heading survives: ${s}`);
+  }
+  // the memory page renders no registration card; 伏せ版を下書き is gone too
+  for (const { rel, code } of sourcesUnder("app/meet")) {
+    assert.ok(!code.includes("maskWords.heading"), `${rel} renders the dead registration card`);
+    assert.ok(!code.includes("伏せ版を下書き"), `${rel} carries the replaced draft button`);
+  }
+});

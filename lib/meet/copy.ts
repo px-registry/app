@@ -189,14 +189,26 @@ export const MEET = {
     durability: "ブラウザのデータを消すと、ここも消えます。控えを保存しておくと戻せます。",
   },
 
-  /** 補遺 E — 伏せたい言葉（owner 全体でひとつのリスト・端末ローカル）。 */
+  /**
+   * 第4便 B — 伏せ字の反転。事前登録はない：AI が固有名を見つけて置き換え案
+   * つきで差し出し、owner はタップで決める。リストは選択の副産物として育ち、
+   * 決定論チェック（findMaskLeaks）の語彙になる。
+   */
   maskWords: {
-    heading: "伏せたい言葉",
-    note: "ここに挙げた言葉が外に出る文に残っていたら、お知らせします。「、」で区切って書けます。",
-    placeholder: "例：PX、Protocol X、○○株式会社",
-    save: "保存",
-    saved: "保存しました",
+    offerLead: "この文には特定につながる言葉がありそうです：",
+    offerPair: (word: string, mask: string): string => `「${word}」→ ${mask}`,
+    maskAll: "ぜんぶ伏せる",
+    pickEach: "一つずつ選ぶ",
+    keepAsIs: "このまま出す",
+    applyPicked: "選んだ語を伏せる",
+    detectBusy: "あなたのAIが読んでいます…",
+    detectFailed: "検出を受け取れませんでした。手で直すこともできます。",
+    connectHint: "AIをつなぐと、固有名の検出と言い換えを手伝えます。",
     leakWarn: (words: string): string => `伏せたい言葉が残っています：${words}`,
+    maskOne: (word: string): string => `「${word}」を伏せる`,
+    historyLine: (words: string): string => `これまでに伏せた言葉：${words}`,
+    historyEdit: "編集",
+    historySave: "保存",
     leakChip: "固有名が出ます → 直す",
     hintChip: "固有名を伏せた書き方にできます → 直す",
   },
@@ -207,9 +219,6 @@ export const MEET = {
     note: "固有名を伏せて、内容だけ伝える言い方にできます。例：「○○株式会社で SaaS の CS 部門を立ち上げ」→「BtoB SaaS の CS 立ち上げ経験」。空のままなら、上の本文がそのまま出ます。",
     titleLabel: "出すときの一言タイトル",
     textLabel: "出すときの本文",
-    aiDraft: "伏せ版を下書き",
-    aiBusy: "あなたのAIが書いています…",
-    aiFailed: "下書きを受け取れませんでした。手で書くこともできます。",
     preview: "候補に出るのはこの文です：",
     activeBadge: "候補に出る書き方",
   },

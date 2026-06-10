@@ -75,32 +75,14 @@ try {
   const placedRow = (pool1.items ?? []).find((it) => it.kind === "want" && it.tags.includes("問い") && it.text === QUESTION);
   check("placed question reaches another participant's pool (want + 問い tag)", !!placedRow);
 
-  // ── B. 公開用の書き方 — private body never serves; AI 伏せ版 drafts it ─────────
+  // ── B. 公開用の書き方 — private body never serves (manual phrasing; the
+  // AI-offer flow has its own smoke: scripts/r15-batch4-smoke.mjs) ────────────
   await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "項目を足す" }).click();
   const form = page.locator(".m-itemlist .m-form");
   await form.locator("input.m-field").first().fill("○○株式会社のCS部門");
   await form.locator("textarea.m-field").first().fill("社外秘のCS立ち上げの経緯と社名入りの実績");
   await form.getByText("候補に出すときの書き方").click();
-
-  // AI 下書き (real Ollama inference; owner edits afterwards — here we accept it)
-  await form.getByRole("button", { name: "伏せ版を下書き" }).click();
-  let aiText = "";
-  for (let i = 0; i < 180; i++) {
-    aiText = await form.locator("textarea.m-field").nth(1).inputValue();
-    if (aiText.trim() !== "") break;
-    const honest = await form
-      .getByText("下書きを受け取れませんでした", { exact: false })
-      .isVisible()
-      .catch(() => false);
-    if (honest) break; // fail-closed surface — the check below reports it
-    await page.waitForTimeout(1000);
-  }
-  const aiTitle = await form.locator("input.m-field").nth(2).inputValue();
-  check("AI 伏せ版 drafted both fields (owner-editable)", aiText.trim() !== "");
-  console.log("    masked title: " + aiTitle);
-  console.log("    masked text : " + aiText.slice(0, 60));
-  // we keep a deterministic public text for the leak check
   await form.locator("textarea.m-field").nth(1).fill("BtoB SaaS の CS 立ち上げ経験");
   await form.locator("input.m-field").nth(2).fill("CS 立ち上げの経験");
   await form.getByRole("button", { name: "出さない" }).click(); // → 出す

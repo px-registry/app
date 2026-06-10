@@ -15,7 +15,7 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import { buildMeetPrompt, toRigPool, parseProposalReply, parseReplyOutcome } from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
-import { buildMaskPrompt, parseMaskReply } from "./mask.ts";
+import { buildDetectPrompt, parseDetectReply } from "./mask.ts";
 import { gateCardsByProvenance } from "./provenance.ts";
 import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
 import { toPublicView } from "../meet-memory/public-view.ts";
@@ -234,32 +234,32 @@ test("MA-5c3: a TRUNCATED array (max-tokens cut) rescues the completed cards", (
   assert.equal(parseReplyOutcome(wrapped).cards.length, 1);
 });
 
-// ── MA-7 (第2便 B): 伏せ版下書き — prompt contract + fail-closed parse ──────────
+// ── MA-7 (第4便 B): 固有名の検出 — prompt contract + fail-closed parse ──────────
 
-test("MA-7: buildMaskPrompt carries the item and the JSON-only contract", () => {
-  const p = buildMaskPrompt("○○株式会社のCS部門", "社内の立ち上げ話");
-  assert.ok(p.includes("固有名を伏せて"));
-  assert.ok(p.includes('{"title"'), "JSON contract stated");
-  assert.ok(p.includes("title: ○○株式会社のCS部門"));
-  assert.ok(p.includes("text: 社内の立ち上げ話"));
-  assert.ok(!p.includes("必ず言い換える"), "no list line when the owner listed nothing");
+test("MA-7: buildDetectPrompt — targets, restraint, JSON-pair contract", () => {
+  const p = buildDetectPrompt("PX Boxの配布", "Protocol X を広めたい");
+  assert.ok(p.includes("特定につながる言葉"));
+  assert.ok(p.includes("一般的な言葉は拾わない"));
+  assert.ok(p.includes("確信が持てない言葉は出さない"), "restraint stated (差し出しすぎは無視される)");
+  assert.ok(p.includes('[{"word"'), "JSON pair contract stated");
+  assert.ok(p.includes("title: PX Boxの配布"));
+  assert.ok(p.includes("text: Protocol X を広めたい"));
 });
 
-test("MA-7c: 補遺 E — the owner's 伏せたい言葉 ride the prompt explicitly", () => {
-  const p = buildMaskPrompt("t", "x", ["PX", " Protocol X ", ""]);
-  assert.ok(p.includes("次の語は必ず言い換える（そのまま残さない）：PX／Protocol X"));
-});
-
-test("MA-7b: parseMaskReply — fenced / prose-wrapped parse; junk is null (never auto-saves)", () => {
-  const body = '{"title": "BtoB SaaS の CS 立ち上げ", "text": "立ち上げ経験があります"}';
-  for (const raw of [body, "```json\n" + body + "\n```", `はい。${body} いかがでしょう。`]) {
-    const r = parseMaskReply(raw);
-    assert.ok(r !== null);
-    assert.equal(r!.title, "BtoB SaaS の CS 立ち上げ");
+test("MA-7b: parseDetectReply — fenced/prose parse; junk → [] (UI never dies)", () => {
+  const body = '[{"word":"Protocol X","mask":"非保管プロトコル"},{"word":"PX Box","mask":"配布基盤"}]';
+  for (const raw of [body, "```json\n" + body + "\n```", `見つけました。${body} 以上です。`]) {
+    const pairs = parseDetectReply(raw);
+    assert.equal(pairs.length, 2);
+    assert.deepEqual(pairs[0], { word: "Protocol X", mask: "非保管プロトコル" });
   }
-  for (const raw of ["できません", "{broken", "[]", '{"title": 1, "text": null}', '{"title":"","text":"  "}']) {
-    assert.equal(parseMaskReply(raw), null, `must fail closed: ${raw}`);
+  for (const raw of ["ありません", "{broken", "{}", '"x"', "[]"]) {
+    assert.deepEqual(parseDetectReply(raw), [], `must fail closed: ${raw}`);
   }
+  // a pair without a word is nothing; a missing mask degrades to ""
+  assert.deepEqual(parseDetectReply('[{"word":"","mask":"x"},{"mask":"y"},{"word":"PX"},42]'), [
+    { word: "PX", mask: "" },
+  ]);
 });
 
 // ── MA-9 (第3便 A): provenance gate — invented partners never display ───────────

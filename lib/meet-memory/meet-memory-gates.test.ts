@@ -31,7 +31,13 @@ import {
   isPlacedQuestion,
 } from "./placed.ts";
 import { toPublicView, hasPublicVariant } from "./public-view.ts";
-import { parseMaskWords, findMaskLeaks } from "./mask-check.ts";
+import {
+  parseMaskWords,
+  findMaskLeaks,
+  filterDetections,
+  applyMasks,
+  mergeMaskWords,
+} from "./mask-check.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 
 const root = (rel: string) => new URL(`../../${rel}`, import.meta.url);
@@ -409,4 +415,60 @@ test("MM-14: mask_list is a validated owner-wide singleton (backed up like the r
   assert.deepEqual(await store.getMaskWords(), ["PX", "○○株式会社"]);
   await store.setMaskWords(["PX"]);
   assert.deepEqual(await store.getMaskWords(), ["PX"], "singleton upserts");
+});
+
+// ── MM-15 (第4便 B): 検出→タップ適用 — pure mechanics, fail-closed ──────────────
+
+test("MM-15: filterDetections — only words actually present survive (no hallucination)", () => {
+  const pairs = [
+    { word: "Protocol X", mask: "非保管プロトコル" },
+    { word: "PX Box", mask: "配布基盤" },
+    { word: "存在しない社名", mask: "どこか" }, // hallucinated — must die
+    { word: " ", mask: "x" },
+    { word: "protocol x", mask: "dup" }, // folded duplicate
+  ];
+  const kept = filterDetections(pairs, "PX Boxの配布", "Protocol X を広めたい");
+  assert.deepEqual(kept.map((p) => p.word), ["Protocol X", "PX Box"]);
+});
+
+test("MM-15b: applyMasks — folded replace, all occurrences, default ●● mask", () => {
+  const r = applyMasks("Protocol Xの実装", "ＰＲＯＴＯＣＯＬ　Xを広めたい。protocol xは良い。", [
+    { word: "Protocol X", mask: "非保管プロトコル" },
+  ]);
+  assert.equal(r.title, "非保管プロトコルの実装");
+  assert.equal(r.text, "非保管プロトコルを広めたい。非保管プロトコルは良い。");
+  // empty mask falls back to the plain default
+  const d = applyMasks("PXの話", "PXとPX", [{ word: "PX", mask: "" }]);
+  assert.equal(d.title, "●●の話");
+  assert.equal(d.text, "●●と●●");
+  // no pairs → unchanged
+  assert.deepEqual(applyMasks("a", "b", []), { title: "a", text: "b" });
+});
+
+test("MM-15c: tap-apply writes the PUBLIC view only — the private body never moves", () => {
+  // the UI applies to toPublicView(...) and stores into publicTitle/publicText;
+  // pinned here as the pure pipeline: private fields are not inputs of the swap
+  const item = {
+    kind: "have" as const,
+    title: "PX Boxの配布",
+    text: "Protocol X を広めたい",
+    tags: [],
+    private: false,
+  };
+  const v = toPublicView(item);
+  const r = applyMasks(v.title, v.text, [
+    { word: "Protocol X", mask: "非保管プロトコル" },
+    { word: "PX Box", mask: "配布基盤" },
+  ]);
+  const masked = { ...item, publicTitle: r.title, publicText: r.text };
+  assert.equal(masked.title, "PX Boxの配布", "private title untouched");
+  assert.equal(masked.text, "Protocol X を広めたい", "private text untouched");
+  const out = toPublicView(masked);
+  assert.equal(out.title, "配布基盤の配布");
+  assert.equal(out.text, "非保管プロトコル を広めたい", "the original spacing survives");
+  // and the byproduct list now catches these words on EVERY item
+  const words = mergeMaskWords([], ["Protocol X", "PX Box", "protocol x"]);
+  assert.deepEqual(words, ["Protocol X", "PX Box"], "folded dedupe");
+  assert.deepEqual(findMaskLeaks(words, "別項目", "PX Boxも使う"), ["PX Box"], "propagates to all items");
+  assert.deepEqual(findMaskLeaks(words, out.title, out.text), [], "masked view is clean");
 });

@@ -36,7 +36,16 @@ export {
   isPlacedQuestion,
 } from "./placed.ts";
 export { toPublicView, hasPublicVariant } from "./public-view.ts";
-export { normalizeMaskText, parseMaskWords, findMaskLeaks } from "./mask-check.ts";
+export {
+  normalizeMaskText,
+  parseMaskWords,
+  findMaskLeaks,
+  filterDetections,
+  applyMasks,
+  mergeMaskWords,
+  DEFAULT_MASK,
+  type MaskPair,
+} from "./mask-check.ts";
 
 import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";
