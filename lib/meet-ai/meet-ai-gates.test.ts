@@ -13,9 +13,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { buildMeetPrompt, toRigPool, parseProposalReply, parseReplyOutcome } from "./prompt.ts";
+import {
+  buildMeetPrompt,
+  toRigPool,
+  toRigPoolWithRefs,
+  parseProposalReply,
+  parseReplyOutcome,
+} from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
-import { buildDetectPrompt, parseDetectReply } from "./mask.ts";
+import { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
 import { gateCardsByProvenance } from "./provenance.ts";
 import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
 import { toPublicView } from "../meet-memory/public-view.ts";
@@ -163,12 +169,21 @@ test("MA-4e: 公開用の書き方 — the OTHER side's prompt gets the public p
 
 test("MA-4d: toRigPool is fail-closed on kind and keeps arrival order", () => {
   const served: PoolItemPublic[] = [
-    { participantRef: "a".repeat(16), ownerRef: "甲", kind: "have", title: "t", text: "x", tags: [] },
-    { participantRef: "b".repeat(16), ownerRef: "乙", kind: "weird", title: "t", text: "y", tags: [] },
-    { participantRef: "c".repeat(16), ownerRef: "丙", kind: "want", title: "t", text: "z", tags: [] },
+    { participantRef: "a".repeat(16), ownerRef: "甲", ownerIntro: "", kind: "have", title: "t", text: "x", tags: [] },
+    { participantRef: "b".repeat(16), ownerRef: "乙", ownerIntro: "", kind: "weird", title: "t", text: "y", tags: [] },
+    { participantRef: "c".repeat(16), ownerRef: "丙", ownerIntro: "", kind: "want", title: "t", text: "z", tags: [] },
   ];
   const rig = toRigPool(served);
   assert.deepEqual(rig.map((r) => r.text), ["x", "z"]);
+
+  // 第7便 C: the ref-carrying variant — stable [p◯] in titles, same map back,
+  // ownerRef attribution intact (fail-closed on kind too).
+  const { pool, basis } = toRigPoolWithRefs(served);
+  assert.deepEqual(pool.map((p) => p.title), ["[p1] t", "[p2] t"]);
+  assert.deepEqual(basis, {
+    p1: { ownerRef: "甲", title: "t", text: "x" },
+    p2: { ownerRef: "丙", title: "t", text: "z" },
+  });
 });
 
 // ── MA-5: reply parsing ─────────────────────────────────────────────────────────
@@ -239,11 +254,32 @@ test("MA-5c3: a TRUNCATED array (max-tokens cut) rescues the completed cards", (
 test("MA-7: buildDetectPrompt — targets, restraint, JSON-pair contract", () => {
   const p = buildDetectPrompt("PX Boxの配布", "Protocol X を広めたい");
   assert.ok(p.includes("特定につながる言葉"));
+  // 第7便 E: 伝わる言い方 — jargon rides the same lane, meaning unchanged
+  assert.ok(p.includes("外の参加者に伝わらない可能性のある言い回し"), "内輪語・専門語 also targeted");
+  assert.ok(p.includes("意味を足さない"));
   assert.ok(p.includes("一般的な言葉は拾わない"));
   assert.ok(p.includes("確信が持てない言葉は出さない"), "restraint stated (差し出しすぎは無視される)");
   assert.ok(p.includes('[{"word"'), "JSON pair contract stated");
   assert.ok(p.includes("title: PX Boxの配布"));
   assert.ok(p.includes("text: Protocol X を広めたい"));
+});
+
+test("MA-7d (第7便 B): intro draft — public-material prompt + fail-closed parse", () => {
+  const p = buildIntroPrompt([
+    { kind: "have", title: "工房", text: "活版印刷ができる" },
+    { kind: "want", title: "", text: "週末の相棒" },
+  ]);
+  assert.ok(p.includes("盛らない"), "no-embellishment stated");
+  assert.ok(p.includes("60字以内"));
+  assert.ok(p.includes('{"intro"'), "JSON contract stated");
+  assert.ok(p.includes("- have: 工房 — 活版印刷ができる"));
+  assert.ok(p.includes("- want: 週末の相棒"));
+
+  assert.equal(parseIntroReply('{"intro":"手を動かす場づくりが好き"}'), "手を動かす場づくりが好き");
+  assert.equal(parseIntroReply('```json\n{"intro":" x "}\n```'), "x");
+  for (const junk of ["できません", "{broken", '{"intro":""}', '{"intro":7}', "[]"]) {
+    assert.equal(parseIntroReply(junk), null, `must fail closed: ${junk}`);
+  }
 });
 
 test("MA-7b: parseDetectReply — fenced/prose parse; junk → [] (UI never dies)", () => {
@@ -281,7 +317,7 @@ test("MA-9: the OBSERVED invented-partner reply is fully excluded by the gate", 
 
 test("MA-9b: real addressees pass, invented ones drop — original indices kept", () => {
   const cards = parseProposalReply(OBSERVED_INVENTED_REPLY);
-  cards.push({ to: "あや", line1: "納屋 × 工房", line2: "週末に一度" });
+  cards.push({ to: "あや", line1: "納屋 × 工房", line2: "週末に一度", basisItemId: "" });
   const refs = { あや: "a".repeat(16), カフェの人: "b".repeat(16) };
   const gated = gateCardsByProvenance(cards, refs);
   assert.equal(gated.kept.length, 1);
@@ -291,10 +327,42 @@ test("MA-9b: real addressees pass, invented ones drop — original indices kept"
 });
 
 test("MA-9c: fail-closed on odd ref values (empty string never resolves)", () => {
-  const cards = [{ to: "ゆら", line1: "x", line2: "" }];
+  const cards = [{ to: "ゆら", line1: "x", line2: "", basisItemId: "" }];
   assert.equal(gateCardsByProvenance(cards, { ゆら: "" }).kept.length, 0);
   assert.equal(gateCardsByProvenance(cards, {}).kept.length, 0);
   assert.equal(gateCardsByProvenance([], { あや: "a".repeat(16) }).kept.length, 0);
+});
+
+// ── MA-9d (第7便 C): basis gate — a proposal must show its grounding ────────────
+
+test("MA-9d: with a basis map, basisItemId must resolve AND belong to the addressee", () => {
+  const refs = { あや: "a".repeat(16), カフェの人: "b".repeat(16) };
+  const basis = {
+    p1: { ownerRef: "あや", title: "工房", text: "活版印刷ができる" },
+    p2: { ownerRef: "カフェの人", title: "昼カフェ", text: "間借りで開けている" },
+  };
+  const card = (to: string, basisItemId: string) => ({ to, line1: "x", line2: "y", basisItemId });
+
+  // resolvable + addressee's own item → kept
+  assert.equal(gateCardsByProvenance([card("あや", "p1")], refs, basis).kept.length, 1);
+  // missing basisItemId → drop (no repair)
+  assert.equal(gateCardsByProvenance([card("あや", "")], refs, basis).kept.length, 0);
+  // basis ref that was never served → drop
+  assert.equal(gateCardsByProvenance([card("あや", "p9")], refs, basis).kept.length, 0);
+  // ANOTHER participant's item as basis → drop (grounding must be the addressee's)
+  assert.equal(gateCardsByProvenance([card("あや", "p2")], refs, basis).kept.length, 0);
+  // legacy entries (no basis map) keep the to-only gate — old shelves don't vanish
+  assert.equal(gateCardsByProvenance([card("あや", "")], refs).kept.length, 1);
+});
+
+test("MA-9e: the format block demands to + basisItemId; parse carries it leniently", () => {
+  const p = buildMeetPrompt(SELF, pool(), "");
+  assert.ok(p.includes('"basisItemId"'), "format block names basisItemId");
+  const reply =
+    '[{"to":"あや","line1":"x","line2":"y","basisItemId":" p3 "},{"to":"あや","line1":"x","line2":"y"}]';
+  const cards = parseProposalReply(reply);
+  assert.equal(cards[0].basisItemId, "p3", "trimmed through parse");
+  assert.equal(cards[1].basisItemId, "", "absent → empty (the gate drops it)");
 });
 
 // ── MA-6 (fix1): key-prefix provider detection — the owner never picks ──────────

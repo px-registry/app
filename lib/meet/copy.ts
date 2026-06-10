@@ -166,6 +166,13 @@ export const MEET = {
     placeholder: "例：あや、カフェの人",
     save: "保存",
     saved: "保存しました",
+    /** 第7便 B — ひとこと紹介（任意・~60字・保存して候補に出して初めて公開）。 */
+    introLabel: "ひとこと紹介（任意）",
+    introNote: "候補や提案に添える、あなたの一言です。AIに下書きを頼めます。",
+    introPlaceholder: "例：手を動かす場づくりが好きです",
+    introDraft: "AIに下書きを頼む",
+    introBusy: "あなたのAIが書いています…",
+    introFailed: "下書きを受け取れませんでした。手で書くこともできます。",
   },
 
   memory: {
@@ -242,6 +249,8 @@ export const MEET = {
     talkSent: "「話してみる」を伝えました",
     talkNote: "押すと、相手に「話してみる」が届きます。連絡先はまだ伝わりません。",
     mutualNote: "おたがいが押したら、連絡のメモを交換できます。",
+    /** 第7便 D — basisItemId の項目1件だけを開く折りたたみ。 */
+    basisShow: "相手の候補から",
     readings: {
       heading: "読みを残す",
       /** チップ群の上の説明（第3便 B-3）。タップ即保存・ひとことは blur 保存（補遺 D）。 */

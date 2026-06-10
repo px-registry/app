@@ -134,3 +134,25 @@ test("publish: an empty item list unpublishes (delete-only batch)", async () => 
   assert.equal((await r.json()).count, 0);
   assert.equal(db.batches[0].length, 1, "just the delete");
 });
+
+// ── 第7便 B: ひとこと紹介 — optional, capped, written with the projection ───────
+
+test("intro: absent publishes as '' (never required)", async () => {
+  const { res, db } = call(GOOD);
+  const r = await res;
+  assert.equal(r.status, 201);
+  const insert = db.batches[0][1];
+  assert.ok(insert.sql.includes("intro"), "insert names the intro column");
+  assert.equal(insert.args[2], "", "absent intro lands as empty string");
+});
+
+test("intro: a saved one-liner rides every row; odd values reject the payload whole", async () => {
+  const { res, db } = call({ ...GOOD, intro: " 手を動かす場づくりが好き " });
+  const r = await res;
+  assert.equal(r.status, 201);
+  for (const stmt of db.batches[0].slice(1)) {
+    assert.equal(stmt.args[2], "手を動かす場づくりが好き", "trimmed intro on each row");
+  }
+  assert.equal((await call({ ...GOOD, intro: 7 }).res).status, 400, "non-string intro rejects");
+  assert.equal((await call({ ...GOOD, intro: "あ".repeat(81) }).res).status, 400, "over-cap rejects");
+});

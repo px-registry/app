@@ -25,6 +25,15 @@ export type ReceivedProposalV1 = {
   cards: ProposalCard[];
   /** ownerRef → participantRef at generation time (for the 話してみる signal). */
   refs: Record<string, string>;
+  /**
+   * 第7便 C: prompt-local ref → the served public item it pointed at, captured
+   * at generation time. The display gate requires each card's basisItemId to
+   * resolve here; the 「相手の候補から」 fold shows exactly this one item.
+   * Absent on pre-第7便 entries (they keep the to-only gate).
+   */
+  basisItems?: Record<string, { ownerRef: string; title: string; text: string }>;
+  /** ownerRef → ひとこと紹介 at generation time (may be ""). 第7便 B. */
+  intros?: Record<string, string>;
   /** Non-blocking: the reply may echo the owner's own private text. */
   echoFlag: boolean;
   /** Owner's readings per card index. */

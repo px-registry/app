@@ -62,6 +62,9 @@ export function validateNewEntry(input: unknown): ValidationResult {
       if (typeof value.displayName !== "string") {
         return { ok: false, error: "profile: displayName must be a string" };
       }
+      if (value.intro !== undefined && typeof value.intro !== "string") {
+        return { ok: false, error: "profile: intro must be a string when present" };
+      }
       return { ok: true };
     }
     case "mask_list": {

@@ -40,6 +40,8 @@ test("R15-rig-1: both ported files carry the px-table source commit header", () 
 // An INDEPENDENT copy of the law text. If anyone edits the law in rig.ts, this
 // test fails. The law is changed in px-table (the law original) or not at all.
 
+// rule 9 改訂（2026-06-10 Hiroto 裁定）— 旧:「各提案2行：①…締めは軽く
+// 「話してみる」。」を裁定確定文に置換。px-table 原本へも同文面を同期する。
 const LAW_VERBATIM = [
   "両得 ＋ 一人では届かないC（owner の願いも叶う。与えるだけ＝出さない）。",
   "同ジャンルの似た者同士に留まらず、異ジャンルの相補をよく読む。ただし候補に点数・順位・優劣はつけない。",
@@ -49,9 +51,9 @@ const LAW_VERBATIM = [
   "owner の private / avoid は判断にだけ使い、本文として引用・再掲しない。",
   "良いのが無ければ「今日は無い」。何でも出さない。",
   "相手は実在として断定しない（擬似・実マッチでない）。",
-  "各提案2行：①owner のもの × 相手のもの（owner 先）②具体の錨を一つ言い切る。締めは軽く「話してみる」。",
+  "提案は読み手に宛てて書く。読み手は「あなた」、相手は表示名で呼ぶ。「私」は使わない。複数の相手を一枚に混ぜない。\n各提案は2行：\n1行目：あなたの○○ × ［相手名］の○○。重なりを一つだけ。双方の専門語・内輪の言い回し・private/avoid の原文は引用せず、平易に言い換える。足さない。\n2行目：そこから生まれそうなものを一つ、具体に言い切る。\n各提案に、根拠にした相手の公開項目を一つ示す（basisItemId）。示せない提案は出さない。\n「話してみる」とは書かない。締めの誘導文・依頼文・連絡を促す文も書かない（ボタンが担う）。",
 ] as const;
-const LAW_OUTPUT_VERBATIM = "出力：3〜5枚（少なくてよい）。";
+const LAW_OUTPUT_VERBATIM = "出力：3〜5枚。少なくてよい。良いものが無ければ「今日は無い」。";
 
 test("R15-rig-2: RIG_LAW rules match the px-table original verbatim", () => {
   assert.deepEqual([...RIG_LAW.rules], [...LAW_VERBATIM]);

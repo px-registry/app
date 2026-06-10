@@ -32,6 +32,7 @@ export const MAX_TEXT = 600;
 export const MAX_TAGS = 6;
 export const MAX_TAG = 30;
 export const MAX_NAME = 30;
+export const MAX_INTRO = 80;
 export const MAX_ANCHOR = 80;
 export const MAX_NOTE = 500;
 export const MAX_QUESTION = 300;
@@ -52,6 +53,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 export type CleanPublish = {
   ownerToken: string;
   displayName: string;
+  /** ひとこと紹介 — optional one-liner, same standing as displayName ("" = unset). */
+  intro: string;
   items: Array<{ kind: string; title: string; text: string; tags: string[]; position: number }>;
 };
 
@@ -68,6 +71,13 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
   if (displayName.length === 0 || displayName.length > MAX_NAME) {
     return { ok: false, reason: "display_name" };
   }
+  // intro is OPTIONAL — absent/empty publishes as "" (never required); but a
+  // present non-string or oversize value rejects the whole payload.
+  if (raw.intro !== undefined && typeof raw.intro !== "string") {
+    return { ok: false, reason: "intro" };
+  }
+  const intro = typeof raw.intro === "string" ? raw.intro.trim() : "";
+  if (intro.length > MAX_INTRO) return { ok: false, reason: "intro" };
   if (!Array.isArray(raw.items) || raw.items.length > MAX_ITEMS) {
     return { ok: false, reason: "items" };
   }
@@ -97,7 +107,7 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
     }
     items.push({ kind: it.kind, title: it.title, text: it.text, tags, position: items.length });
   }
-  return { ok: true, value: { ownerToken: raw.ownerToken, displayName, items } };
+  return { ok: true, value: { ownerToken: raw.ownerToken, displayName, intro, items } };
 }
 
 /** Same-origin write guard (lineage: functions/_ownerboard.ts). */

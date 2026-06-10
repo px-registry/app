@@ -176,3 +176,16 @@ test("M-8: no mask-registration wording or keys survive (the list is a byproduct
     assert.ok(!code.includes("伏せ版を下書き"), `${rel} carries the replaced draft button`);
   }
 });
+
+// ── M-9 (第7便 D): 相手の候補から is ONE item — never a browsable list ──────────
+
+test("M-9: the basis fold resolves a single basisItemId; basisItems is never iterated", () => {
+  const src = read("app/meet/ProposalEntry.tsx");
+  assert.ok(src.includes("basisItems?.[card.basisItemId]"), "single-key lookup renders the fold");
+  for (const { rel, code } of sourcesUnder("app/meet")) {
+    assert.ok(
+      !/basisItems\s*\)?\s*\.\s*map|Object\.(keys|values|entries)\([^)]*basisItems/.test(code),
+      `${rel} must not enumerate basisItems (no human-browsable partner list)`,
+    );
+  }
+});

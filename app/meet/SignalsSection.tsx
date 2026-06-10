@@ -101,6 +101,11 @@ export function SignalsSection({
                 <p className="m-item-title" style={{ margin: 0 }}>
                   {MEET.home.signals.incoming(sig.fromName)}
                 </p>
+                {sig.fromIntro.trim() !== "" && (
+                  <p className="m-item-tags" style={{ margin: "0.1rem 0 0" }}>
+                    {sig.fromName}——{sig.fromIntro}
+                  </p>
+                )}
                 {sig.anchor !== "" && <p className="m-item-text">{sig.anchor}</p>}
                 {sig.mutual ? (
                   <ContactExchange

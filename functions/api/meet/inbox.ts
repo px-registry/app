@@ -20,6 +20,7 @@ import {
 interface SignalRow {
   from_ref: string;
   from_name: string;
+  from_intro: string;
   anchor: string;
   created_at: string;
   mutual: number;
@@ -48,6 +49,8 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
     const incoming = await env.BOARD
       .prepare(
         "SELECT s.from_ref, s.from_name, s.anchor, s.created_at, " +
+          // sender's CURRENT published ひとこと紹介 (公開射影の一部; '' = unset)
+          "COALESCE((SELECT p.intro FROM r15_pool_item p WHERE p.participant_ref = s.from_ref ORDER BY p.position LIMIT 1), '') AS from_intro, " +
           "EXISTS(SELECT 1 FROM r15_signal b WHERE b.from_ref = s.to_ref AND b.to_ref = s.from_ref) AS mutual " +
           "FROM r15_signal s WHERE s.to_ref = ?1 ORDER BY s.created_at",
       )
@@ -85,6 +88,7 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       incoming: (incoming.results ?? []).map((r) => ({
         fromRef: r.from_ref,
         fromName: r.from_name,
+        fromIntro: r.from_intro,
         anchor: r.anchor,
         createdAt: r.created_at,
         mutual: r.mutual === 1,

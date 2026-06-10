@@ -39,7 +39,8 @@ export type MeetRigItemV1 = RigMemoryItemV1 & {
 };
 
 export type QuestionValue = { text: string };
-export type ProfileValue = { displayName: string };
+/** 第7便 B: intro = ひとこと紹介 (optional one-liner; published with the projection). */
+export type ProfileValue = { displayName: string; intro?: string };
 /**
  * 補遺 E — 伏せたい言葉 (one owner-wide list, device-local). Words the owner
  * never wants in an OUTGOING text; the deterministic mask check warns when one

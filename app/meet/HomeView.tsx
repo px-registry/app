@@ -47,7 +47,7 @@ import {
   getEndpoint,
   isConnected,
   buildMeetPrompt,
-  toRigPool,
+  toRigPoolWithRefs,
   parseProposalReply,
   generateProposals,
 } from "@/lib/meet-ai";
@@ -115,6 +115,7 @@ export function HomeView() {
   const [question, setQuestion] = useState("");
   const [rigEntries, setRigEntries] = useState<RigEntry[]>([]);
   const [displayName, setDisplayName] = useState("");
+  const [intro, setIntro] = useState("");
   const [connected, setConnected] = useState(false);
   const [received, setReceived] = useState<ReceivedProposalV1[]>([]);
   const [inbox, setInbox] = useState<InboxData | null>(null);
@@ -129,6 +130,7 @@ export function HomeView() {
     setRigEntries(await memory.listRigItems());
     const profile = await memory.getProfile();
     setDisplayName(profile?.displayName.trim() ?? "");
+    setIntro(profile?.intro?.trim() ?? "");
     setConnected(isConnected());
     setSnapshot(getPublishedSnapshot());
     const list = await shelf.list();
@@ -217,6 +219,7 @@ export function HomeView() {
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName,
+      intro,
       items,
     });
     if (r.ok) {
@@ -246,11 +249,16 @@ export function HomeView() {
       return;
     }
     const refs: Record<string, string> = {};
+    const intros: Record<string, string> = {};
     for (const it of poolRes.items) {
       if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
+      if (!(it.ownerRef in intros)) intros[it.ownerRef] = it.ownerIntro;
     }
 
-    const prompt = buildMeetPrompt(self, toRigPool(poolRes.items), question);
+    // 第7便 C: stable [p◯] refs ride the prompt; the same map is captured on
+    // the entry so the gate + 「相手の候補から」 can resolve basisItemId.
+    const { pool, basis } = toRigPoolWithRefs(poolRes.items);
+    const prompt = buildMeetPrompt(self, pool, question);
     const model = getModel();
     const r = await generateProposals({
       model,
@@ -268,6 +276,8 @@ export function HomeView() {
       raw: r.text,
       cards: parseProposalReply(r.text),
       refs,
+      basisItems: basis,
+      intros,
       echoFlag: pastedOutputEchoesPrivate(self, r.text),
     });
     // Test-disclosed mirror (the boundary block below says so). Best-effort —

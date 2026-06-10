@@ -14,6 +14,8 @@ export type NetResult<T> = ({ ok: true } & T) | { ok: false; error: string };
 export type PoolItemPublic = {
   participantRef: string;
   ownerRef: string;
+  /** ひとこと紹介 (第7便 B) — owner-written, published with the projection; "" = unset. */
+  ownerIntro: string;
   kind: string;
   title: string;
   text: string;
@@ -27,6 +29,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 export async function publishProjection(input: {
   ownerToken: string;
   displayName: string;
+  /** ひとこと紹介 — optional; "" publishes as unset. */
+  intro: string;
   items: OutboundPoolItem[];
 }): Promise<NetResult<{ count: number; participantRef: string }>> {
   try {
@@ -61,6 +65,7 @@ function parsePoolItem(raw: unknown): PoolItemPublic | null {
   return {
     participantRef: raw.participantRef,
     ownerRef: raw.ownerRef,
+    ownerIntro: typeof raw.ownerIntro === "string" ? raw.ownerIntro : "",
     kind: raw.kind,
     title: raw.title,
     text: raw.text,
@@ -73,6 +78,8 @@ function parsePoolItem(raw: unknown): PoolItemPublic | null {
 export type InboxIncoming = {
   fromRef: string;
   fromName: string;
+  /** sender's published ひとこと紹介 ("" = unset). */
+  fromIntro: string;
   anchor: string;
   createdAt: string;
   mutual: boolean;
@@ -122,6 +129,7 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
           ? [{
               fromRef: r.fromRef,
               fromName: r.fromName,
+              fromIntro: typeof r.fromIntro === "string" ? r.fromIntro : "",
               anchor: typeof r.anchor === "string" ? r.anchor : "",
               createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
               mutual: r.mutual === true,

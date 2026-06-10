@@ -28,6 +28,8 @@ import {
   generateProposals,
   buildDetectPrompt,
   parseDetectReply,
+  buildIntroPrompt,
+  parseIntroReply,
 } from "@/lib/meet-ai";
 import {
   getOrMintOwnerToken,
@@ -396,6 +398,10 @@ export function MemoryPanel() {
   const store = useMemo(() => openMeetMemory(), []);
   const [entries, setEntries] = useState<RigEntry[]>([]);
   const [displayName, setDisplayName] = useState("");
+  const [intro, setIntroState] = useState("");
+  const [introAi, setIntroAi] = useState<"idle" | "busy" | "failed">("idle");
+  // effect-initialized — isConnected() touches localStorage (prerender-unsafe)
+  const [panelConnected, setPanelConnected] = useState(false);
   const [savedName, setSavedName] = useState(false);
   const [editing, setEditing] = useState<string | null>(null); // entryId | "new"
   const [report, setReport] = useState("");
@@ -403,8 +409,12 @@ export function MemoryPanel() {
 
   const reload = useCallback(async () => {
     setEntries(toRigEntries(await store.list()));
+    setPanelConnected(isConnected());
     const profile = await store.getProfile();
-    if (profile) setDisplayName(profile.displayName);
+    if (profile) {
+      setDisplayName(profile.displayName);
+      setIntroState(profile.intro ?? "");
+    }
     // 第4便: the byproduct list (a pre-registered list, if any, just keeps
     // living in the same singleton — nothing is thrown away).
     setMaskWords(await store.getMaskWords());
@@ -415,9 +425,35 @@ export function MemoryPanel() {
   }, [reload]);
 
   const saveName = async () => {
-    await store.setProfile({ displayName: displayName.trim() });
+    // ひとこと紹介 publishes only via this explicit save + 候補に出す — an AI
+    // draft that the owner didn't save never leaves the device.
+    await store.setProfile({ displayName: displayName.trim(), intro: intro.trim() });
     setSavedName(true);
     setTimeout(() => setSavedName(false), 2000);
+  };
+
+  // 第7便 B: draft the intro from the owner's PUBLIC items only (差し出し型 —
+  // fills the field; the owner edits, then 保存).
+  const introDraft = async () => {
+    setIntroAi("busy");
+    const material = entries
+      .filter((e) => e.item.private === false)
+      .map((e) => toPublicView(e.item))
+      .map((v) => ({ kind: v.kind, title: v.title, text: v.text }));
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildIntroPrompt(material),
+    });
+    const draft = r.ok ? parseIntroReply(r.text) : null;
+    if (draft === null) {
+      setIntroAi("failed");
+      return;
+    }
+    setIntroState(draft);
+    setIntroAi("idle");
   };
 
   /** The byproduct list grows from 伏せる taps (and shrinks via 編集). */
@@ -500,6 +536,7 @@ export function MemoryPanel() {
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName: displayName.trim(),
+      intro: intro.trim(),
       items,
     });
     if (r.ok) {
@@ -536,6 +573,35 @@ export function MemoryPanel() {
               {savedName ? MEET.profile.saved : MEET.profile.save}
             </button>
           </div>
+          <label className="m-note" style={{ display: "block", marginTop: "0.6rem" }}>
+            {MEET.profile.introLabel}
+          </label>
+          <p className="m-note" style={{ margin: "0 0 0.3rem" }}>
+            {MEET.profile.introNote}
+          </p>
+          <input
+            className="m-field"
+            value={intro}
+            onChange={(e) => setIntroState(e.target.value)}
+            placeholder={MEET.profile.introPlaceholder}
+            maxLength={80}
+          />
+          {panelConnected && (
+            <button
+              type="button"
+              className="m-btn m-btn-quiet"
+              style={{ marginTop: "0.4rem" }}
+              disabled={introAi === "busy" || entries.every((e) => e.item.private !== false)}
+              onClick={() => void introDraft()}
+            >
+              {introAi === "busy" ? MEET.profile.introBusy : MEET.profile.introDraft}
+            </button>
+          )}
+          {introAi === "failed" && (
+            <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+              {MEET.profile.introFailed}
+            </p>
+          )}
         </div>
       </section>
 

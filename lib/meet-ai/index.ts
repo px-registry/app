@@ -30,11 +30,14 @@ export {
 export {
   buildMeetPrompt,
   toRigPool,
+  toRigPoolWithRefs,
   parseProposalReply,
   parseReplyOutcome,
   type ProposalCard,
   type ReplyOutcome,
+  type BasisItem,
+  type BasisMap,
 } from "./prompt.ts";
 export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";
-export { buildDetectPrompt, parseDetectReply } from "./mask.ts";
+export { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
 export { gateCardsByProvenance, type GatedCard, type GatedCards } from "./provenance.ts";

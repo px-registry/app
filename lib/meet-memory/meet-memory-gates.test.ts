@@ -472,3 +472,19 @@ test("MM-15c: tap-apply writes the PUBLIC view only — the private body never m
   assert.deepEqual(findMaskLeaks(words, "別項目", "PX Boxも使う"), ["PX Box"], "propagates to all items");
   assert.deepEqual(findMaskLeaks(words, out.title, out.text), [], "masked view is clean");
 });
+
+// ── MM-16 (第7便 B): ひとこと紹介 — owner-saved only, validated, optional ───────
+
+test("MM-16: profile.intro is an optional string; odd values refused; round-trips", async () => {
+  const ok = (value: unknown) =>
+    validateNewEntry({ kind: "profile", provenance: "owner_written", value });
+  assert.deepEqual(ok({ displayName: "あや" }), { ok: true }, "absent intro stays valid");
+  assert.deepEqual(ok({ displayName: "あや", intro: "手を動かす場づくりが好き" }), { ok: true });
+  assert.equal(ok({ displayName: "あや", intro: 7 }).ok, false);
+
+  const store = freshStore();
+  await store.setProfile({ displayName: "あや", intro: "一言" });
+  assert.deepEqual(await store.getProfile(), { displayName: "あや", intro: "一言" });
+  await store.setProfile({ displayName: "あや" });
+  assert.equal((await store.getProfile())?.intro, undefined, "save without intro clears it");
+});

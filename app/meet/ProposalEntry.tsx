@@ -120,7 +120,9 @@ export function ProposalEntry({
   onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<boolean>;
   onRemove: (entryId: string) => Promise<void>;
 }) {
-  const { kept, excluded } = gateCardsByProvenance(entry.cards, entry.refs);
+  // 第7便 C: with a basis map (new entries), a card must also point at a real
+  // served item OF ITS ADDRESSEE; pre-第7便 entries keep the to-only gate.
+  const { kept, excluded } = gateCardsByProvenance(entry.cards, entry.refs, entry.basisItems);
 
   const rawFold = (
     <details>
@@ -163,13 +165,34 @@ export function ProposalEntry({
           {kept.map(({ card, index }) => {
             const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
             const sent = sentRefs.has(toRef);
+            const partnerIntro = (entry.intros?.[card.to] ?? "").trim();
+            const basisItem = entry.basisItems?.[card.basisItemId];
             return (
               <div key={index} className="m-proposal">
                 <p className="m-item-title" style={{ margin: 0 }}>
                   {card.to}
                 </p>
+                {partnerIntro !== "" && (
+                  <p className="m-item-tags" style={{ margin: "0.1rem 0 0" }}>
+                    {card.to}——{partnerIntro}
+                  </p>
+                )}
                 <p className="m-item-text">{card.line1}</p>
                 {card.line2 && <p className="m-item-text">{card.line2}</p>}
+                {basisItem !== undefined && (
+                  // 第7便 D: exactly ONE grounding item — never the partner's
+                  // whole list (the AI-only pool stays human-unbrowsable).
+                  <details style={{ marginTop: "0.3rem" }}>
+                    <summary className="m-note" style={{ cursor: "pointer" }}>
+                      {MEET.proposal.basisShow}
+                    </summary>
+                    <p className="m-item-text">
+                      {basisItem.title.trim() !== ""
+                        ? `${basisItem.title} — ${basisItem.text}`
+                        : basisItem.text}
+                    </p>
+                  </details>
+                )}
                 <button
                   type="button"
                   className={`m-btn ${sent ? "m-btn-quiet" : "m-btn-primary"}`}

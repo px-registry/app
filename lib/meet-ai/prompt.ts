@@ -26,7 +26,8 @@ const QUESTION_HEADING = "【今日の問い】";
 const FORMAT_BLOCK = [
   "【返答の形】",
   "次の形のJSONだけを返してください（前後に説明文を付けない）：",
-  '[{ "to": "相手の名前（プールの[名前]と同じ表記）", "line1": "①あなたのもの × 相手のもの", "line2": "②具体の錨をひとつ言い切る" }]',
+  '[{ "to": "相手の名前（プールの[名前]と同じ表記）", "line1": "1行目（あなたの○○ × ［相手名］の○○）", "line2": "2行目（そこから生まれそうなものを一つ）", "basisItemId": "根拠にした相手の項目の参照（[p3] と書かれた項目なら p3）" }]',
+  "basisItemId は、その相手の公開項目に実際に付いている参照だけを使う。",
   "今日は無い場合は [] を返す。",
 ].join("\n");
 
@@ -46,6 +47,41 @@ export function toRigPool(items: PoolItemPublic[]): RigPublicPoolItemV1[] {
     });
   }
   return out;
+}
+
+// ── basis provenance (第7便 C) ─────────────────────────────────────────────────
+
+/** One serveable basis item, captured at generation time for the gate + fold. */
+export type BasisItem = { ownerRef: string; title: string; text: string };
+export type BasisMap = Record<string, BasisItem>;
+
+/**
+ * Like {@link toRigPool}, but every item carries a STABLE prompt-local ref
+ * ([p1], [p2], …) rendered into its title, and the same refs come back as a
+ * map — the provenance gate later requires each card's basisItemId to resolve
+ * here AND belong to the card's addressee (fail-closed; no repair).
+ */
+export function toRigPoolWithRefs(items: PoolItemPublic[]): {
+  pool: RigPublicPoolItemV1[];
+  basis: BasisMap;
+} {
+  const pool: RigPublicPoolItemV1[] = [];
+  const basis: BasisMap = {};
+  let n = 0;
+  for (const it of items) {
+    if (!KIND_SET.has(it.kind)) continue;
+    n += 1;
+    const id = `p${n}`;
+    basis[id] = { ownerRef: it.ownerRef, title: it.title, text: it.text };
+    pool.push({
+      ownerRef: it.ownerRef,
+      kind: it.kind as RigMemoryKindV1,
+      title: `[${id}] ${it.title}`.trim(),
+      text: it.text,
+      tags: [...it.tags],
+    });
+  }
+  return { pool, basis };
 }
 
 /**
@@ -70,7 +106,7 @@ export function buildMeetPrompt(
 
 // ── Parsing the model's reply (fail-closed; raw text is kept either way) ───────
 
-export type ProposalCard = { to: string; line1: string; line2: string };
+export type ProposalCard = { to: string; line1: string; line2: string; basisItemId: string };
 
 /**
  * `parsed` distinguishes the two empty-card cases the UI must not conflate
@@ -130,8 +166,11 @@ export function parseReplyOutcome(raw: string): ReplyOutcome {
     if (!isRecord(c)) continue;
     if (typeof c.to !== "string" || typeof c.line1 !== "string") continue;
     const line2 = typeof c.line2 === "string" ? c.line2 : "";
+    // basisItemId is kept lenient at PARSE time ("" when absent/odd) — the
+    // provenance gate is where a missing/false basis drops the card.
+    const basisItemId = typeof c.basisItemId === "string" ? c.basisItemId.trim() : "";
     if (c.to.trim() === "" || c.line1.trim() === "") continue;
-    cards.push({ to: c.to.trim(), line1: c.line1, line2 });
+    cards.push({ to: c.to.trim(), line1: c.line1, line2, basisItemId });
   }
   return { parsed: true, cards };
 }

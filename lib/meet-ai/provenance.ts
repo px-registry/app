@@ -6,27 +6,37 @@
 // proposal only when its addressee resolves to a real ownerRef of the pool
 // that was actually sent. Pure; display-side (the raw reply stays inspectable).
 
-import type { ProposalCard } from "./prompt.ts";
+import type { ProposalCard, BasisMap } from "./prompt.ts";
 
 /** Cards keep their ORIGINAL index — readings are keyed by it. */
 export type GatedCard = { card: ProposalCard; index: number };
 export type GatedCards = { kept: GatedCard[]; excluded: GatedCard[] };
 
 /**
- * Split cards by whether `to` resolves inside the refs captured AT GENERATION
- * TIME (ownerRef → participantRef of the sent pool). Fail-closed: anything
- * that doesn't resolve to a non-empty ref is excluded — an invented partner
- * never renders as a proposal.
+ * Split cards by provenance, fail-closed and unrepaired:
+ *   - `to` must resolve inside the refs captured AT GENERATION TIME
+ *     (ownerRef → participantRef of the sent pool) — an invented partner
+ *     never renders.
+ *   - 第7便 C: when the entry carries a basis map (new generations), the
+ *     card's basisItemId must resolve in it AND belong to the addressee —
+ *     a proposal that can't show its grounding item is not shown.
+ *     Entries WITHOUT a basis map (pre-第7便 shelf) keep the to-only gate,
+ *     so old proposals don't vanish retroactively.
  */
 export function gateCardsByProvenance(
   cards: ProposalCard[],
   refs: Record<string, string>,
+  basis?: BasisMap,
 ): GatedCards {
   const kept: GatedCard[] = [];
   const excluded: GatedCard[] = [];
   cards.forEach((card, index) => {
     const ref = refs[card.to];
-    if (typeof ref === "string" && ref !== "") kept.push({ card, index });
+    const toResolves = typeof ref === "string" && ref !== "";
+    const basisResolves =
+      basis === undefined ||
+      (card.basisItemId !== "" && basis[card.basisItemId]?.ownerRef === card.to);
+    if (toResolves && basisResolves) kept.push({ card, index });
     else excluded.push({ card, index });
   });
   return { kept, excluded };

@@ -38,10 +38,10 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
         env.BOARD
           .prepare(
             "INSERT INTO r15_pool_item " +
-              "(participant_ref, display_name, kind, title, text, tags, position, updated_at) " +
-              "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+              "(participant_ref, display_name, intro, kind, title, text, tags, position, updated_at) " +
+              "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
           )
-          .bind(ref, v.value.displayName, it.kind, it.title, it.text, JSON.stringify(it.tags), it.position, at),
+          .bind(ref, v.value.displayName, v.value.intro, it.kind, it.title, it.text, JSON.stringify(it.tags), it.position, at),
       ),
     ];
     await env.BOARD.batch(stmts);

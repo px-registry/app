@@ -9,11 +9,12 @@
 import { json, type MeetEnv } from "../../_meet.ts";
 import { isParticipantRef } from "../../../lib/meet-net/ref.ts";
 
-const PUBLIC_COLUMNS = "participant_ref, display_name, kind, title, text, tags, position";
+const PUBLIC_COLUMNS = "participant_ref, display_name, intro, kind, title, text, tags, position";
 
 interface RawRow {
   participant_ref: string;
   display_name: string;
+  intro: string;
   kind: string;
   title: string;
   text: string;
@@ -46,6 +47,7 @@ export const onRequestGet: PagesFunction<MeetEnv> = async ({ request, env }) => 
     const items = (results ?? []).map((r) => ({
       participantRef: r.participant_ref,
       ownerRef: r.display_name,
+      ownerIntro: r.intro,
       kind: r.kind,
       title: r.title,
       text: r.text,
