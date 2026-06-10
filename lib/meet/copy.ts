@@ -56,12 +56,56 @@ export const MEET = {
     },
   },
 
+  /** 記憶の種類 — rig kinds の表示名。 */
+  kinds: {
+    have: "持っている",
+    want: "求めている",
+    avoid: "避けたい",
+    memory: "記憶",
+  } as Record<string, string>,
+
+  intake: {
+    copyPrompt: "プロンプトをコピー",
+    copied: "コピーしました",
+    pasteLabel: "AIの返事をここに貼る",
+    pastePlaceholder: "返ってきたJSONをそのまま貼り付けてください",
+    parse: "取り込む",
+    reviewHeading: "確認してから確定",
+    reviewNote:
+      "公開にした項目だけが、ほかの参加者の候補に出ます。あとからいつでも変えられます。迷ったら非公開のままで。",
+    publicLabel: "公開",
+    privateLabel: "非公開",
+    confirm: (n: number): string => `この${n}件で確定する`,
+    done: "記憶の下地ができました。",
+    redo: "貼り直す",
+  },
+
+  profile: {
+    heading: "公開のときの名前",
+    note: "公開の項目や合図に添える呼び名です。本名でなくてかまいません。",
+    placeholder: "例：あや、カフェの人",
+    save: "保存",
+    saved: "保存しました",
+  },
+
   memory: {
     title: "あなたの記憶",
     boundary: "記憶はこの端末の中だけにあります。PXは預かりません。",
+    empty: "まだ記憶がありません。はじめかたの手順でつくれます。",
+    addItem: "項目を足す",
+    edit: "直す",
+    remove: "消す",
+    save: "保存",
+    cancel: "やめる",
+    titleLabel: "一言タイトル",
+    textLabel: "本文",
+    tagsLabel: "タグ（、で区切る）",
+    clearAll: "すべて消す",
+    confirmClear: "この端末の記憶をすべて消します。よろしいですか？",
     exportLabel: "控えを保存",
     importLabel: "控えから戻す",
-    clearAll: "すべて消す",
+    importReport: (added: number, updated: number): string =>
+      `${added}件を追加、${updated}件を更新しました。`,
     durability: "ブラウザのデータを消すと、ここも消えます。控えを保存しておくと戻せます。",
   },
 

@@ -1,21 +1,38 @@
+import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
+import { ColdStartIntake } from "./ColdStartIntake.tsx";
 
-// R1.5 はじめかた — Slice 1 shell: the three steps as a single quiet scroll.
-// Each step gains its interactive widget in later slices (key entry, cold-start
-// paste-back, publish toggles); the descriptions here are the durable copy.
+// R1.5 はじめかた — the three steps as a single quiet scroll. Step 2 (cold-start
+// paste-back) is live; step 1 gains the key widget in Slice 3; step 3 links to
+// the memory page where 公開/非公開 lives.
 export default function MeetStart() {
-  const steps = [MEET.start.step1, MEET.start.step2, MEET.start.step3];
   return (
     <>
       <section className="m-section">
         <h1 className="m-h1">{MEET.start.title}</h1>
         <p className="m-lede">{MEET.start.lede}</p>
-        {steps.map((s) => (
-          <div className="m-card" key={s.heading}>
-            <h2 className="m-h2 m-stepnum">{s.heading}</h2>
-            <p style={{ margin: 0, color: "var(--text)" }}>{s.body}</p>
-          </div>
-        ))}
+
+        <div className="m-card">
+          <h2 className="m-h2 m-stepnum">{MEET.start.step1.heading}</h2>
+          <p style={{ margin: 0, color: "var(--text)" }}>{MEET.start.step1.body}</p>
+        </div>
+
+        <div className="m-card">
+          <h2 className="m-h2 m-stepnum">{MEET.start.step2.heading}</h2>
+          <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
+          <ColdStartIntake />
+        </div>
+
+        <div className="m-card">
+          <h2 className="m-h2 m-stepnum">{MEET.start.step3.heading}</h2>
+          <p style={{ margin: 0, color: "var(--text)" }}>{MEET.start.step3.body}</p>
+          <p className="m-note" style={{ marginTop: "0.6rem" }}>
+            <Link href="/meet/memory/" style={{ color: "var(--shu-deep)" }}>
+              {MEET.nav.memory}
+            </Link>
+            で項目ごとに選べます。
+          </p>
+        </div>
       </section>
 
       <div className="m-boundary">

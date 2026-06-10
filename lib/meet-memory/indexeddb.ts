@@ -1,0 +1,83 @@
+// R1.5 meet memory — IndexedDB backend (browser only; Stage B lineage:
+// lib/owner-memory/indexeddb.ts).
+//
+// The owner's R1.5 memory body lives here, in their own browser, under the
+// `px-meet` database. Nothing in this file talks to a network — no fetch, no
+// sync, no server. A browser data-clear wipes it; that honest caveat is why the
+// UI promotes 控えを保存 (export) — see STOP #2 (hybrid).
+//
+// Two object stores are created up front so later slices need no version bump:
+//   memory   — MeetMemoryEntryV1 (owner-authored substrate; THIS backend)
+//   received — proposals the owner's AI produced + the owner's readings
+//              (separate shelf: never validated into the memory substrate)
+//
+// Imported only from client components via the lib barrel. node:test uses
+// InMemoryMeetBackend instead, so this DOM-only code never loads there.
+
+import type { MeetBackend } from "./backend.ts";
+import type { MeetMemoryEntryV1 } from "./types.ts";
+
+const DB_NAME = "px-meet";
+export const MEMORY_STORE = "memory";
+export const RECEIVED_STORE = "received";
+const VERSION = 1;
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(MEMORY_STORE)) {
+        db.createObjectStore(MEMORY_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(RECEIVED_STORE)) {
+        db.createObjectStore(RECEIVED_STORE, { keyPath: "entryId" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function tx<T>(
+  store: string,
+  mode: IDBTransactionMode,
+  run: (s: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  return openDb().then(
+    (db) =>
+      new Promise<T>((resolve, reject) => {
+        const t = db.transaction(store, mode);
+        const req = run(t.objectStore(store));
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+        t.oncomplete = () => db.close();
+      }),
+  );
+}
+
+/** The browser-backed memory store. Owner-local, never networked. */
+export class IndexedDbMeetBackend implements MeetBackend {
+  private store: string;
+  constructor(store: string = MEMORY_STORE) {
+    this.store = store;
+  }
+  async list(): Promise<MeetMemoryEntryV1[]> {
+    return (await tx<MeetMemoryEntryV1[]>(this.store, "readonly", (s) => s.getAll())) ?? [];
+  }
+  async get(id: string): Promise<MeetMemoryEntryV1 | undefined> {
+    return (
+      (await tx<MeetMemoryEntryV1 | undefined>(this.store, "readonly", (s) => s.get(id))) ??
+      undefined
+    );
+  }
+  async put(entry: MeetMemoryEntryV1): Promise<void> {
+    await tx(this.store, "readwrite", (s) => s.put(entry));
+  }
+  async remove(id: string): Promise<void> {
+    await tx(this.store, "readwrite", (s) => s.delete(id));
+  }
+  async clear(): Promise<void> {
+    await tx(this.store, "readwrite", (s) => s.clear());
+  }
+}
