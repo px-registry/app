@@ -58,8 +58,8 @@ const browser = await chromium.launch();
 
   // REAL generation — the owner's machine does the inference
   await page.goto(`${LOCAL}/meet/`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: "いま聞く" }).waitFor();
-  await page.getByRole("button", { name: "いま聞く" }).click();
+  await page.getByRole("button", { name: "探しに行く" }).waitFor();
+  await page.getByRole("button", { name: "探しに行く" }).click();
   // model load + inference can take a while on first run
   await page
     .locator(".m-itemlist .m-item")

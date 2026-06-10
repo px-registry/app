@@ -153,7 +153,7 @@ try {
   check("あや receives みどり's note", inboxA.body?.notes?.some((n) => n.note === "メール: midori@example.jp"));
 
   // 7. receive attempt (fake key) — honest typed error
-  await page.getByRole("button", { name: "いま聞く" }).click();
+  await page.getByRole("button", { name: "探しに行く" }).click();
   await page.locator("p.m-note[aria-live=polite]").first().waitFor({ timeout: 30000 });
   const errText = await page.locator("p.m-note[aria-live=polite]").first().innerText();
   check("receive shows an honest typed error (fake key)", errText.trim().length > 0);

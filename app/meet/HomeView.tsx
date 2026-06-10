@@ -181,7 +181,7 @@ export function HomeView() {
       },
     });
     setPlaceDraft(null);
-    // The question moved onto the waiting list — leaving it in the いま聞く box
+    // The question moved onto the waiting list — leaving it in the 問い box
     // would feed it twice (问い block AND want card) on the next generation.
     setQuestion("");
     await memory.setQuestion("");

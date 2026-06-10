@@ -52,7 +52,7 @@ try {
   // ── A. 問いを置く → 確定 → 候補を更新する → 待っています ───────────────────────
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
   check("home heading is 問い (今日の dropped)", await page.getByRole("heading", { name: "問い", exact: true }).isVisible());
-  check("two-tense line shown", await page.getByText("いま聞くか、置いて待つか", { exact: false }).isVisible());
+  check("two-tense line shown", await page.getByText("いま探しに行くか、置いて待つか", { exact: false }).isVisible());
   const QUESTION = "週末に一緒に古い納屋を直す相棒を探したい";
   await page.locator("textarea.m-field").first().fill(QUESTION);
   await page.getByRole("button", { name: "置いておく" }).click();
@@ -127,8 +127,8 @@ try {
 
   // ── C. generation: fenced replies render honestly (no raw ``` on screen) ─────
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: "いま聞く" }).waitFor();
-  await page.getByRole("button", { name: "いま聞く" }).click();
+  await page.getByRole("button", { name: "探しに行く" }).waitFor();
+  await page.getByRole("button", { name: "探しに行く" }).click();
   // the home now has TWO item lists (置いてある問い + 届いた提案) — scope to a
   // proposal entry by its model line
   const entry = page.locator(".m-item", { hasText: "が読みました" }).first();

@@ -19,7 +19,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { allMeetCopyStrings } from "./copy.ts";
+import { MEET, allMeetCopyStrings } from "./copy.ts";
 import { findForbiddenTerm } from "./forbidden.ts";
 
 const root = (rel: string) => new URL(`../../${rel}`, import.meta.url);
@@ -133,4 +133,26 @@ test("M-6c: the candidate wording replaced 公開 in the meet copy", () => {
   assert.ok(copy.includes("候補に出す"), "the AIの候補に出す wording exists");
   assert.ok(!copy.includes("公開する"), "the old 公開する action wording is gone");
   assert.ok(copy.includes("人間の一覧には出ません"), "the AI-only fact is stated");
+});
+
+// ── M-7 (naming final): 主動詞の対は「探しに行く」／「置いておく」 ────────────────
+//
+// Hiroto 確定: 結果を約束せず行為だけを名指す。探すのであって、つながるとは
+// 言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
+
+test("M-7: the generate verb is 探しに行く; the 聞く-era wording is extinct", () => {
+  assert.equal(MEET.home.receive, "探しに行く", "the generate button names the act");
+  assert.equal(MEET.home.place.action, "置いておく", "the waiting verb stays");
+  assert.ok(
+    MEET.home.question.twoTenses.startsWith("いま探しに行くか、置いて待つか。"),
+    "the two-tense line uses the same verb pair",
+  );
+  for (const s of allMeetCopyStrings()) {
+    assert.ok(!s.includes("いま聞く"), `聞く-era copy survives: ${s}`);
+    assert.ok(!s.includes("提案を受け取る"), `pre-fix1 verb survives: ${s}`);
+  }
+  // UI sources too — no inline resurrection outside the label layer
+  for (const { rel, code } of sourcesUnder("app/meet")) {
+    assert.ok(!code.includes("いま聞く"), `${rel} carries 聞く-era wording`);
+  }
 });
