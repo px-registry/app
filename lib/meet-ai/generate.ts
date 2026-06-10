@@ -23,6 +23,31 @@ function failFrom(status: number): GenerateResult {
   return { ok: false, error: "provider" };
 }
 
+/**
+ * Reachability probe for the local lane (fix: 「つながっています」 is said only
+ * after this succeeds — never assumed). Returns the installed model names so
+ * the picker offers what the machine actually has.
+ */
+export async function probeOllama(
+  endpoint: string,
+): Promise<{ ok: true; models: string[] } | { ok: false }> {
+  const base = (endpoint.trim() || "http://localhost:11434").replace(/\/+$/, "");
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(`${base}/api/tags`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return { ok: false };
+    const body = (await res.json()) as { models?: Array<{ name?: string }> };
+    const models = (body.models ?? [])
+      .map((m) => (typeof m.name === "string" ? m.name : ""))
+      .filter((n) => n !== "");
+    return { ok: true, models };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function generateProposals(input: GenerateInput): Promise<GenerateResult> {
   try {
     if (input.model.provider === "anthropic") {

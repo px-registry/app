@@ -7,6 +7,9 @@ export {
   DEFAULT_BY_PROVIDER,
   PROVIDER_LABELS,
   UNKNOWN_KEY_HINT,
+  OLLAMA_UNREACHABLE,
+  OLLAMA_NO_MODELS,
+  OLLAMA_MODELS_LABEL,
   findModel,
   detectProviderFromKey,
   type MeetModel,
@@ -25,4 +28,4 @@ export {
   DEFAULT_OLLAMA_ENDPOINT,
 } from "./keys.ts";
 export { buildMeetPrompt, toRigPool, parseProposalReply, type ProposalCard } from "./prompt.ts";
-export { generateProposals, type GenerateInput, type GenerateResult } from "./generate.ts";
+export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";

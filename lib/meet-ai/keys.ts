@@ -26,8 +26,13 @@ const MODEL_STORE = "pxmeet:model";
 export const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434";
 
 export function getModel(): MeetModel {
-  const id = localStorage.getItem(MODEL_STORE);
-  return findModel(id && MEET_MODELS.some((m) => m.id === id) ? id : DEFAULT_MODEL_ID);
+  const id = localStorage.getItem(MODEL_STORE) ?? "";
+  // Catalog ids AND dynamic ollama:<installed-model> ids are both valid —
+  // findModel resolves the latter on the fly (an empty ollama name falls back).
+  if (id !== "" && (MEET_MODELS.some((m) => m.id === id) || id.startsWith("ollama:"))) {
+    return findModel(id);
+  }
+  return findModel(DEFAULT_MODEL_ID);
 }
 export function setModel(id: string): void {
   localStorage.setItem(MODEL_STORE, id);

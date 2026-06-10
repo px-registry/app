@@ -26,7 +26,14 @@ export const DEFAULT_BY_PROVIDER: Record<ProviderId, string> = {
 };
 
 export function findModel(id: string): MeetModel {
-  return MEET_MODELS.find((m) => m.id === id) ?? MEET_MODELS[0];
+  const fixed = MEET_MODELS.find((m) => m.id === id);
+  if (fixed) return fixed;
+  // Ollama models are whatever the owner's machine actually has (probed via
+  // /api/tags) — any "ollama:<name>" id resolves dynamically.
+  if (id.startsWith("ollama:") && id.length > "ollama:".length) {
+    return { id, provider: "ollama", label: `Ollama（${id.slice("ollama:".length)}）` };
+  }
+  return MEET_MODELS[0];
 }
 
 /** Provider label for the 「…につながります」 line. */
@@ -40,6 +47,12 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
  *  gate M-3b — but a key hint has to name what it recognizes). */
 export const UNKNOWN_KEY_HINT =
   "この鍵の形はまだ知りません。sk-ant-…（Claude）か sk-…（OpenAI）の鍵を貼ってください。";
+
+export const OLLAMA_UNREACHABLE =
+  "Ollamaに届きませんでした。PCでOllamaが起動しているか確かめてください。公開URLから使うには、OLLAMA_ORIGINS にこのサイトの許可も必要です。";
+export const OLLAMA_NO_MODELS =
+  "Ollamaにモデルがまだありません。PCで `ollama pull <モデル名>` を実行してください。";
+export const OLLAMA_MODELS_LABEL = "つかうモデル（この端末にあるもの）";
 
 /**
  * fix1: detect the provider from the key's prefix so the owner never picks one.

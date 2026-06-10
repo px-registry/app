@@ -14,7 +14,8 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
 import { buildMeetPrompt, toRigPool, parseProposalReply } from "./prompt.ts";
-import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey } from "./models.ts";
+import { probeOllama } from "./generate.ts";
+import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
 import { RIG_LAW, buildPublicPool, type RigOwnerV1 } from "../rig/rig.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 import type { PoolItemPublic } from "../meet-net/api.ts";
@@ -167,5 +168,64 @@ test("MA-6b: every per-provider default model exists in the catalog", () => {
     const m = MEET_MODELS.find((x) => x.id === id);
     assert.ok(m, `default for ${provider} must exist: ${id}`);
     assert.equal(m!.provider, provider, `default for ${provider} must belong to it`);
+  }
+});
+
+test("MA-6c: ollama model ids resolve dynamically (whatever the machine has)", () => {
+  const m = findModel("ollama:qwen2.5-coder:7b");
+  assert.equal(m.provider, "ollama");
+  assert.equal(m.id, "ollama:qwen2.5-coder:7b");
+  assert.ok(m.label.includes("qwen2.5-coder:7b"));
+  // unknown non-ollama ids still fall back to the catalog head
+  assert.equal(findModel("nonsense").id, MEET_MODELS[0].id);
+  assert.equal(findModel("ollama:").id, MEET_MODELS[0].id, "empty ollama name falls back");
+});
+
+// ── MA-6d: 「つながっています」 is probe-truth — reachable and unreachable both pinned
+
+test("MA-6d: probeOllama — reachable lists models; unreachable/odd is fail-closed", async () => {
+  const realFetch = globalThis.fetch;
+  const calls: string[] = [];
+  const respond = (impl: () => Promise<Response>) => {
+    globalThis.fetch = ((url: string | URL) => {
+      calls.push(String(url));
+      return impl();
+    }) as typeof fetch;
+  };
+  try {
+    // reachable → ok with the machine's installed model names
+    respond(async () =>
+      new Response(JSON.stringify({ models: [{ name: "qwen2.5-coder:7b" }, { name: "llama3" }] })),
+    );
+    assert.deepEqual(await probeOllama("http://localhost:11434/"), {
+      ok: true,
+      models: ["qwen2.5-coder:7b", "llama3"],
+    });
+    assert.equal(calls.at(-1), "http://localhost:11434/api/tags", "trailing slash normalized");
+
+    // empty endpoint falls back to the default localhost
+    respond(async () => new Response(JSON.stringify({ models: [] })));
+    assert.deepEqual(await probeOllama("  "), { ok: true, models: [] });
+    assert.equal(calls.at(-1), "http://localhost:11434/api/tags");
+
+    // unreachable (network error) → never claims connected
+    respond(async () => {
+      throw new TypeError("fetch failed");
+    });
+    assert.deepEqual(await probeOllama("http://localhost:11434"), { ok: false });
+
+    // reachable but non-2xx → fail-closed
+    respond(async () => new Response("nope", { status: 503 }));
+    assert.deepEqual(await probeOllama("http://localhost:11434"), { ok: false });
+
+    // reachable but malformed body → fail-closed (no throw, no phantom connect)
+    respond(async () => new Response("{broken"));
+    assert.deepEqual(await probeOllama("http://localhost:11434"), { ok: false });
+
+    // body without names → ok but zero models (UI must NOT say connected then)
+    respond(async () => new Response(JSON.stringify({ models: [{}, { name: 7 }] })));
+    assert.deepEqual(await probeOllama("http://localhost:11434"), { ok: true, models: [] });
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
