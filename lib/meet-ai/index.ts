@@ -27,5 +27,13 @@ export {
   switchToLocalLane,
   DEFAULT_OLLAMA_ENDPOINT,
 } from "./keys.ts";
-export { buildMeetPrompt, toRigPool, parseProposalReply, type ProposalCard } from "./prompt.ts";
+export {
+  buildMeetPrompt,
+  toRigPool,
+  parseProposalReply,
+  parseReplyOutcome,
+  type ProposalCard,
+  type ReplyOutcome,
+} from "./prompt.ts";
 export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";
+export { buildMaskPrompt, parseMaskReply } from "./mask.ts";

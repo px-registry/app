@@ -62,7 +62,7 @@ const shot = (name) => page.screenshot({ path: `${SHOT_DIR}/r15b-${name}.png`, f
 try {
   // 1. home — first visit: prerequisites + AI-less reassurance + open promise
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  await waitCheck("home renders 今日の問い", page.getByRole("heading", { name: "今日の問い" }));
+  await waitCheck("home renders 問い", page.getByRole("heading", { name: "問い", exact: true }));
   await waitCheck("home lists missing steps", page.getByText("AIがまだつながっていません"));
   await waitCheck("AI-less loop reassurance shown", page.getByText("AIをつながなくても", { exact: false }));
   await waitCheck("promise open on first visit", page.getByText("PXはAIを実行しません", { exact: false }));
@@ -112,7 +112,8 @@ try {
   // 5. fix1-1 regression: ADD an item AFTER publishing → banner → update → served
   await page.getByRole("button", { name: "項目を足す" }).click();
   await page.locator(".m-form input.m-field").first().fill("週末の手伝い");
-  await page.locator(".m-form textarea.m-field").fill("日曜の午前なら体が空いている");
+  // .first(): the form now carries a second textarea (候補に出すときの書き方)
+  await page.locator(".m-form textarea.m-field").first().fill("日曜の午前なら体が空いている");
   await page.locator(".m-form .m-toggle").click(); // 出さない → 出す
   await page.locator(".m-form").getByRole("button", { name: "保存", exact: true }).click();
   await waitCheck("未反映バナー appears", page.getByText("候補の変更が1件あります", { exact: false }));
@@ -152,7 +153,7 @@ try {
   check("あや receives みどり's note", inboxA.body?.notes?.some((n) => n.note === "メール: midori@example.jp"));
 
   // 7. receive attempt (fake key) — honest typed error
-  await page.getByRole("button", { name: "提案を受け取る" }).click();
+  await page.getByRole("button", { name: "いま聞く" }).click();
   await page.locator("p.m-note[aria-live=polite]").first().waitFor({ timeout: 30000 });
   const errText = await page.locator("p.m-note[aria-live=polite]").first().innerText();
   check("receive shows an honest typed error (fake key)", errText.trim().length > 0);

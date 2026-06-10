@@ -6,6 +6,7 @@ export {
   type MeetProvenance,
   type MeetEntryKind,
   type MeetMemoryEntryV1,
+  type MeetRigItemV1,
   type NewMeetEntry,
   type QuestionValue,
   type ProfileValue,
@@ -28,6 +29,13 @@ export {
 export { parseColdStartPaste, type MeetIntakeResult } from "./intake.ts";
 export { COLDSTART_PROMPT, COLDSTART_NOTE } from "./coldstart.ts";
 export { MEET_MEMORY_BOUNDARY, type MeetMemoryBoundary } from "./boundary.ts";
+export {
+  PLACED_QUESTION_TAG,
+  draftPlacedQuestionTitle,
+  draftPlacedQuestion,
+  isPlacedQuestion,
+} from "./placed.ts";
+export { toPublicView, hasPublicVariant } from "./public-view.ts";
 
 import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";

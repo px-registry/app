@@ -8,21 +8,35 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
 import {
   openMeetMemory,
+  toPublicView,
+  hasPublicVariant,
   type MeetMemoryEntryV1,
+  type MeetRigItemV1,
 } from "@/lib/meet-memory";
+import {
+  getModel,
+  getKey,
+  getEndpoint,
+  isConnected,
+  generateProposals,
+  buildMaskPrompt,
+  parseMaskReply,
+} from "@/lib/meet-ai";
 import {
   getOrMintOwnerToken,
   buildOutboundProjection,
   publishProjection,
   getPublishedSnapshot,
   setPublishedSnapshot,
+  projectionSnapshotJson,
+  snapshotPendingCount,
 } from "@/lib/meet-net";
-import { RIG_MEMORY_KINDS, type RigMemoryItemV1, type RigMemoryKindV1 } from "@/lib/rig";
+import { RIG_MEMORY_KINDS, type RigMemoryKindV1 } from "@/lib/rig";
 import { BoundaryNote } from "../BoundaryNote.tsx";
 
-type RigEntry = { entryId: string; item: RigMemoryItemV1 };
+type RigEntry = { entryId: string; item: MeetRigItemV1 };
 
-const BLANK: RigMemoryItemV1 = { kind: "have", title: "", text: "", tags: [], private: true };
+const BLANK: MeetRigItemV1 = { kind: "have", title: "", text: "", tags: [], private: true };
 
 function toRigEntries(all: MeetMemoryEntryV1[]): RigEntry[] {
   const out: RigEntry[] = [];
@@ -30,17 +44,50 @@ function toRigEntries(all: MeetMemoryEntryV1[]): RigEntry[] {
   return out;
 }
 
+/** What would actually leave — title and text in one honest line. */
+function publicFace(item: MeetRigItemV1): string {
+  const v = toPublicView(item);
+  return v.title.trim() !== "" ? `${v.title} — ${v.text}` : v.text;
+}
+
 function ItemForm({
   initial,
   onSave,
   onCancel,
 }: {
-  initial: RigMemoryItemV1;
-  onSave: (item: RigMemoryItemV1) => void;
+  initial: MeetRigItemV1;
+  onSave: (item: MeetRigItemV1) => void;
   onCancel: () => void;
 }) {
-  const [draft, setDraft] = useState<RigMemoryItemV1>(initial);
+  const [draft, setDraft] = useState<MeetRigItemV1>(initial);
   const [tagsText, setTagsText] = useState(initial.tags.join("、"));
+  const [connected] = useState(() => isConnected());
+  const [aiState, setAiState] = useState<"idle" | "busy" | "failed">("idle");
+
+  // 伏せ版の下書き — the owner's OWN AI rewrites with proper nouns masked
+  // (browser-direct, same lane as proposals); the owner edits, then 保存.
+  const aiDraft = async () => {
+    setAiState("busy");
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildMaskPrompt(draft.title, draft.text),
+    });
+    const masked = r.ok ? parseMaskReply(r.text) : null;
+    if (masked === null) {
+      setAiState("failed");
+      return;
+    }
+    setDraft((d) => ({
+      ...d,
+      publicTitle: masked.title !== "" ? masked.title : d.publicTitle,
+      publicText: masked.text !== "" ? masked.text : d.publicText,
+    }));
+    setAiState("idle");
+  };
+
   return (
     <div className="m-form">
       <div className="m-kindrow" role="group">
@@ -70,6 +117,43 @@ function ItemForm({
       />
       <label className="m-note">{MEET.memory.tagsLabel}</label>
       <input className="m-field" value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+      <details style={{ marginTop: "0.6rem" }} open={hasPublicVariant(draft)}>
+        <summary className="m-note" style={{ cursor: "pointer" }}>
+          {MEET.publicWriting.summary}
+        </summary>
+        <p className="m-note" style={{ marginTop: "0.4rem" }}>
+          {MEET.publicWriting.note}
+        </p>
+        <label className="m-note">{MEET.publicWriting.titleLabel}</label>
+        <input
+          className="m-field"
+          value={draft.publicTitle ?? ""}
+          onChange={(e) => setDraft((d) => ({ ...d, publicTitle: e.target.value }))}
+        />
+        <label className="m-note">{MEET.publicWriting.textLabel}</label>
+        <textarea
+          className="m-field"
+          rows={2}
+          value={draft.publicText ?? ""}
+          onChange={(e) => setDraft((d) => ({ ...d, publicText: e.target.value }))}
+        />
+        {connected && (
+          <button
+            type="button"
+            className="m-btn m-btn-quiet"
+            style={{ marginTop: "0.4rem" }}
+            disabled={aiState === "busy" || draft.text.trim() === ""}
+            onClick={() => void aiDraft()}
+          >
+            {aiState === "busy" ? MEET.publicWriting.aiBusy : MEET.publicWriting.aiDraft}
+          </button>
+        )}
+        {aiState === "failed" && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.publicWriting.aiFailed}
+          </p>
+        )}
+      </details>
       <div className="m-item-head" style={{ marginTop: "0.5rem" }}>
         <button
           type="button"
@@ -80,6 +164,13 @@ function ItemForm({
           {draft.private ? MEET.intake.privateLabel : MEET.intake.publicLabel}
         </button>
       </div>
+      {!draft.private && draft.text.trim() !== "" && (
+        // 顔 preview — which words would actually go out, said plainly.
+        <p className="m-note" style={{ marginTop: "0.4rem" }}>
+          {MEET.publicWriting.preview}
+          {publicFace(draft)}
+        </p>
+      )}
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
         <button
           type="button"
@@ -129,7 +220,7 @@ export function MemoryPanel() {
     setTimeout(() => setSavedName(false), 2000);
   };
 
-  const saveItem = async (entryId: string | "new", item: RigMemoryItemV1) => {
+  const saveItem = async (entryId: string | "new", item: MeetRigItemV1) => {
     if (entryId === "new") {
       await store.create({ kind: "rig_item", provenance: "owner_written", value: item });
     } else {
@@ -190,31 +281,16 @@ export function MemoryPanel() {
 
   // 未反映 diff — what differs between the current projection and what was last
   // actually pushed from this device (symmetric difference, by item identity).
-  const projection = buildOutboundProjection(entries.map((e) => e.item));
-  const pendingCount = (() => {
-    if (snapshot === "") return 0; // never published from this device — no banner
-    let prev: Array<unknown> = [];
-    try {
-      const v = JSON.parse(snapshot);
-      prev = Array.isArray(v) ? v : [];
-    } catch {
-      prev = [];
-    }
-    const a = new Set(prev.map((p) => JSON.stringify(p)));
-    const b = new Set(
-      projection.map((p) => JSON.stringify({ k: p.kind, t: p.title, x: p.text, g: p.tags })),
-    );
-    let n = 0;
-    for (const s of a) if (!b.has(s)) n++;
-    for (const s of b) if (!a.has(s)) n++;
-    return n;
-  })();
+  // toPublicView first: what leaves is the 公開用の書き方 when one is set.
+  const projection = buildOutboundProjection(entries.map((e) => toPublicView(e.item)));
+  const pendingCount = snapshotPendingCount(snapshot, projection);
 
   const publish = async () => {
     setPubState("busy");
     // The outbound path runs through the frozen rig-core gate (fail-closed):
-    // only private === false items can appear in the projection.
-    const items = buildOutboundProjection(entries.map((e) => e.item));
+    // only private === false items can appear in the projection — and they
+    // leave as their public view (候補に出すときの書き方 substituted).
+    const items = buildOutboundProjection(entries.map((e) => toPublicView(e.item)));
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName: displayName.trim(),
@@ -223,7 +299,7 @@ export function MemoryPanel() {
     if (r.ok) {
       setPubCount(r.count);
       setPubState("done");
-      const json = JSON.stringify(items.map((p) => ({ k: p.kind, t: p.title, x: p.text, g: p.tags })));
+      const json = projectionSnapshotJson(items);
       setPublishedSnapshot(json);
       setSnapshot(json);
     } else {
@@ -297,6 +373,11 @@ export function MemoryPanel() {
                   <p className="m-item-text">{e.item.text}</p>
                   {e.item.tags.length > 0 && (
                     <p className="m-item-tags">{e.item.tags.join(" / ")}</p>
+                  )}
+                  {!e.item.private && hasPublicVariant(e.item) && (
+                    <p className="m-note">
+                      {MEET.publicWriting.activeBadge}：{publicFace(e.item)}
+                    </p>
                   )}
                   <div className="m-item-actions">
                     <button type="button" className="m-link" onClick={() => setEditing(e.entryId)}>

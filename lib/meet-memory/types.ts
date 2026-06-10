@@ -25,6 +25,19 @@ export type MeetProvenance = "owner_written" | "owner_imported_confirmed";
 export const MEET_ENTRY_KINDS = ["rig_item", "question", "profile"] as const;
 export type MeetEntryKind = (typeof MEET_ENTRY_KINDS)[number];
 
+/**
+ * 第2便 B — a stored rig item may carry 候補に出すときの書き方: optional public
+ * phrasings (固有名を伏せた言い方) used INSTEAD of title/text whenever the item
+ * leaves the device (pool projection → other participants' prompts). The
+ * private body stays for the owner's own SELF grounding. The rig core type is
+ * untouched: these fields live in the meet-memory layer only, and the frozen
+ * buildPublicPool explicit-pick means they can never ride along unprojected.
+ */
+export type MeetRigItemV1 = RigMemoryItemV1 & {
+  publicTitle?: string;
+  publicText?: string;
+};
+
 export type QuestionValue = { text: string };
 export type ProfileValue = { displayName: string };
 
@@ -37,13 +50,13 @@ type EntryBase = {
 
 export type MeetMemoryEntryV1 = EntryBase &
   (
-    | { kind: "rig_item"; value: RigMemoryItemV1 }
+    | { kind: "rig_item"; value: MeetRigItemV1 }
     | { kind: "question"; value: QuestionValue }
     | { kind: "profile"; value: ProfileValue }
   );
 
 /** A new entry before id/timestamps — what a caller submits. */
 export type NewMeetEntry =
-  | { kind: "rig_item"; provenance: MeetProvenance; value: RigMemoryItemV1 }
+  | { kind: "rig_item"; provenance: MeetProvenance; value: MeetRigItemV1 }
   | { kind: "question"; provenance: MeetProvenance; value: QuestionValue }
   | { kind: "profile"; provenance: MeetProvenance; value: ProfileValue };

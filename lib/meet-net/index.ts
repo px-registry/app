@@ -12,6 +12,12 @@ export {
 } from "./local.ts";
 export { buildOutboundProjection, type OutboundPoolItem } from "./projection.ts";
 export {
+  projectionSnapshotJson,
+  snapshotRowSet,
+  snapshotHas,
+  snapshotPendingCount,
+} from "./snapshot.ts";
+export {
   publishProjection,
   fetchPool,
   sendSignal,

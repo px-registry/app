@@ -13,7 +13,14 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
 import { buildOutboundProjection } from "./projection.ts";
+import {
+  projectionSnapshotJson,
+  snapshotRowSet,
+  snapshotHas,
+  snapshotPendingCount,
+} from "./snapshot.ts";
 import { deriveParticipantRef, isParticipantRef, isOwnerToken } from "./ref.ts";
+import { toPublicView } from "../meet-memory/public-view.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 import type { RigMemoryItemV1 } from "../rig/rig.ts";
 
@@ -108,4 +115,62 @@ test("MN-5b: shape guards", () => {
   assert.equal(isParticipantRef("0123456789abcdef"), true);
   assert.equal(isParticipantRef("0123456789abcdeg"), false);
   assert.equal(isParticipantRef("0123"), false);
+});
+
+// ── MN-6 (第2便 A): published-snapshot identity — one definition everywhere ────
+
+test("MN-6: snapshot round-trip — what was pushed is what snapshotHas finds", () => {
+  const items = buildOutboundProjection([
+    { kind: "want", title: "問いA", text: "本文A", tags: ["問い"], private: false },
+    { kind: "have", title: "工房", text: "活版", tags: [], private: false },
+    { kind: "memory", title: "秘", text: "PRIVATE", tags: [], private: true },
+  ]);
+  const snap = projectionSnapshotJson(items);
+  assert.ok(snapshotHas(snap, { kind: "want", title: "問いA", text: "本文A", tags: ["問い"] }));
+  assert.ok(!snapshotHas(snap, { kind: "memory", title: "秘", text: "PRIVATE", tags: [] }), "private never entered");
+  assert.ok(!snapshotHas(snap, { kind: "want", title: "問いA", text: "直した本文", tags: ["問い"] }), "edit changes identity");
+  assert.equal(snapshotPendingCount(snap, items), 0);
+});
+
+test("MN-6b: pending count — symmetric diff; empty snapshot stays quiet; broken JSON is empty", () => {
+  const a = buildOutboundProjection([
+    { kind: "want", title: "t", text: "x", tags: [], private: false },
+  ]);
+  const b = buildOutboundProjection([
+    { kind: "want", title: "t", text: "x2", tags: [], private: false },
+  ]);
+  const snap = projectionSnapshotJson(a);
+  assert.equal(snapshotPendingCount(snap, b), 2, "one removed + one added");
+  assert.equal(snapshotPendingCount("", b), 0, "never-published device shows no banner");
+  assert.equal(snapshotRowSet("{broken").size, 0);
+  assert.ok(!snapshotHas("{broken", { kind: "want", title: "t", text: "x", tags: [] }));
+});
+
+// ── MN-7 (第2便 B): the outbound projection carries ONLY the public phrasing ───
+// Same shape as the rig backstop: with a 書き方 set, the private title/text of
+// that item appear NOWHERE in what leaves the device (the publish payload IS
+// this projection, serialized).
+
+test("MN-7: private phrasing of a 書き方-item never survives the outbound projection", () => {
+  const items = [
+    {
+      kind: "have" as const,
+      title: "○○株式会社のCS部門",
+      text: "SECRET_COMPANY_STORY",
+      tags: ["仕事"],
+      private: false,
+      publicTitle: "BtoB SaaS の CS 立ち上げ",
+      publicText: "PUBLIC_SAFE_TEXT",
+    },
+    { kind: "want" as const, title: "相棒", text: "床を張る人", tags: [], private: false },
+    { kind: "memory" as const, title: "秘", text: "FULLY_PRIVATE", tags: [], private: true },
+  ];
+  const out = JSON.stringify(buildOutboundProjection(items.map(toPublicView)));
+  assert.ok(out.includes("PUBLIC_SAFE_TEXT") && out.includes("BtoB SaaS の CS 立ち上げ"));
+  assert.ok(!out.includes("○○株式会社"), "private title must not leave");
+  assert.ok(!out.includes("SECRET_COMPANY_STORY"), "private text must not leave");
+  assert.ok(!out.includes("FULLY_PRIVATE"), "private item still gated out entirely");
+  assert.ok(!out.includes("publicTitle") && !out.includes("publicText"), "closed key set");
+  // untouched items pass through verbatim
+  assert.ok(out.includes("床を張る人"));
 });

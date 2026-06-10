@@ -44,6 +44,14 @@ export function validateNewEntry(input: unknown): ValidationResult {
         // Explicit boolean only — an absent/odd flag never becomes public.
         return { ok: false, error: "rig_item: private must be an explicit boolean" };
       }
+      // 第2便 B: 候補に出すときの書き方 — optional, but when present must be a
+      // plain string (an odd value must not survive into the outbound swap).
+      if (value.publicTitle !== undefined && typeof value.publicTitle !== "string") {
+        return { ok: false, error: "rig_item: publicTitle must be a string when present" };
+      }
+      if (value.publicText !== undefined && typeof value.publicText !== "string") {
+        return { ok: false, error: "rig_item: publicText must be a string when present" };
+      }
       return { ok: true };
     }
     case "question": {

@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
+import { parseReplyOutcome } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
 import { RIG_PRIVATE_ECHO_NOTE } from "@/lib/rig";
 
@@ -96,9 +97,26 @@ export function ProposalEntry({
         </p>
       )}
       {entry.cards.length === 0 ? (
-        <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
-          {entry.raw.trim() === "[]" ? MEET.home.proposals.noneToday : entry.raw}
-        </p>
+        // A RECOGNIZED empty array means the model said 今日は無い — show that,
+        // not the raw markup (第1便: fenced "[]" was dumped verbatim). Only a
+        // true format miss falls back to the verbatim reply.
+        parseReplyOutcome(entry.raw).parsed ? (
+          <>
+            <p className="m-item-text">{MEET.home.proposals.noneToday}</p>
+            <details>
+              <summary className="m-note" style={{ cursor: "pointer" }}>
+                {MEET.home.proposals.rawShow}
+              </summary>
+              <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+                {entry.raw}
+              </p>
+            </details>
+          </>
+        ) : (
+          <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+            {entry.raw}
+          </p>
+        )
       ) : (
         <div style={{ display: "grid", gap: "0.9rem" }}>
           {entry.cards.map((card, i) => {

@@ -13,11 +13,11 @@ import type { MeetBackend } from "./backend.ts";
 import type {
   MeetMemoryEntryV1,
   MeetEntryKind,
+  MeetRigItemV1,
   NewMeetEntry,
   QuestionValue,
   ProfileValue,
 } from "./types.ts";
-import type { RigMemoryItemV1 } from "../rig/rig.ts";
 
 export const MEET_EXPORT_FORMAT = "px.meet-memory/v1";
 
@@ -60,8 +60,8 @@ export class MeetMemoryStore {
     return (await this.backend.list()).filter((e) => e.kind === kind);
   }
   /** The rig items, in stored order — the SELF grounding substrate. */
-  async listRigItems(): Promise<Array<{ entryId: string; item: RigMemoryItemV1 }>> {
-    const out: Array<{ entryId: string; item: RigMemoryItemV1 }> = [];
+  async listRigItems(): Promise<Array<{ entryId: string; item: MeetRigItemV1 }>> {
+    const out: Array<{ entryId: string; item: MeetRigItemV1 }> = [];
     for (const e of await this.backend.list()) {
       if (e.kind === "rig_item") out.push({ entryId: e.entryId, item: e.value });
     }

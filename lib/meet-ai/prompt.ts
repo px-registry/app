@@ -72,32 +72,59 @@ export function buildMeetPrompt(
 
 export type ProposalCard = { to: string; line1: string; line2: string };
 
+/**
+ * `parsed` distinguishes the two empty-card cases the UI must not conflate
+ * (第1便 observation: qwen's fenced "```json\n[]\n```" was dumped raw):
+ *   parsed=true,  cards=[]  → the model SAID 今日は無い (a recognized empty array)
+ *   parsed=false, cards=[]  → format miss; raw is the honest fallback
+ */
+export type ReplyOutcome = { parsed: boolean; cards: ProposalCard[] };
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** Last-ditch rescue for a TRUNCATED array (max-tokens cut): keep the cards
+ *  completed before the cut by re-closing at each `}` from the end. */
+function parseTruncatedArray(s: string): unknown {
+  for (let i = s.lastIndexOf("}"); i > 0; i = s.lastIndexOf("}", i - 1)) {
+    try {
+      return JSON.parse(s.slice(0, i + 1) + "]");
+    } catch {
+      /* keep walking back */
+    }
+  }
+  return null;
+}
+
 /**
- * Parse the reply into cards. Lenient extraction (fenced/prose-wrapped JSON),
- * fail-closed per card. Returns [] when nothing parses — the caller still keeps
- * and shows the raw text verbatim, so a format miss never loses a proposal.
+ * Parse the reply leniently — code fences stripped, surrounding prose removed
+ * (everything outside the outermost [...]), truncated arrays rescued — and
+ * fail-closed per card. When nothing is recognizable as a JSON array,
+ * `parsed: false` tells the caller to fall back to the verbatim raw text, so
+ * a format miss never loses a proposal.
  */
-export function parseProposalReply(raw: string): ProposalCard[] {
+export function parseReplyOutcome(raw: string): ReplyOutcome {
   const stripped = raw.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, "");
   let parsed: unknown = null;
   try {
     parsed = JSON.parse(stripped.trim());
   } catch {
     const a = stripped.indexOf("[");
-    const b = stripped.lastIndexOf("]");
-    if (a >= 0 && b > a) {
-      try {
-        parsed = JSON.parse(stripped.slice(a, b + 1));
-      } catch {
-        parsed = null;
+    if (a >= 0) {
+      const b = stripped.lastIndexOf("]");
+      if (b > a) {
+        try {
+          parsed = JSON.parse(stripped.slice(a, b + 1));
+        } catch {
+          parsed = parseTruncatedArray(stripped.slice(a));
+        }
+      } else {
+        parsed = parseTruncatedArray(stripped.slice(a));
       }
     }
   }
-  if (!Array.isArray(parsed)) return [];
+  if (!Array.isArray(parsed)) return { parsed: false, cards: [] };
   const cards: ProposalCard[] = [];
   for (const c of parsed) {
     if (!isRecord(c)) continue;
@@ -106,5 +133,10 @@ export function parseProposalReply(raw: string): ProposalCard[] {
     if (c.to.trim() === "" || c.line1.trim() === "") continue;
     cards.push({ to: c.to.trim(), line1: c.line1, line2 });
   }
-  return cards;
+  return { parsed: true, cards };
+}
+
+/** Card list only — kept for callers that don't need the parsed/raw distinction. */
+export function parseProposalReply(raw: string): ProposalCard[] {
+  return parseReplyOutcome(raw).cards;
 }

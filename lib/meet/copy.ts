@@ -28,11 +28,31 @@ export const MEET = {
 
   home: {
     question: {
-      heading: "今日の問い",
+      heading: "問い",
       placeholder: "例：PXを広めるシナジーがある相手を探したい",
       note: "いつでも書き換えられます。空でもかまいません。",
+      twoTenses: "いま聞くか、置いて待つか。置いた問いは、ほかの参加者のAIにも見つけられます。",
     },
-    receive: "提案を受け取る",
+    receive: "いま聞く",
+    place: {
+      action: "置いておく",
+      confirmHeading: "問いを置く",
+      confirmNote:
+        "「求めている」の項目になります。置く＝あなたのAIが探し続け、相手のAIもあなたを見つけられる、ということです。",
+      titleLabel: "一言タイトル（短縮案・直せます）",
+      textLabel: "問いの本文",
+      confirm: "この内容で置く",
+      cancel: "やめる",
+      listHeading: "置いてある問い",
+      stateWaiting: "待っています。",
+      stateNotOut: "まだ候補に出ていません。「候補を更新する」で出ます。",
+      stateStillOut: "「出さない」にしました——候補からは「候補を更新する」で下がります。",
+      stateDown: "「出さない」になっています。",
+      putBack: "出すに戻す",
+      withdraw: "候補から下げる",
+      updatePool: "候補を更新する",
+      needName: "候補に出すには、先に記憶ページで「候補に出すときの名前」を決めてください。",
+    },
     proposals: {
       heading: "届いた提案",
       empty: "まだ提案はありません。記憶の下地ができたら、ここに届きます。",
@@ -161,6 +181,19 @@ export const MEET = {
     importReport: (added: number, updated: number): string =>
       `${added}件を追加、${updated}件を更新しました。`,
     durability: "ブラウザのデータを消すと、ここも消えます。控えを保存しておくと戻せます。",
+  },
+
+  /** 第2便 B — 候補に出すときの書き方（公開用の言い方）。 */
+  publicWriting: {
+    summary: "候補に出すときの書き方",
+    note: "固有名を伏せて、内容だけ伝える言い方にできます。例：「○○株式会社で SaaS の CS 部門を立ち上げ」→「BtoB SaaS の CS 立ち上げ経験」。空のままなら、上の本文がそのまま出ます。",
+    titleLabel: "出すときの一言タイトル",
+    textLabel: "出すときの本文",
+    aiDraft: "伏せ版を下書き",
+    aiBusy: "あなたのAIが書いています…",
+    aiFailed: "下書きを受け取れませんでした。手で書くこともできます。",
+    preview: "候補に出るのはこの文です：",
+    activeBadge: "候補に出る書き方",
   },
 
   publish: {

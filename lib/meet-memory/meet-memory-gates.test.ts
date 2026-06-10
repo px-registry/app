@@ -24,6 +24,13 @@ import { InMemoryMeetBackend } from "./backend.ts";
 import { MeetMemoryStore, MEET_EXPORT_FORMAT } from "./store.ts";
 import { validateNewEntry } from "./validate.ts";
 import { parseColdStartPaste } from "./intake.ts";
+import {
+  PLACED_QUESTION_TAG,
+  draftPlacedQuestion,
+  draftPlacedQuestionTitle,
+  isPlacedQuestion,
+} from "./placed.ts";
+import { toPublicView, hasPublicVariant } from "./public-view.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 
 const root = (rel: string) => new URL(`../../${rel}`, import.meta.url);
@@ -261,4 +268,83 @@ test("MM-9c: private defaults to TRUE; broken items dropped; never throws", () =
   assert.ok(r.warnings.length >= 2);
   assert.deepEqual(parseColdStartPaste("そもそもJSONではない").items, []);
   assert.deepEqual(parseColdStartPaste("").items, []);
+});
+
+// ── MM-10 (第2便 A): 置いた問い＝want カード — pure helper pins ─────────────────
+
+test("MM-10: draftPlacedQuestion is a want card tagged 問い, text verbatim", () => {
+  const q = "  PXを広めるシナジーがある相手を探したい  ";
+  const d = draftPlacedQuestion(q);
+  assert.equal(d.kind, "want");
+  assert.equal(d.text, q.trim());
+  assert.deepEqual(d.tags, [PLACED_QUESTION_TAG]);
+  assert.equal(d.private, false, "置く is the choice to be findable (toggle can flip before 確定)");
+  assert.ok(d.title.length > 0 && d.title.length <= 17, "auto title stays short");
+});
+
+test("MM-10b: title draft — first sentence, ellipsis past 16 chars, whitespace folded", () => {
+  assert.equal(draftPlacedQuestionTitle("古い納屋を直したい。誰か手を貸して。"), "古い納屋を直したい");
+  assert.equal(
+    draftPlacedQuestionTitle("PXを広めるシナジーがある相手を探したい"),
+    "PXを広めるシナジーがある相手を…",
+  );
+  assert.equal(draftPlacedQuestionTitle("短い問い"), "短い問い");
+  assert.equal(draftPlacedQuestionTitle("a\n b   c"), "a b c");
+});
+
+test("MM-10c: isPlacedQuestion — exactly want+問い; ordinary items stay ordinary", () => {
+  assert.ok(isPlacedQuestion({ kind: "want", tags: ["問い"] }));
+  assert.ok(isPlacedQuestion({ kind: "want", tags: ["手仕事", "問い"] }));
+  assert.ok(!isPlacedQuestion({ kind: "want", tags: ["手仕事"] }));
+  assert.ok(!isPlacedQuestion({ kind: "have", tags: ["問い"] }));
+});
+
+test("MM-10d: a placed question passes the normal validator (no special write path)", () => {
+  const r = validateNewEntry({
+    kind: "rig_item",
+    provenance: "owner_written",
+    value: draftPlacedQuestion("週末に床を張る相棒がほしい"),
+  });
+  assert.deepEqual(r, { ok: true });
+});
+
+// ── MM-11/12 (第2便 B): 候補に出すときの書き方 — validator + outbound swap ──────
+
+test("MM-11: publicTitle/publicText are optional strings; odd values refused", () => {
+  const base = { kind: "have", title: "t", text: "x", tags: [], private: false };
+  const ok = (value: unknown) =>
+    validateNewEntry({ kind: "rig_item", provenance: "owner_written", value });
+  assert.deepEqual(ok({ ...base }), { ok: true }, "absent stays valid");
+  assert.deepEqual(ok({ ...base, publicTitle: "出す題", publicText: "出す文" }), { ok: true });
+  assert.equal(ok({ ...base, publicTitle: 5 }).ok, false);
+  assert.equal(ok({ ...base, publicText: { a: 1 } }).ok, false);
+});
+
+test("MM-12: toPublicView — swap when set, fallback when blank, EXPLICIT PICK", () => {
+  const item = {
+    kind: "have" as const,
+    title: "○○株式会社のCS部門",
+    text: "PRIVATE_DETAIL",
+    tags: ["仕事"],
+    private: false,
+    publicTitle: "BtoB SaaS の CS 立ち上げ",
+    publicText: "PUBLIC_SAFE",
+  };
+  const v = toPublicView(item);
+  assert.equal(v.title, "BtoB SaaS の CS 立ち上げ");
+  assert.equal(v.text, "PUBLIC_SAFE");
+  assert.deepEqual(v.tags, ["仕事"]);
+  assert.equal(v.private, false);
+  assert.ok(!("publicTitle" in v) && !("publicText" in v), "swap fields never ride along");
+
+  // half-set / whitespace falls back — a 書き方 must not blank a published item
+  const half = toPublicView({ ...item, publicTitle: "  ", publicText: "PUBLIC_SAFE" });
+  assert.equal(half.title, "○○株式会社のCS部門");
+  assert.equal(half.text, "PUBLIC_SAFE");
+  const none = toPublicView({ kind: "want", title: "t", text: "x", tags: [], private: false });
+  assert.equal(none.title, "t");
+  assert.equal(none.text, "x");
+
+  assert.ok(hasPublicVariant(item));
+  assert.ok(!hasPublicVariant({ ...item, publicTitle: " ", publicText: "" }));
 });

@@ -13,9 +13,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { buildMeetPrompt, toRigPool, parseProposalReply } from "./prompt.ts";
+import { buildMeetPrompt, toRigPool, parseProposalReply, parseReplyOutcome } from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
+import { buildMaskPrompt, parseMaskReply } from "./mask.ts";
 import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
+import { toPublicView } from "../meet-memory/public-view.ts";
 import { RIG_LAW, buildPublicPool, type RigOwnerV1 } from "../rig/rig.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 import type { PoolItemPublic } from "../meet-net/api.ts";
@@ -124,6 +126,40 @@ test("MA-4c: end-to-end leak negatives survive the composition", () => {
   assert.ok(p.includes("カフェの人"), "other participant attributed by ownerRef");
 });
 
+test("MA-4e: 公開用の書き方 — the OTHER side's prompt gets the public phrasing only; SELF keeps grounding on the raw body", () => {
+  const itemWithWriting = {
+    kind: "have" as const,
+    title: "○○株式会社のCS部門",
+    text: "SECRET_STORY",
+    tags: [],
+    private: false,
+    publicTitle: "BtoB SaaS の CS 立ち上げ",
+    publicText: "MASKED_PUBLIC_TEXT",
+  };
+  // What OTHER pushed to the pool is the PUBLIC VIEW (the projection swaps it
+  // before publish); the viewer's prompt composes that pool.
+  const otherPublished: RigOwnerV1 = {
+    ownerId: "raw-other-id",
+    items: [toPublicView(itemWithWriting)],
+  };
+  const viewerPool = buildPublicPool([otherPublished], {
+    excludeOwnerId: SELF.ownerId,
+    ownerRefById: REFS,
+  });
+  const viewerPrompt = buildMeetPrompt(SELF, viewerPool, "");
+  assert.ok(viewerPrompt.includes("MASKED_PUBLIC_TEXT"), "public phrasing reaches the pool");
+  assert.ok(!viewerPrompt.includes("SECRET_STORY"), "private text never reaches another prompt");
+  assert.ok(!viewerPrompt.includes("○○株式会社"), "private title never reaches another prompt");
+
+  // The owner's OWN prompt still grounds on the raw body (SELF channel).
+  const ownPrompt = buildMeetPrompt(
+    { ownerId: "raw-other-id", items: [itemWithWriting] },
+    [],
+    "",
+  );
+  assert.ok(ownPrompt.includes("SECRET_STORY"), "SELF grounding keeps the real thing");
+});
+
 test("MA-4d: toRigPool is fail-closed on kind and keeps arrival order", () => {
   const served: PoolItemPublic[] = [
     { participantRef: "a".repeat(16), ownerRef: "甲", kind: "have", title: "t", text: "x", tags: [] },
@@ -150,6 +186,73 @@ test("MA-5b: junk replies yield [] without throwing (raw stays the fallback)", (
     assert.ok(Array.isArray(parseProposalReply(raw)));
   }
   assert.equal(parseProposalReply("今日は無い").length, 0);
+});
+
+// ── MA-5c: OBSERVED qwen2.5-coder outputs (第1便 r15_log) + truncation rescue ──
+// parsed=true/cards=[] (model said 今日は無い) must be distinguishable from a
+// format miss (parsed=false) — the UI shows noneToday vs the verbatim raw.
+
+const QWEN_FENCED_EMPTY = "```json\n[]\n```"; // the one that leaked raw markup
+const QWEN_FENCED_ONE =
+  '```json\n[\n  {\n    "to": "あや",\n    "line1": "古い町家の納屋 × 活版印刷の工房",\n    "line2": "週末に一緒に作業してみては"\n  }\n]\n```';
+const QWEN_FENCED_TWO =
+  '```json\n[\n    {\n        "to": "あや",\n        "line1": "[あなた] have: 納屋 × [あや] want: 子どもと作る場",\n        "line2": "納屋で親子の作業環境を"\n    },\n    {\n        "to": "カフェの人",\n        "line1": "[あなた] have: 納屋 × [カフェの人] want: 夜の使い手",\n        "line2": "夜のカフェに納屋の道具を"\n    }\n]\n```';
+
+test("MA-5c: observed fenced replies — empty array is PARSED, not a format miss", () => {
+  const empty = parseReplyOutcome(QWEN_FENCED_EMPTY);
+  assert.equal(empty.parsed, true, "fenced [] must count as parsed (今日は無い)");
+  assert.equal(empty.cards.length, 0);
+
+  const one = parseReplyOutcome(QWEN_FENCED_ONE);
+  assert.equal(one.parsed, true);
+  assert.equal(one.cards.length, 1);
+  assert.equal(one.cards[0].to, "あや");
+
+  const two = parseReplyOutcome(QWEN_FENCED_TWO);
+  assert.equal(two.parsed, true);
+  assert.deepEqual(two.cards.map((c) => c.to), ["あや", "カフェの人"]);
+});
+
+test("MA-5c2: prose-only / broken replies stay parsed=false (raw fallback)", () => {
+  for (const raw of ["今日は無い", "{broken", "はい、探してみますね。"]) {
+    const r = parseReplyOutcome(raw);
+    assert.equal(r.parsed, false, `must be a format miss: ${raw}`);
+    assert.equal(r.cards.length, 0);
+  }
+});
+
+test("MA-5c3: a TRUNCATED array (max-tokens cut) rescues the completed cards", () => {
+  const cut =
+    '```json\n[\n  {"to": "あや", "line1": "納屋 × 工房", "line2": "週末に一度"},\n  {"to": "カフェの人", "line1": "納屋 × 夜の店", "li';
+  const r = parseReplyOutcome(cut);
+  assert.equal(r.parsed, true, "rescued prefix counts as parsed");
+  assert.equal(r.cards.length, 1, "only the COMPLETED card survives");
+  assert.equal(r.cards[0].to, "あや");
+  // prose around the array is removed
+  const wrapped = `前置きです。\n[{"to":"あや","line1":"x","line2":"y"}]\nどうでしょう。`;
+  assert.equal(parseReplyOutcome(wrapped).cards.length, 1);
+});
+
+// ── MA-7 (第2便 B): 伏せ版下書き — prompt contract + fail-closed parse ──────────
+
+test("MA-7: buildMaskPrompt carries the item and the JSON-only contract", () => {
+  const p = buildMaskPrompt("○○株式会社のCS部門", "社内の立ち上げ話");
+  assert.ok(p.includes("固有名を伏せて"));
+  assert.ok(p.includes('{"title"'), "JSON contract stated");
+  assert.ok(p.includes("title: ○○株式会社のCS部門"));
+  assert.ok(p.includes("text: 社内の立ち上げ話"));
+});
+
+test("MA-7b: parseMaskReply — fenced / prose-wrapped parse; junk is null (never auto-saves)", () => {
+  const body = '{"title": "BtoB SaaS の CS 立ち上げ", "text": "立ち上げ経験があります"}';
+  for (const raw of [body, "```json\n" + body + "\n```", `はい。${body} いかがでしょう。`]) {
+    const r = parseMaskReply(raw);
+    assert.ok(r !== null);
+    assert.equal(r!.title, "BtoB SaaS の CS 立ち上げ");
+  }
+  for (const raw of ["できません", "{broken", "[]", '{"title": 1, "text": null}', '{"title":"","text":"  "}']) {
+    assert.equal(parseMaskReply(raw), null, `must fail closed: ${raw}`);
+  }
 });
 
 // ── MA-6 (fix1): key-prefix provider detection — the owner never picks ──────────
