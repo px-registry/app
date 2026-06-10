@@ -162,10 +162,13 @@ test("BoardTemplate-impl-9: the publish projection REUSES the A1 machineReadable
 
 test("BoardTemplate-impl-9: Board Templates added no migration; no board-template / draft table exists", () => {
   // Board Templates introduced NO migration of its own (owner-local scaffold). The
-  // only migration added after Canonical is 0006 — a LATER, separately sanctioned
+  // migrations added after Canonical are 0006 — a LATER, separately sanctioned
   // stage (Owner Board Publish v0) that adds a publication_state COLUMN to the
   // existing board_records (the A1 public table), not a board_template / draft /
-  // board-state table. The set is locked so any surprise migration still trips.
+  // board-state table — and 0007, the R1.5 meet stage (STOP #1/#2 sanctioned:
+  // public projection / signal / mutual contact note / facilitator log; still
+  // no board-template, draft, or owner-memory table). The set stays locked so
+  // any surprise migration still trips.
   const files = readdirSync(here("../../migrations")).filter((f) => f.endsWith(".sql")).sort();
   assert.deepEqual(files, [
     "0001_board_records.sql",
@@ -174,6 +177,7 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
     "0004_declarations.sql",
     "0005_narrow_surface_shape.sql",
     "0006_publication_state.sql",
+    "0007_r15_meet.sql",
   ]);
 });
 

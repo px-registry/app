@@ -10,6 +10,11 @@ import {
   openMeetMemory,
   type MeetMemoryEntryV1,
 } from "@/lib/meet-memory";
+import {
+  getOrMintOwnerToken,
+  buildOutboundProjection,
+  publishProjection,
+} from "@/lib/meet-net";
 import { RIG_MEMORY_KINDS, type RigMemoryItemV1, type RigMemoryKindV1 } from "@/lib/rig";
 
 type RigEntry = { entryId: string; item: RigMemoryItemV1 };
@@ -170,6 +175,29 @@ export function MemoryPanel() {
     await reload();
   };
 
+  // ── publish (公開する) — explicit owner action, never automatic ──────────────
+  const [pubState, setPubState] = useState<"idle" | "busy" | "done" | "failed">("idle");
+  const [pubCount, setPubCount] = useState(0);
+  const publicCount = entries.filter((e) => e.item.private === false).length;
+
+  const publish = async () => {
+    setPubState("busy");
+    // The outbound path runs through the frozen rig-core gate (fail-closed):
+    // only private === false items can appear in the projection.
+    const items = buildOutboundProjection(entries.map((e) => e.item));
+    const r = await publishProjection({
+      ownerToken: getOrMintOwnerToken(),
+      displayName: displayName.trim(),
+      items,
+    });
+    if (r.ok) {
+      setPubCount(r.count);
+      setPubState("done");
+    } else {
+      setPubState("failed");
+    }
+  };
+
   return (
     <>
       <section className="m-section">
@@ -259,6 +287,46 @@ export function MemoryPanel() {
             {MEET.memory.addItem}
           </button>
         )}
+      </section>
+
+      <section className="m-section">
+        <h2 className="m-h2">{MEET.publish.heading}</h2>
+        <div className="m-card">
+          {displayName.trim() === "" ? (
+            <p className="m-note" style={{ margin: 0 }}>
+              {MEET.publish.needName}
+            </p>
+          ) : publicCount === 0 ? (
+            <p className="m-note" style={{ margin: 0 }}>
+              {MEET.publish.none}
+            </p>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 0.75rem", color: "var(--text)", fontSize: "0.92rem" }}>
+                {MEET.publish.body(publicCount)}
+              </p>
+              <button
+                type="button"
+                className="m-btn m-btn-primary m-btn-wide"
+                onClick={() => void publish()}
+                disabled={pubState === "busy"}
+              >
+                {pubState === "done" ? MEET.publish.update : MEET.publish.action}
+              </button>
+              {pubState === "done" && (
+                <p className="m-note" aria-live="polite">
+                  {MEET.publish.done(pubCount)}
+                </p>
+              )}
+              {pubState === "failed" && (
+                <p className="m-note" aria-live="polite">
+                  {MEET.publish.failed}
+                </p>
+              )}
+              <p className="m-note">{MEET.publish.unpublishNote}</p>
+            </>
+          )}
+        </div>
       </section>
 
       <section className="m-section">
