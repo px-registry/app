@@ -49,7 +49,7 @@ export const UNKNOWN_KEY_HINT =
   "この鍵の形はまだ知りません。sk-ant-…（Claude）か sk-…（OpenAI）の鍵を貼ってください。";
 
 export const OLLAMA_UNREACHABLE =
-  "Ollamaに届きませんでした。PCでOllamaが起動しているか確かめてください。公開URLから使うには、OLLAMA_ORIGINS にこのサイトの許可も必要です。";
+  "Ollamaに届きませんでした。PCでOllamaが起動しているか確かめてください。公開URLから使うには、OLLAMA_ORIGINS にこのサイトの許可と、ブラウザの「ローカルネットワークへのアクセス」の許可も必要です。";
 export const OLLAMA_NO_MODELS =
   "Ollamaにモデルがまだありません。PCで `ollama pull <モデル名>` を実行してください。";
 export const OLLAMA_MODELS_LABEL = "つかうモデル（この端末にあるもの）";

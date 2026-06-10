@@ -86,6 +86,10 @@ const browser = await chromium.launch();
       httpCredentials: { username: user, password: pass },
       locale: "ja-JP",
     });
+    // Chrome gates public-site → localhost behind a Local Network Access
+    // permission prompt; granting it here mirrors a tester clicking 許可.
+    // (Denied/undecided, the lane shows the honest unreachable line.)
+    await ctx.grantPermissions(["local-network-access"], { origin: REMOTE });
     const page = await ctx.newPage();
     await page.goto(`${REMOTE}/meet/start/`, { waitUntil: "networkidle" });
     await page.getByRole("button", { name: "ローカルAI（Ollama）" }).click();
