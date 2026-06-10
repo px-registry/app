@@ -1,0 +1,226 @@
+"use client";
+
+// R1.5 home — the loop's resting surface: 今日の問い → 提案を受け取る → 届いた提案.
+//
+// Receiving runs entirely on the owner's side: memory (private included, SELF
+// only) + the served public pool + the question are composed by the FROZEN rig
+// core, the owner's own model is called browser-direct with the owner's key,
+// and the reply lands on the owner-local received shelf. PX runs no model and
+// holds no proposal here. Entries render newest-first — a TIME order only.
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { MEET } from "@/lib/meet/copy.ts";
+import { openMeetMemory, openReceived, type ReceivedProposalV1 } from "@/lib/meet-memory";
+import { getOrMintOwnerToken, deriveParticipantRef, fetchPool } from "@/lib/meet-net";
+import {
+  getModel,
+  getKey,
+  getEndpoint,
+  isConnected,
+  buildMeetPrompt,
+  toRigPool,
+  parseProposalReply,
+  generateProposals,
+} from "@/lib/meet-ai";
+import { pastedOutputEchoesPrivate, RIG_PRIVATE_ECHO_NOTE, type RigOwnerV1 } from "@/lib/rig";
+
+type GenState = { phase: "idle" } | { phase: "busy" } | { phase: "error"; code: string };
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+export function HomeView() {
+  const memory = useMemo(() => openMeetMemory(), []);
+  const shelf = useMemo(() => openReceived(), []);
+
+  const [question, setQuestion] = useState("");
+  const [hasItems, setHasItems] = useState(false);
+  const [hasName, setHasName] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [received, setReceived] = useState<ReceivedProposalV1[]>([]);
+  const [gen, setGen] = useState<GenState>({ phase: "idle" });
+
+  const reload = useCallback(async () => {
+    setQuestion(await memory.getQuestion());
+    setHasItems((await memory.listRigItems()).length > 0);
+    const profile = await memory.getProfile();
+    setHasName(profile !== null && profile.displayName.trim() !== "");
+    setConnected(isConnected());
+    const list = await shelf.list();
+    list.reverse(); // newest first — arrival time, nothing else
+    setReceived(list);
+  }, [memory, shelf]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const saveQuestion = async () => {
+    await memory.setQuestion(question);
+  };
+
+  const ready = connected && hasItems && hasName;
+
+  const receive = async () => {
+    setGen({ phase: "busy" });
+    await memory.setQuestion(question);
+    const items = (await memory.listRigItems()).map((e) => e.item);
+    const self: RigOwnerV1 = { ownerId: "self", items };
+
+    const me = await deriveParticipantRef(getOrMintOwnerToken());
+    const poolRes = await fetchPool(me);
+    if (!poolRes.ok) {
+      setGen({ phase: "error", code: "pool" });
+      return;
+    }
+    const refs: Record<string, string> = {};
+    for (const it of poolRes.items) {
+      if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
+    }
+
+    const prompt = buildMeetPrompt(self, toRigPool(poolRes.items), question);
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt,
+    });
+    if (!r.ok) {
+      setGen({ phase: "error", code: r.error });
+      return;
+    }
+    await shelf.add({
+      question: question.trim(),
+      modelLabel: model.label,
+      raw: r.text,
+      cards: parseProposalReply(r.text),
+      refs,
+      echoFlag: pastedOutputEchoesPrivate(self, r.text),
+    });
+    setGen({ phase: "idle" });
+    await reload();
+  };
+
+  const removeEntry = async (entryId: string) => {
+    await shelf.remove(entryId);
+    await reload();
+  };
+
+  return (
+    <>
+      <section className="m-section">
+        <h1 className="m-h1">{MEET.home.question.heading}</h1>
+        <p className="m-lede" style={{ fontSize: "0.95rem" }}>
+          {MEET.lede}
+        </p>
+        <textarea
+          className="m-field"
+          rows={2}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onBlur={() => void saveQuestion()}
+          placeholder={MEET.home.question.placeholder}
+        />
+        <p className="m-note">{MEET.home.question.note}</p>
+
+        {ready ? (
+          <button
+            type="button"
+            className="m-btn m-btn-primary m-btn-wide"
+            style={{ marginTop: "0.75rem" }}
+            onClick={() => void receive()}
+            disabled={gen.phase === "busy"}
+          >
+            {gen.phase === "busy" ? MEET.receive.busy : MEET.home.receive}
+          </button>
+        ) : (
+          <div className="m-empty" style={{ marginTop: "0.75rem", textAlign: "left" }}>
+            <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
+              {!connected && <li>{MEET.receive.needKey}</li>}
+              {!hasItems && <li>{MEET.receive.needMemory}</li>}
+              {!hasName && <li>{MEET.receive.needName}</li>}
+            </ul>
+            <p className="m-note" style={{ marginTop: "0.5rem" }}>
+              <Link href="/meet/start/" style={{ color: "var(--shu-deep)" }}>
+                {MEET.receive.toStart}
+              </Link>
+            </p>
+          </div>
+        )}
+        {gen.phase === "error" && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.receive.errors[gen.code] ?? MEET.receive.errors.provider}
+          </p>
+        )}
+      </section>
+
+      <section className="m-section">
+        <h2 className="m-h2">{MEET.home.proposals.heading}</h2>
+        {received.length === 0 ? (
+          <div className="m-empty">{MEET.home.proposals.empty}</div>
+        ) : (
+          <>
+            <p className="m-note" style={{ margin: "0 0 0.6rem" }}>
+              {MEET.home.proposals.orderNote}
+            </p>
+            <ul className="m-itemlist">
+              {received.map((entry) => (
+                <li key={entry.entryId} className="m-item">
+                  <p className="m-item-tags" style={{ margin: "0 0 0.4rem" }}>
+                    {fmtDate(entry.createdAt)} ・ {MEET.home.proposals.modelNote(entry.modelLabel)}
+                    {entry.question !== "" && <>（{entry.question}）</>}
+                  </p>
+                  {entry.echoFlag && (
+                    <p className="m-warnings" style={{ margin: "0 0 0.5rem" }}>
+                      {RIG_PRIVATE_ECHO_NOTE}
+                    </p>
+                  )}
+                  {entry.cards.length === 0 ? (
+                    <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+                      {entry.raw.trim() === "[]" ? MEET.home.proposals.noneToday : entry.raw}
+                    </p>
+                  ) : (
+                    <div style={{ display: "grid", gap: "0.6rem" }}>
+                      {entry.cards.map((card, i) => (
+                        <div key={i} className="m-proposal">
+                          <p className="m-item-title" style={{ margin: 0 }}>
+                            {card.to}
+                          </p>
+                          <p className="m-item-text">{card.line1}</p>
+                          {card.line2 && <p className="m-item-text">{card.line2}</p>}
+                        </div>
+                      ))}
+                      <details>
+                        <summary className="m-note" style={{ cursor: "pointer" }}>
+                          {MEET.home.proposals.rawShow}
+                        </summary>
+                        <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+                          {entry.raw}
+                        </p>
+                      </details>
+                    </div>
+                  )}
+                  <div className="m-item-actions">
+                    <button type="button" className="m-link" onClick={() => void removeEntry(entry.entryId)}>
+                      {MEET.home.proposals.removeEntry}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <div className="m-boundary">
+        <p>{MEET.boundary.memory}</p>
+        <p>{MEET.boundary.ai}</p>
+        <p>{MEET.boundary.order}</p>
+      </div>
+    </>
+  );
+}

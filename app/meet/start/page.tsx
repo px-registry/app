@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import { ColdStartIntake } from "./ColdStartIntake.tsx";
+import { KeyConnect } from "./KeyConnect.tsx";
 
 // R1.5 はじめかた — the three steps as a single quiet scroll. Step 2 (cold-start
 // paste-back) is live; step 1 gains the key widget in Slice 3; step 3 links to
@@ -14,7 +15,8 @@ export default function MeetStart() {
 
         <div className="m-card">
           <h2 className="m-h2 m-stepnum">{MEET.start.step1.heading}</h2>
-          <p style={{ margin: 0, color: "var(--text)" }}>{MEET.start.step1.body}</p>
+          <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step1.body}</p>
+          <KeyConnect />
         </div>
 
         <div className="m-card">

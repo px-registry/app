@@ -11,7 +11,13 @@ export {
   type ProfileValue,
 } from "./types.ts";
 
-export { type MeetBackend, InMemoryMeetBackend } from "./backend.ts";
+export {
+  type MeetBackend,
+  type KeyedBackend,
+  InMemoryMeetBackend,
+  InMemoryKeyedBackend,
+} from "./backend.ts";
+export { ReceivedStore, type ReceivedProposalV1, type ReadingV1 } from "./received.ts";
 export { validateNewEntry, validateStoredEntry, type ValidationResult } from "./validate.ts";
 export {
   MeetMemoryStore,
@@ -25,14 +31,15 @@ export { MEET_MEMORY_BOUNDARY, type MeetMemoryBoundary } from "./boundary.ts";
 
 import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";
-import type { MeetBackend } from "./backend.ts";
+import { ReceivedStore, type ReceivedProposalV1 } from "./received.ts";
+import type { MeetMemoryEntryV1 } from "./types.ts";
 
-/** Browser-side store over IndexedDB. Call only from client components. */
+/** Browser-side memory store over IndexedDB. Call only from client components. */
 export function openMeetMemory(): MeetMemoryStore {
-  return new MeetMemoryStore(new IndexedDbMeetBackend(MEMORY_STORE));
+  return new MeetMemoryStore(new IndexedDbMeetBackend<MeetMemoryEntryV1>(MEMORY_STORE));
 }
 
-/** Raw backend for the received-proposals shelf (Slice 3 wires its store). */
-export function openReceivedBackend(): MeetBackend {
-  return new IndexedDbMeetBackend(RECEIVED_STORE);
+/** Browser-side received-proposals shelf. Call only from client components. */
+export function openReceived(): ReceivedStore {
+  return new ReceivedStore(new IndexedDbMeetBackend<ReceivedProposalV1>(RECEIVED_STORE));
 }

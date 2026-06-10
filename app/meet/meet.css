@@ -381,6 +381,11 @@ textarea.m-field {
   color: var(--shu-deep);
 }
 
+.m-proposal {
+  border-left: 2px solid var(--shu-line);
+  padding-left: 0.8rem;
+}
+
 .m-backup {
   display: flex;
   flex-wrap: wrap;

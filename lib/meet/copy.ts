@@ -30,13 +30,42 @@ export const MEET = {
       heading: "届いた提案",
       empty: "まだ提案はありません。記憶の下地ができたら、ここに届きます。",
       noneToday: "今日は無い、という日もあります。",
-      orderNote: "届いた順に並びます。順番に意味はありません。",
+      orderNote: "新しく届いた順に並びます。順番に意味はありません。",
+      modelNote: (label: string): string => `${label} が読みました`,
+      rawShow: "そのままの返事を見る",
+      removeEntry: "この回を消す",
     },
     signals: {
       heading: "合図",
       empty: "いまのところ合図はありません。",
       incoming: (ref: string): string => `${ref} から「話してみる」の合図が届いています。`,
     },
+  },
+
+  connect: {
+    modelLabel: "つかうAI",
+    keyLabel: "鍵（APIキー）",
+    endpointLabel: "つなぎ先（あなたのPC）",
+    save: "保存",
+    saved: "保存しました",
+    connected: "つながっています。",
+    privacy:
+      "鍵はこの端末の中だけに置かれ、PXのサーバーへは送られません。呼び出しはこの端末からあなたの鍵で直接行われます。",
+  },
+
+  receive: {
+    needKey: "AIがまだつながっていません。",
+    needMemory: "記憶の下地がまだありません。",
+    needName: "公開のときの名前がまだありません。",
+    toStart: "はじめかたへ",
+    busy: "あなたのAIが読んでいます…",
+    errors: {
+      auth: "鍵が通りませんでした。鍵を確かめてください。",
+      rate: "少し混んでいます。間をおいてもう一度。",
+      provider: "AIから返事が返りませんでした。もう一度お試しください。",
+      network: "つながりませんでした。電波の良いところでもう一度。",
+      pool: "公開の候補を読み込めませんでした。もう一度お試しください。",
+    } as Record<string, string>,
   },
 
   start: {

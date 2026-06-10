@@ -8,25 +8,30 @@
 
 import type { MeetMemoryEntryV1 } from "./types.ts";
 
-export interface MeetBackend {
-  list(): Promise<MeetMemoryEntryV1[]>;
-  get(id: string): Promise<MeetMemoryEntryV1 | undefined>;
-  put(entry: MeetMemoryEntryV1): Promise<void>;
+/** Generic id→record store; the memory substrate and the received shelf each
+ *  get their own typed instance (separate object stores, same discipline). */
+export interface KeyedBackend<T extends { entryId: string }> {
+  list(): Promise<T[]>;
+  get(id: string): Promise<T | undefined>;
+  put(entry: T): Promise<void>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
 }
 
-/** Process-local backend for tests (and a safe SSR no-op fallback). */
-export class InMemoryMeetBackend implements MeetBackend {
-  private map = new Map<string, MeetMemoryEntryV1>();
+/** The memory substrate's backend type. */
+export type MeetBackend = KeyedBackend<MeetMemoryEntryV1>;
 
-  async list(): Promise<MeetMemoryEntryV1[]> {
+/** Process-local backend for tests (and a safe SSR no-op fallback). */
+export class InMemoryKeyedBackend<T extends { entryId: string }> implements KeyedBackend<T> {
+  private map = new Map<string, T>();
+
+  async list(): Promise<T[]> {
     return [...this.map.values()];
   }
-  async get(id: string): Promise<MeetMemoryEntryV1 | undefined> {
+  async get(id: string): Promise<T | undefined> {
     return this.map.get(id);
   }
-  async put(entry: MeetMemoryEntryV1): Promise<void> {
+  async put(entry: T): Promise<void> {
     this.map.set(entry.entryId, entry);
   }
   async remove(id: string): Promise<void> {
@@ -36,3 +41,6 @@ export class InMemoryMeetBackend implements MeetBackend {
     this.map.clear();
   }
 }
+
+/** Back-compat alias for the memory substrate's in-memory backend. */
+export class InMemoryMeetBackend extends InMemoryKeyedBackend<MeetMemoryEntryV1> {}

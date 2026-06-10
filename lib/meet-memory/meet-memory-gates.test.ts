@@ -90,6 +90,15 @@ test("MM-3: no Function imports meet-memory; no migration defines its table", ()
   }
 });
 
+// ── MM-3b: the received shelf cannot reach the memory substrate ─────────────────
+
+test("MM-3b: received.ts never imports the memory store/validator (AI output cannot compound)", () => {
+  const src = read("lib/meet-memory/received.ts");
+  assert.ok(!/from\s+["']\.\/store\.ts["']/.test(src), "received must not import store.ts");
+  assert.ok(!/from\s+["']\.\/validate\.ts["']/.test(src), "received must not import validate.ts");
+  assert.ok(!/MeetMemoryStore/.test(src), "received must not reference the memory store");
+});
+
 // ── MM-4: forbidden copy over the module (cold-start prompt included) ───────────
 
 test("MM-4: lib/meet-memory sources carry no forbidden term", () => {

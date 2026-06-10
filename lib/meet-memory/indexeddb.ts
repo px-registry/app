@@ -14,8 +14,7 @@
 // Imported only from client components via the lib barrel. node:test uses
 // InMemoryMeetBackend instead, so this DOM-only code never loads there.
 
-import type { MeetBackend } from "./backend.ts";
-import type { MeetMemoryEntryV1 } from "./types.ts";
+import type { KeyedBackend } from "./backend.ts";
 
 const DB_NAME = "px-meet";
 export const MEMORY_STORE = "memory";
@@ -56,22 +55,19 @@ function tx<T>(
   );
 }
 
-/** The browser-backed memory store. Owner-local, never networked. */
-export class IndexedDbMeetBackend implements MeetBackend {
+/** The browser-backed store. Owner-local, never networked. */
+export class IndexedDbMeetBackend<T extends { entryId: string }> implements KeyedBackend<T> {
   private store: string;
   constructor(store: string = MEMORY_STORE) {
     this.store = store;
   }
-  async list(): Promise<MeetMemoryEntryV1[]> {
-    return (await tx<MeetMemoryEntryV1[]>(this.store, "readonly", (s) => s.getAll())) ?? [];
+  async list(): Promise<T[]> {
+    return (await tx<T[]>(this.store, "readonly", (s) => s.getAll())) ?? [];
   }
-  async get(id: string): Promise<MeetMemoryEntryV1 | undefined> {
-    return (
-      (await tx<MeetMemoryEntryV1 | undefined>(this.store, "readonly", (s) => s.get(id))) ??
-      undefined
-    );
+  async get(id: string): Promise<T | undefined> {
+    return (await tx<T | undefined>(this.store, "readonly", (s) => s.get(id))) ?? undefined;
   }
-  async put(entry: MeetMemoryEntryV1): Promise<void> {
+  async put(entry: T): Promise<void> {
     await tx(this.store, "readwrite", (s) => s.put(entry));
   }
   async remove(id: string): Promise<void> {
