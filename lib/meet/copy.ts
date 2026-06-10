@@ -39,6 +39,15 @@ export const MEET = {
       heading: "合図",
       empty: "いまのところ合図はありません。",
       incoming: (ref: string): string => `${ref} から「話してみる」の合図が届いています。`,
+      talkBack: "こちらも話してみる",
+      mutual: "おたがいに合図が出ています。",
+      contactHeading: "連絡のメモ",
+      contactNote: "おたがいが押したので、連絡のメモを交換できます。届くのはこの相手だけです。",
+      contactPlaceholder: "例：LINEのID、メール、電話など、つながれる窓口",
+      contactSave: "渡す",
+      contactSaved: "渡しました",
+      theirNote: (name: string): string => `${name} からのメモ`,
+      waitingNote: "相手のメモはまだ届いていません。",
     },
   },
 
@@ -96,6 +105,8 @@ export const MEET = {
   intake: {
     copyPrompt: "プロンプトをコピー",
     copied: "コピーしました",
+    copyFailed: "コピーできませんでした。下の全文から手でコピーしてください。",
+    showPrompt: "プロンプトの全文を見る",
     pasteLabel: "AIの返事をここに貼る",
     pastePlaceholder: "返ってきたJSONをそのまま貼り付けてください",
     parse: "取り込む",
@@ -162,19 +173,38 @@ export const MEET = {
 
   proposal: {
     talk: "話してみる",
+    talkSent: "合図を出しました",
     talkNote: "押すと、相手にその合図が表示されます。連絡先はまだ伝わりません。",
     mutualNote: "おたがいが押したら、連絡のメモを交換できます。",
+    noTarget: "相手を特定できなかったため、この提案からは合図を出せません。",
     readings: {
       heading: "読みを残す",
       options: ["面白い", "腑に落ちる", "突飛", "話したい"] as readonly string[],
+      notePlaceholder: "ひとこと（あってもなくても）",
+      save: "残す",
+      saved: "残しました",
       note: "読みはあなたの私的なメモです。相手には見えません。進行役がテストのために読みます。",
     },
+  },
+
+  host: {
+    title: "進行役",
+    keyLabel: "進行役の合鍵",
+    open: "開く",
+    failed: "開けませんでした。合鍵を確かめてください。",
+    empty: "まだ記録がありません。",
+    signalsHeading: "合図のながれ",
+    logsHeading: "提案と読み",
+    readingLabel: "読み",
+    noReading: "（読みはまだありません）",
   },
 
   boundary: {
     memory: "私的な記憶はこの端末の中だけ。PXのサーバーが持つのは、公開すると決めた項目と「話してみる」の合図だけです。",
     ai: "PXはAIを実行しません。提案をつくるのは、あなたの鍵で動くあなたのAIです。",
     order: "点数も順位もつけません。",
+    disclosure:
+      "テストのあいだ、届いた提案とあなたの読みは進行役も読めます（テストの記録のため）。連絡のメモは読めません。",
   },
 } as const;
 

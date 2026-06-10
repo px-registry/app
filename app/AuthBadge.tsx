@@ -10,10 +10,12 @@
 // free of auth chrome (sealed pages untouched at build time).
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { fetchMe, type MeResponse } from "@/lib/auth-client.ts";
 
 export function AuthBadge() {
   const [me, setMe] = useState<MeResponse | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     let live = true;
@@ -32,6 +34,10 @@ export function AuthBadge() {
     window.addEventListener("px:session-changed", refresh);
     return () => window.removeEventListener("px:session-changed", refresh);
   }, []);
+
+  // The R1.5 meet surface has its own header and no WebAuthn lane — the
+  // registry auth chrome would only overlay and confuse it.
+  if (pathname !== null && pathname.startsWith("/meet")) return null;
 
   if (me === null) return null;
 

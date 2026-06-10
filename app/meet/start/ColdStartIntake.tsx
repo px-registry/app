@@ -19,16 +19,22 @@ type Phase = "paste" | "review" | "done";
 
 export function ColdStartIntake() {
   const [phase, setPhase] = useState<Phase>("paste");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   const [paste, setPaste] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [items, setItems] = useState<RigMemoryItemV1[]>([]);
   const [busy, setBusy] = useState(false);
 
   const copyPrompt = async () => {
-    await navigator.clipboard.writeText(COLDSTART_PROMPT);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    // Clipboard can be unavailable (permissions, in-app browsers) — the full
+    // text below is the always-works fallback, so the loop never blocks here.
+    try {
+      await navigator.clipboard.writeText(COLDSTART_PROMPT);
+      setCopied("done");
+    } catch {
+      setCopied("failed");
+    }
+    setTimeout(() => setCopied("idle"), 2500);
   };
 
   const parse = () => {
@@ -118,9 +124,20 @@ export function ColdStartIntake() {
 
   return (
     <div>
-      <button type="button" className="m-btn m-btn-quiet m-btn-wide" onClick={copyPrompt}>
-        {copied ? MEET.intake.copied : MEET.intake.copyPrompt}
+      <button type="button" className="m-btn m-btn-quiet m-btn-wide" onClick={() => void copyPrompt()}>
+        {copied === "done" ? MEET.intake.copied : MEET.intake.copyPrompt}
       </button>
+      {copied === "failed" && (
+        <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+          {MEET.intake.copyFailed}
+        </p>
+      )}
+      <details style={{ margin: "0.5rem 0" }}>
+        <summary className="m-note" style={{ cursor: "pointer" }}>
+          {MEET.intake.showPrompt}
+        </summary>
+        <textarea className="m-field" rows={8} readOnly value={COLDSTART_PROMPT} />
+      </details>
       <p className="m-note" style={{ margin: "0.6rem 0" }}>
         {COLDSTART_NOTE}
       </p>

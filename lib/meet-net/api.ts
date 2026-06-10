@@ -68,6 +68,133 @@ function parsePoolItem(raw: unknown): PoolItemPublic | null {
   };
 }
 
+// ── signal / contact / inbox / facilitator-log lanes ───────────────────────────
+
+export type InboxIncoming = {
+  fromRef: string;
+  fromName: string;
+  anchor: string;
+  createdAt: string;
+  mutual: boolean;
+};
+export type InboxData = {
+  incoming: InboxIncoming[];
+  outgoing: Array<{ toRef: string; mutual: boolean }>;
+  notes: Array<{ fromRef: string; note: string }>;
+  myNotes: Array<{ peerRef: string; note: string }>;
+};
+
+async function postJson(path: string, body: unknown): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+export async function sendSignal(input: {
+  ownerToken: string;
+  toRef: string;
+  fromName: string;
+  anchor: string;
+}): Promise<NetResult<{ mutual: boolean }>> {
+  try {
+    const { body } = await postJson("/api/meet/signal", input);
+    if (!isRecord(body) || body.ok !== true) {
+      return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "signal_failed" };
+    }
+    return { ok: true, mutual: body.mutual === true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxData>> {
+  try {
+    const { body } = await postJson("/api/meet/inbox", { ownerToken });
+    if (!isRecord(body) || body.ok !== true) return { ok: false, error: "inbox_failed" };
+    const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+    return {
+      ok: true,
+      incoming: arr(body.incoming).filter(isRecord).flatMap((r) =>
+        isParticipantRef(r.fromRef) && typeof r.fromName === "string"
+          ? [{
+              fromRef: r.fromRef,
+              fromName: r.fromName,
+              anchor: typeof r.anchor === "string" ? r.anchor : "",
+              createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
+              mutual: r.mutual === true,
+            }]
+          : [],
+      ),
+      outgoing: arr(body.outgoing).filter(isRecord).flatMap((r) =>
+        isParticipantRef(r.toRef) ? [{ toRef: r.toRef, mutual: r.mutual === true }] : [],
+      ),
+      notes: arr(body.notes).filter(isRecord).flatMap((r) =>
+        isParticipantRef(r.fromRef) && typeof r.note === "string"
+          ? [{ fromRef: r.fromRef, note: r.note }]
+          : [],
+      ),
+      myNotes: arr(body.myNotes).filter(isRecord).flatMap((r) =>
+        isParticipantRef(r.peerRef) && typeof r.note === "string"
+          ? [{ peerRef: r.peerRef, note: r.note }]
+          : [],
+      ),
+    };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+export async function saveContactNote(input: {
+  ownerToken: string;
+  peerRef: string;
+  note: string;
+}): Promise<NetResult<Record<never, never>>> {
+  try {
+    const { body } = await postJson("/api/meet/contact", input);
+    if (!isRecord(body) || body.ok !== true) {
+      return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "contact_failed" };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+/** Test-disclosed facilitator lane (the app says so next to the action). */
+export async function submitLog(input: {
+  ownerToken: string;
+  clientEntryId: string;
+  displayName: string;
+  question: string;
+  proposalText: string;
+  reading: string;
+}): Promise<NetResult<Record<never, never>>> {
+  try {
+    const { body } = await postJson("/api/meet/log", input);
+    if (!isRecord(body) || body.ok !== true) return { ok: false, error: "log_failed" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+export async function fetchHostView(hostKey: string): Promise<NetResult<{ logs: unknown[]; signals: unknown[] }>> {
+  try {
+    const { body } = await postJson("/api/meet/host", { hostKey });
+    if (!isRecord(body) || body.ok !== true) return { ok: false, error: "host_key" };
+    return {
+      ok: true,
+      logs: Array.isArray(body.logs) ? body.logs : [],
+      signals: Array.isArray(body.signals) ? body.signals : [],
+    };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
 export async function fetchPool(
   myRef: string,
 ): Promise<NetResult<{ items: PoolItemPublic[] }>> {

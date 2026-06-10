@@ -44,13 +44,16 @@ CREATE TABLE r15_contact_note (
 );
 
 -- ── facilitator log (test-disclosed: proposals as received + owner readings) ───
+-- Keyed by the owner-local entry id so a reading update overwrites its row
+-- (one row per received generation, not per edit).
 CREATE TABLE r15_log (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
   participant_ref TEXT NOT NULL,
+  client_entry_id TEXT NOT NULL,
   display_name    TEXT NOT NULL,
   question        TEXT NOT NULL DEFAULT '',
   proposal_text   TEXT NOT NULL,
-  reading         TEXT NOT NULL DEFAULT '', -- JSON: owner's marks + free note
+  reading         TEXT NOT NULL DEFAULT '', -- JSON: echo flag + per-card marks/notes
   created_at      TEXT NOT NULL,
-  updated_at      TEXT NOT NULL
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (participant_ref, client_entry_id)
 );

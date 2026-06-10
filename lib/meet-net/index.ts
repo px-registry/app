@@ -7,6 +7,13 @@ export { buildOutboundProjection, type OutboundPoolItem } from "./projection.ts"
 export {
   publishProjection,
   fetchPool,
+  sendSignal,
+  fetchInbox,
+  saveContactNote,
+  submitLog,
+  fetchHostView,
   type PoolItemPublic,
   type NetResult,
+  type InboxData,
+  type InboxIncoming,
 } from "./api.ts";

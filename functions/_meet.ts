@@ -13,7 +13,7 @@
 // Imports are relative into the top-level lib/ (the Pages build bundles with
 // esbuild, no "@/*" alias) — same convention as functions/_board.ts.
 
-import { deriveParticipantRef, isOwnerToken } from "../lib/meet-net/ref.ts";
+import { deriveParticipantRef, isOwnerToken, isParticipantRef } from "../lib/meet-net/ref.ts";
 
 export interface MeetEnv {
   /** Same D1 database as the board (wrangler.toml binding = "BOARD");
@@ -21,7 +21,7 @@ export interface MeetEnv {
   BOARD: D1Database;
 }
 
-export { deriveParticipantRef, isOwnerToken };
+export { deriveParticipantRef, isOwnerToken, isParticipantRef };
 
 export const MEET_KINDS = new Set(["have", "want", "avoid", "memory"]);
 
@@ -32,6 +32,11 @@ export const MAX_TEXT = 600;
 export const MAX_TAGS = 6;
 export const MAX_TAG = 30;
 export const MAX_NAME = 30;
+export const MAX_ANCHOR = 80;
+export const MAX_NOTE = 500;
+export const MAX_QUESTION = 300;
+export const MAX_PROPOSAL = 8000;
+export const MAX_READING = 4000;
 
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

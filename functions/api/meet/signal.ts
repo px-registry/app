@@ -1,0 +1,59 @@
+// POST /api/meet/signal — send (or re-send) the one-sided 話してみる signal.
+//
+// The sender's identity is the derived ref (token dropped, as everywhere).
+// The receiver will see: who (public pseudonym), one short anchor line, when.
+// Idempotent upsert on (from_ref, to_ref) — pressing twice is pressing once.
+// A signal to yourself, or to a ref shape that isn't one, is refused. No
+// notification machinery: the receiver sees it on their next visit (R1.5).
+
+import {
+  json,
+  deriveParticipantRef,
+  isOwnerToken,
+  isParticipantRef,
+  isAllowedWriteOrigin,
+  MAX_ANCHOR,
+  MAX_NAME,
+  type MeetEnv,
+} from "../../_meet.ts";
+
+export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) => {
+  if (!isAllowedWriteOrigin(request)) return json({ ok: false, error: "bad_origin" }, 403);
+
+  const raw = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (raw === null || typeof raw !== "object") return json({ ok: false, error: "body" }, 400);
+  if (!isOwnerToken(raw.ownerToken)) return json({ ok: false, error: "token" }, 400);
+  if (!isParticipantRef(raw.toRef)) return json({ ok: false, error: "to_ref" }, 400);
+  const fromName = typeof raw.fromName === "string" ? raw.fromName.trim() : "";
+  if (fromName.length === 0 || fromName.length > MAX_NAME) {
+    return json({ ok: false, error: "from_name" }, 400);
+  }
+  const anchor =
+    typeof raw.anchor === "string" ? raw.anchor.trim().slice(0, MAX_ANCHOR) : "";
+
+  const fromRef = await deriveParticipantRef(raw.ownerToken);
+  if (fromRef === raw.toRef) return json({ ok: false, error: "self_signal" }, 400);
+
+  try {
+    await env.BOARD
+      .prepare(
+        "INSERT INTO r15_signal (from_ref, to_ref, from_name, anchor, created_at) " +
+          "VALUES (?1, ?2, ?3, ?4, ?5) " +
+          "ON CONFLICT (from_ref, to_ref) DO UPDATE SET from_name = ?3, anchor = ?4",
+      )
+      .bind(fromRef, raw.toRef, fromName, anchor, new Date().toISOString())
+      .run();
+    // mutual? — tell the sender so the UI can open the contact step right away
+    const back = await env.BOARD
+      .prepare("SELECT 1 AS x FROM r15_signal WHERE from_ref = ?1 AND to_ref = ?2")
+      .bind(raw.toRef, fromRef)
+      .all();
+    const mutual = (back.results ?? []).length > 0;
+    return json({ ok: true, mutual }, 201);
+  } catch {
+    return json({ ok: false, error: "signal_failed" }, 500);
+  }
+};
+
+export const onRequestOptions: PagesFunction<MeetEnv> = async () =>
+  new Response(null, { status: 204, headers: { Allow: "POST, OPTIONS" } });
