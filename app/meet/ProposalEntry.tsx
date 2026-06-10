@@ -1,13 +1,16 @@
 "use client";
 
-// One received generation: its cards (each with 話してみる + 読み), the echo
-// warning, the verbatim raw fallback. Signals go to the participantRef captured
-// at generation time; a card whose counterpart can't be resolved says so and
-// offers no button (fail-closed targeting, fail-open display).
+// One received generation. Cards pass the PROVENANCE GATE before display
+// (第3便 A): only a card whose addressee resolves to a real ownerRef of the
+// pool sent at generation time renders as a proposal — an invented partner is
+// excluded with an honest one-liner, and the verbatim raw reply stays
+// inspectable in the fold for every entry. Readings auto-save (補遺 D): chips
+// toggle-and-save on tap, the note saves on blur; the status line says
+// honestly whether the test record was written.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
-import { parseReplyOutcome } from "@/lib/meet-ai";
+import { parseReplyOutcome, gateCardsByProvenance } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
 import { RIG_PRIVATE_ECHO_NOTE } from "@/lib/rig";
 
@@ -21,19 +24,55 @@ function ReadingEditor({
   onSave,
 }: {
   initial: ReadingV1 | undefined;
-  onSave: (r: ReadingV1) => Promise<void>;
+  onSave: (r: ReadingV1) => Promise<boolean>;
 }) {
   const [marks, setMarks] = useState<string[]>(initial?.marks ?? []);
   const [note, setNote] = useState(initial?.note ?? "");
-  const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saved" | "failed">("idle");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef({ marks, note });
+  latest.current = { marks, note };
+  const lastSaved = useRef(
+    JSON.stringify({ marks: initial?.marks ?? [], note: (initial?.note ?? "").trim() }),
+  );
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  // Debounced auto-save: rapid taps / tap+blur collapse into one write.
+  const flush = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    const payload: ReadingV1 = { marks: latest.current.marks, note: latest.current.note.trim() };
+    const key = JSON.stringify(payload);
+    if (key === lastSaved.current) return; // nothing new to record
+    lastSaved.current = key;
+    void onSave(payload).then((ok) => {
+      setStatus(ok ? "saved" : "failed");
+      if (!ok) lastSaved.current = ""; // a later change may retry honestly
+    });
+  };
+  const schedule = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(flush, 500);
+  };
 
   const toggle = (m: string) => {
     setMarks((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
-    setSaved(false);
+    schedule();
   };
 
   return (
     <div style={{ marginTop: "0.5rem" }}>
+      <p className="m-note" style={{ margin: "0 0 0.35rem" }}>
+        {MEET.proposal.readings.note}
+      </p>
       <div className="m-kindrow" style={{ marginBottom: "0.35rem" }}>
         {MEET.proposal.readings.options.map((m) => (
           <button
@@ -47,26 +86,22 @@ function ReadingEditor({
           </button>
         ))}
       </div>
-      <div style={{ display: "flex", gap: "0.4rem" }}>
-        <input
-          className="m-field"
-          value={note}
-          onChange={(e) => {
-            setNote(e.target.value);
-            setSaved(false);
-          }}
-          placeholder={MEET.proposal.readings.notePlaceholder}
-        />
-        <button
-          type="button"
-          className="m-btn m-btn-quiet"
-          onClick={() => {
-            void onSave({ marks, note: note.trim() }).then(() => setSaved(true));
-          }}
+      <input
+        className="m-field"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={flush}
+        placeholder={MEET.proposal.readings.notePlaceholder}
+      />
+      {status !== "idle" && (
+        <p
+          className="m-note"
+          aria-live="polite"
+          style={status === "failed" ? { color: "var(--shu-deep)" } : undefined}
         >
-          {saved ? MEET.proposal.readings.saved : MEET.proposal.readings.save}
-        </button>
-      </div>
+          {status === "saved" ? MEET.proposal.readings.recorded : MEET.proposal.readings.recordFailed}
+        </p>
+      )}
     </div>
   );
 }
@@ -82,9 +117,22 @@ export function ProposalEntry({
   /** refs this owner has already signalled (from the inbox outgoing list). */
   sentRefs: ReadonlySet<string>;
   onTalk: (toRef: string, anchor: string) => Promise<void>;
-  onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<void>;
+  onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<boolean>;
   onRemove: (entryId: string) => Promise<void>;
 }) {
+  const { kept, excluded } = gateCardsByProvenance(entry.cards, entry.refs);
+
+  const rawFold = (
+    <details>
+      <summary className="m-note" style={{ cursor: "pointer" }}>
+        {MEET.home.proposals.rawShow}
+      </summary>
+      <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+        {entry.raw}
+      </p>
+    </details>
+  );
+
   return (
     <li className="m-item">
       <p className="m-item-tags" style={{ margin: "0 0 0.4rem" }}>
@@ -98,19 +146,11 @@ export function ProposalEntry({
       )}
       {entry.cards.length === 0 ? (
         // A RECOGNIZED empty array means the model said 今日は無い — show that,
-        // not the raw markup (第1便: fenced "[]" was dumped verbatim). Only a
-        // true format miss falls back to the verbatim reply.
+        // not the raw markup. Only a true format miss falls back to the raw.
         parseReplyOutcome(entry.raw).parsed ? (
           <>
             <p className="m-item-text">{MEET.home.proposals.noneToday}</p>
-            <details>
-              <summary className="m-note" style={{ cursor: "pointer" }}>
-                {MEET.home.proposals.rawShow}
-              </summary>
-              <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
-                {entry.raw}
-              </p>
-            </details>
+            {rawFold}
           </>
         ) : (
           <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
@@ -119,44 +159,39 @@ export function ProposalEntry({
         )
       ) : (
         <div style={{ display: "grid", gap: "0.9rem" }}>
-          {entry.cards.map((card, i) => {
-            const toRef = entry.refs[card.to] ?? "";
-            const sent = toRef !== "" && sentRefs.has(toRef);
+          {kept.length === 0 && <p className="m-item-text">{MEET.home.proposals.noneToday}</p>}
+          {kept.map(({ card, index }) => {
+            const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
+            const sent = sentRefs.has(toRef);
             return (
-              <div key={i} className="m-proposal">
+              <div key={index} className="m-proposal">
                 <p className="m-item-title" style={{ margin: 0 }}>
                   {card.to}
                 </p>
                 <p className="m-item-text">{card.line1}</p>
                 {card.line2 && <p className="m-item-text">{card.line2}</p>}
-                {toRef === "" ? (
-                  <p className="m-note">{MEET.proposal.noTarget}</p>
-                ) : (
-                  <button
-                    type="button"
-                    className={`m-btn ${sent ? "m-btn-quiet" : "m-btn-primary"}`}
-                    style={{ marginTop: "0.45rem" }}
-                    disabled={sent}
-                    onClick={() => void onTalk(toRef, card.line1.slice(0, 80))}
-                  >
-                    {sent ? MEET.proposal.talkSent : MEET.proposal.talk}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className={`m-btn ${sent ? "m-btn-quiet" : "m-btn-primary"}`}
+                  style={{ marginTop: "0.45rem" }}
+                  disabled={sent}
+                  onClick={() => void onTalk(toRef, card.line1.slice(0, 80))}
+                >
+                  {sent ? MEET.proposal.talkSent : MEET.proposal.talk}
+                </button>
                 <ReadingEditor
-                  initial={entry.readings[i]}
-                  onSave={(r) => onReading(entry.entryId, i, r)}
+                  initial={entry.readings[index]}
+                  onSave={(r) => onReading(entry.entryId, index, r)}
                 />
               </div>
             );
           })}
-          <details>
-            <summary className="m-note" style={{ cursor: "pointer" }}>
-              {MEET.home.proposals.rawShow}
-            </summary>
-            <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
-              {entry.raw}
+          {excluded.length > 0 && (
+            <p className="m-note" style={{ margin: 0 }}>
+              {MEET.home.proposals.provenanceNote(excluded.length)}
             </p>
-          </details>
+          )}
+          {rawFold}
         </div>
       )}
       <div className="m-item-actions">

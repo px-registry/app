@@ -51,7 +51,7 @@ try {
 
   // ── A. 問いを置く → 確定 → 候補を更新する → 待っています ───────────────────────
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  check("home heading is 問い (今日の dropped)", await page.getByRole("heading", { name: "問い", exact: true }).isVisible());
+  check("home heading is the tagline (第3便 B-1)", await page.getByRole("heading", { name: "お互いの記憶から、思いがけない接点を。" }).isVisible());
   check("two-tense line shown", await page.getByText("いま探しに行くか、置いて待つか", { exact: false }).isVisible());
   const QUESTION = "週末に一緒に古い納屋を直す相棒を探したい";
   await page.locator("textarea.m-field").first().fill(QUESTION);

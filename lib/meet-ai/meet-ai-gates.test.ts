@@ -16,6 +16,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { buildMeetPrompt, toRigPool, parseProposalReply, parseReplyOutcome } from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
 import { buildMaskPrompt, parseMaskReply } from "./mask.ts";
+import { gateCardsByProvenance } from "./provenance.ts";
 import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
 import { toPublicView } from "../meet-memory/public-view.ts";
 import { RIG_LAW, buildPublicPool, type RigOwnerV1 } from "../rig/rig.ts";
@@ -241,6 +242,12 @@ test("MA-7: buildMaskPrompt carries the item and the JSON-only contract", () => 
   assert.ok(p.includes('{"title"'), "JSON contract stated");
   assert.ok(p.includes("title: ○○株式会社のCS部門"));
   assert.ok(p.includes("text: 社内の立ち上げ話"));
+  assert.ok(!p.includes("必ず言い換える"), "no list line when the owner listed nothing");
+});
+
+test("MA-7c: 補遺 E — the owner's 伏せたい言葉 ride the prompt explicitly", () => {
+  const p = buildMaskPrompt("t", "x", ["PX", " Protocol X ", ""]);
+  assert.ok(p.includes("次の語は必ず言い換える（そのまま残さない）：PX／Protocol X"));
 });
 
 test("MA-7b: parseMaskReply — fenced / prose-wrapped parse; junk is null (never auto-saves)", () => {
@@ -253,6 +260,41 @@ test("MA-7b: parseMaskReply — fenced / prose-wrapped parse; junk is null (neve
   for (const raw of ["できません", "{broken", "[]", '{"title": 1, "text": null}', '{"title":"","text":"  "}']) {
     assert.equal(parseMaskReply(raw), null, `must fail closed: ${raw}`);
   }
+});
+
+// ── MA-9 (第3便 A): provenance gate — invented partners never display ───────────
+// FIXTURE: Hiroto's live observation (Ollama qwen2.5-coder:7b, EMPTY pool):
+// 4 cards were generated, every addressee invented. Verbatim from the
+// test-disclosed facilitator log (r15_log, 2026-06-10).
+
+const OBSERVED_INVENTED_REPLY =
+  '```json\n[\n    {\n        "to": "AIエージェントコミュニティ",\n        "line1": "PX Table（MET）の実装基盤 × AIエージェント運用経験を共有",\n        "line2": "相互手挙げ型マッチングとAIエージェントによるプロセス改善について話す"\n    },\n    {\n        "to": "教育出版業界",\n        "line1": "分岐型ナラティブ教材 × 教育コンテンツの設計力",\n        "line2": "数・ことば・空間の3スキルトラックとAIとの連携について話す"\n    },\n    {\n        "to": "飲食業界",\n        "line1": "PX Tableを浸透させたい × 飲食業界への影響",\n        "line2": "非カストディアルな飲食サービスの可能性について話す"\n    },\n    {\n        "to": "AI研究者コミュニティ",\n        "line1": "Qwen3系のローカルLLM運用 × AI研究と開発環境の最適化",\n        "line2": "ローカルマシンでの高速なAIモデル実行について話す"\n    }\n]\n```';
+
+test("MA-9: the OBSERVED invented-partner reply is fully excluded by the gate", () => {
+  const cards = parseProposalReply(OBSERVED_INVENTED_REPLY);
+  assert.equal(cards.length, 4, "the reply parses — the gate, not the parser, must stop it");
+  // the pool sent that day was EMPTY → refs is empty
+  const gated = gateCardsByProvenance(cards, {});
+  assert.equal(gated.kept.length, 0, "no invented partner may display");
+  assert.equal(gated.excluded.length, 4);
+});
+
+test("MA-9b: real addressees pass, invented ones drop — original indices kept", () => {
+  const cards = parseProposalReply(OBSERVED_INVENTED_REPLY);
+  cards.push({ to: "あや", line1: "納屋 × 工房", line2: "週末に一度" });
+  const refs = { あや: "a".repeat(16), カフェの人: "b".repeat(16) };
+  const gated = gateCardsByProvenance(cards, refs);
+  assert.equal(gated.kept.length, 1);
+  assert.equal(gated.kept[0].card.to, "あや");
+  assert.equal(gated.kept[0].index, 4, "reading keys stay on the ORIGINAL card index");
+  assert.deepEqual(gated.excluded.map((e) => e.index), [0, 1, 2, 3]);
+});
+
+test("MA-9c: fail-closed on odd ref values (empty string never resolves)", () => {
+  const cards = [{ to: "ゆら", line1: "x", line2: "" }];
+  assert.equal(gateCardsByProvenance(cards, { ゆら: "" }).kept.length, 0);
+  assert.equal(gateCardsByProvenance(cards, {}).kept.length, 0);
+  assert.equal(gateCardsByProvenance([], { あや: "a".repeat(16) }).kept.length, 0);
 });
 
 // ── MA-6 (fix1): key-prefix provider detection — the owner never picks ──────────

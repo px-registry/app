@@ -31,6 +31,7 @@ import {
   isPlacedQuestion,
 } from "./placed.ts";
 import { toPublicView, hasPublicVariant } from "./public-view.ts";
+import { parseMaskWords, findMaskLeaks } from "./mask-check.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 
 const root = (rel: string) => new URL(`../../${rel}`, import.meta.url);
@@ -347,4 +348,65 @@ test("MM-12: toPublicView — swap when set, fallback when blank, EXPLICIT PICK"
 
   assert.ok(hasPublicVariant(item));
   assert.ok(!hasPublicVariant({ ...item, publicTitle: " ", publicText: "" }));
+});
+
+// ── MM-13/14 (補遺 E): 伏せたい言葉 — deterministic leak check + the list ───────
+
+test("MM-13: findMaskLeaks — case/width folded; checks the OUTGOING view only", () => {
+  const words = ["PX", "Protocol X", "○○株式会社"];
+  // the observed leak shape: the masked draft kept the words verbatim
+  assert.deepEqual(
+    findMaskLeaks(words, "Protocol Xの普及", "PXを広めたい"),
+    ["PX", "Protocol X"],
+    "verbatim survivors are caught (PX also matches inside Protocol X line)",
+  );
+  // case + full/half width wobble is absorbed (even the full-width space)
+  assert.deepEqual(findMaskLeaks(words, "", "ｐｘ と protocol　x"), ["PX", "Protocol X"]);
+  assert.deepEqual(findMaskLeaks(words, "", "ＰＸの話"), ["PX"]);
+  // gone from the public phrasing → no warning
+  assert.deepEqual(findMaskLeaks(words, "BtoB SaaS の CS 立ち上げ", "中抜きゼロの台帳の話"), []);
+  assert.deepEqual(findMaskLeaks([], "PX", "PX"), [], "no list → no check");
+
+  // the PRIVATE body is out of scope: with a 書き方 set, only the public view
+  // is what leaves — and only it is scanned
+  const item = {
+    kind: "have" as const,
+    title: "PXの実装",
+    text: "Protocol X の中身",
+    tags: [],
+    private: false,
+    publicTitle: "分散プロトコルの実装",
+    publicText: "非カストディアルな台帳の中身",
+  };
+  const view = toPublicView(item);
+  assert.deepEqual(findMaskLeaks(words, view.title, view.text), [], "private-side words don't warn");
+});
+
+test("MM-13b: parseMaskWords — 、 , ／ / newline split, trim, dedupe", () => {
+  assert.deepEqual(parseMaskWords("PX、Protocol X／○○株式会社, PX\n  "), [
+    "PX",
+    "Protocol X",
+    "○○株式会社",
+  ]);
+  assert.deepEqual(parseMaskWords(""), []);
+});
+
+test("MM-14: mask_list is a validated owner-wide singleton (backed up like the rest)", async () => {
+  const r = validateNewEntry({
+    kind: "mask_list",
+    provenance: "owner_written",
+    value: { words: ["PX", "Protocol X"] },
+  });
+  assert.deepEqual(r, { ok: true });
+  assert.equal(
+    validateNewEntry({ kind: "mask_list", provenance: "owner_written", value: { words: [1] } }).ok,
+    false,
+    "non-string words refused",
+  );
+  const store = freshStore();
+  assert.deepEqual(await store.getMaskWords(), [], "empty before first save");
+  await store.setMaskWords(["PX", "○○株式会社"]);
+  assert.deepEqual(await store.getMaskWords(), ["PX", "○○株式会社"]);
+  await store.setMaskWords(["PX"]);
+  assert.deepEqual(await store.getMaskWords(), ["PX"], "singleton upserts");
 });

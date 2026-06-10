@@ -37,3 +37,4 @@ export {
 } from "./prompt.ts";
 export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";
 export { buildMaskPrompt, parseMaskReply } from "./mask.ts";
+export { gateCardsByProvenance, type GatedCard, type GatedCards } from "./provenance.ts";

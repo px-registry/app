@@ -22,7 +22,7 @@ import type { RigMemoryItemV1 } from "../rig/rig.ts";
 /** How an entry came to be. AI-authored facts are REFUSED by the validator. */
 export type MeetProvenance = "owner_written" | "owner_imported_confirmed";
 
-export const MEET_ENTRY_KINDS = ["rig_item", "question", "profile"] as const;
+export const MEET_ENTRY_KINDS = ["rig_item", "question", "profile", "mask_list"] as const;
 export type MeetEntryKind = (typeof MEET_ENTRY_KINDS)[number];
 
 /**
@@ -40,6 +40,13 @@ export type MeetRigItemV1 = RigMemoryItemV1 & {
 
 export type QuestionValue = { text: string };
 export type ProfileValue = { displayName: string };
+/**
+ * 補遺 E — 伏せたい言葉 (one owner-wide list, device-local). Words the owner
+ * never wants in an OUTGOING text; the deterministic mask check warns when one
+ * survives in a public view. Model-side masking is best-effort — this list is
+ * what the structure verifies against.
+ */
+export type MaskListValue = { words: string[] };
 
 type EntryBase = {
   entryId: string;
@@ -53,10 +60,12 @@ export type MeetMemoryEntryV1 = EntryBase &
     | { kind: "rig_item"; value: MeetRigItemV1 }
     | { kind: "question"; value: QuestionValue }
     | { kind: "profile"; value: ProfileValue }
+    | { kind: "mask_list"; value: MaskListValue }
   );
 
 /** A new entry before id/timestamps — what a caller submits. */
 export type NewMeetEntry =
   | { kind: "rig_item"; provenance: MeetProvenance; value: MeetRigItemV1 }
   | { kind: "question"; provenance: MeetProvenance; value: QuestionValue }
-  | { kind: "profile"; provenance: MeetProvenance; value: ProfileValue };
+  | { kind: "profile"; provenance: MeetProvenance; value: ProfileValue }
+  | { kind: "mask_list"; provenance: MeetProvenance; value: MaskListValue };

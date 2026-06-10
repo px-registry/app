@@ -4,10 +4,14 @@
 // and the private body goes only to the owner's OWN AI, exactly like the SELF
 // grounding block. The owner edits and confirms before anything is saved.
 
-export function buildMaskPrompt(title: string, text: string): string {
+export function buildMaskPrompt(title: string, text: string, maskWords: string[] = []): string {
+  const words = maskWords.map((w) => w.trim()).filter((w) => w !== "");
   return [
     "次の項目を、固有名を伏せて内容だけが伝わる言い方に書き換えてください。",
     "伏せるもの：会社名・サービス名・ブランド名・人名・地名の細部（市区町村より細かいもの）。",
+    // 補遺 E: the owner's explicit list rides along — and is then VERIFIED
+    // deterministically on save (model obedience is not assumed).
+    ...(words.length > 0 ? [`次の語は必ず言い換える（そのまま残さない）：${words.join("／")}`] : []),
     "内容と経験の中身は保ち、誇張しない。",
     '返答は次の形のJSONだけ（前後に説明文を付けない）：{"title": "短い言い換え", "text": "本文の言い換え"}',
     "",

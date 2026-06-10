@@ -17,6 +17,7 @@ import type {
   NewMeetEntry,
   QuestionValue,
   ProfileValue,
+  MaskListValue,
 } from "./types.ts";
 
 export const MEET_EXPORT_FORMAT = "px.meet-memory/v1";
@@ -126,9 +127,17 @@ export class MeetMemoryStore {
   async setProfile(value: ProfileValue): Promise<void> {
     await this.upsertSingleton("profile", value);
   }
+  /** 補遺 E: 伏せたい言葉 — one owner-wide list (device-local, backed up too). */
+  async getMaskWords(): Promise<string[]> {
+    const all = await this.listByKind("mask_list");
+    return all.length > 0 && all[0].kind === "mask_list" ? all[0].value.words : [];
+  }
+  async setMaskWords(words: string[]): Promise<void> {
+    await this.upsertSingleton("mask_list", { words });
+  }
   private async upsertSingleton(
-    kind: "question" | "profile",
-    value: QuestionValue | ProfileValue,
+    kind: "question" | "profile" | "mask_list",
+    value: QuestionValue | ProfileValue | MaskListValue,
   ): Promise<void> {
     const all = await this.listByKind(kind);
     if (all.length > 0) {

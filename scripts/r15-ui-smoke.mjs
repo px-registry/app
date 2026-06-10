@@ -62,7 +62,7 @@ const shot = (name) => page.screenshot({ path: `${SHOT_DIR}/r15b-${name}.png`, f
 try {
   // 1. home — first visit: prerequisites + AI-less reassurance + open promise
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  await waitCheck("home renders 問い", page.getByRole("heading", { name: "問い", exact: true }));
+  await waitCheck("home renders the tagline heading", page.getByRole("heading", { name: "お互いの記憶から、思いがけない接点を。" }));
   await waitCheck("home lists missing steps", page.getByText("AIがまだつながっていません"));
   await waitCheck("AI-less loop reassurance shown", page.getByText("AIをつながなくても", { exact: false }));
   await waitCheck("promise open on first visit", page.getByText("PXはAIを実行しません", { exact: false }));
@@ -102,7 +102,8 @@ try {
   await page.locator(".m-itemlist .m-item").first().waitFor();
   check("memory lists 3 items", (await page.locator(".m-itemlist .m-item").count()) === 3);
   await page.locator("input.m-field").first().fill("みどり");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
+  // .first(): the memory page now carries a second 保存 (伏せたい言葉)
+  await page.getByRole("button", { name: "保存", exact: true }).first().click();
   await page.getByRole("button", { name: "候補に出す", exact: true }).waitFor();
   await page.getByRole("button", { name: "候補に出す", exact: true }).click();
   await page.getByText("2件を候補に出しました。").waitFor();

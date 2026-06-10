@@ -56,7 +56,11 @@ import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
 
-type GenState = { phase: "idle" } | { phase: "busy" } | { phase: "error"; code: string };
+type GenState =
+  | { phase: "idle" }
+  | { phase: "busy" }
+  | { phase: "empty" } // pool had nobody — generation short-circuited (第3便 A)
+  | { phase: "error"; code: string };
 type RigEntry = { entryId: string; item: MeetRigItemV1 };
 type PlaceDraft = { title: string; text: string; private: boolean };
 
@@ -235,6 +239,12 @@ export function HomeView() {
       setGen({ phase: "error", code: "pool" });
       return;
     }
+    // 第3便 A: an empty pool means there is nobody to propose — don't run the
+    // model at all (a weak model invents partners; rule 7 is backed here).
+    if (poolRes.items.length === 0) {
+      setGen({ phase: "empty" });
+      return;
+    }
     const refs: Record<string, string> = {};
     for (const it of poolRes.items) {
       if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
@@ -290,12 +300,19 @@ export function HomeView() {
     return r.ok;
   };
 
-  const reading = async (entryId: string, cardIndex: number, value: ReadingV1) => {
-    await shelf.setReading(entryId, cardIndex, value);
+  // 補遺 D: auto-saved readings report honestly — 「記録しました」 may be said
+  // only when BOTH the local shelf write and the test-record mirror landed.
+  const reading = async (entryId: string, cardIndex: number, value: ReadingV1): Promise<boolean> => {
+    try {
+      await shelf.setReading(entryId, cardIndex, value);
+    } catch {
+      return false;
+    }
     const list = await shelf.list();
     const entry = list.find((e) => e.entryId === entryId);
+    let recorded = false;
     if (entry) {
-      void submitLog({
+      const r = await submitLog({
         ownerToken: getOrMintOwnerToken(),
         clientEntryId: entry.entryId,
         displayName,
@@ -303,9 +320,11 @@ export function HomeView() {
         proposalText: entry.raw,
         reading: readingJson(entry),
       });
+      recorded = r.ok;
     }
     list.reverse();
     setReceived(list);
+    return recorded;
   };
 
   const removeEntry = async (entryId: string) => {
@@ -316,10 +335,10 @@ export function HomeView() {
   return (
     <>
       <section className="m-section">
-        <h1 className="m-h1">{MEET.home.question.heading}</h1>
-        <p className="m-lede" style={{ fontSize: "0.95rem" }}>
+        {/* 第3便 B-1: the tagline IS the heading — no 「問い」 label above it. */}
+        <h1 className="m-h1" style={{ fontSize: "1.15rem", lineHeight: 1.6 }}>
           {MEET.lede}
-        </p>
+        </h1>
         <textarea
           className="m-field"
           rows={2}
@@ -376,6 +395,11 @@ export function HomeView() {
         {gen.phase === "error" && (
           <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
             {MEET.receive.errors[gen.code] ?? MEET.receive.errors.provider}
+          </p>
+        )}
+        {gen.phase === "empty" && (
+          <p className="m-note" aria-live="polite">
+            {MEET.home.proposals.noneToday} {MEET.receive.poolEmptyNote}
           </p>
         )}
 

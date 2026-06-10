@@ -64,6 +64,12 @@ export function validateNewEntry(input: unknown): ValidationResult {
       }
       return { ok: true };
     }
+    case "mask_list": {
+      if (!Array.isArray(value.words) || value.words.some((w) => typeof w !== "string")) {
+        return { ok: false, error: "mask_list: words must be string[]" };
+      }
+      return { ok: true };
+    }
     default:
       return { ok: false, error: "unknown entry kind" };
   }

@@ -10,6 +10,8 @@ import {
   openMeetMemory,
   toPublicView,
   hasPublicVariant,
+  parseMaskWords,
+  findMaskLeaks,
   type MeetMemoryEntryV1,
   type MeetRigItemV1,
 } from "@/lib/meet-memory";
@@ -52,10 +54,13 @@ function publicFace(item: MeetRigItemV1): string {
 
 function ItemForm({
   initial,
+  maskWords,
   onSave,
   onCancel,
 }: {
   initial: MeetRigItemV1;
+  /** 補遺 E: the owner's 伏せたい言葉 — drives the prompt AND the live check. */
+  maskWords: string[];
   onSave: (item: MeetRigItemV1) => void;
   onCancel: () => void;
 }) {
@@ -73,7 +78,7 @@ function ItemForm({
       model,
       apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
       endpoint: getEndpoint(),
-      prompt: buildMaskPrompt(draft.title, draft.text),
+      prompt: buildMaskPrompt(draft.title, draft.text, maskWords),
     });
     const masked = r.ok ? parseMaskReply(r.text) : null;
     if (masked === null) {
@@ -171,6 +176,18 @@ function ItemForm({
           {publicFace(draft)}
         </p>
       )}
+      {!draft.private &&
+        (() => {
+          // 補遺 E: deterministic check on the OUTGOING text — warns while a
+          // listed word survives; never blocks (the owner may send it out).
+          const view = toPublicView(draft);
+          const leaks = findMaskLeaks(maskWords, view.title, view.text);
+          return leaks.length > 0 ? (
+            <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+              {MEET.maskWords.leakWarn(leaks.join("、"))}
+            </p>
+          ) : null;
+        })()}
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
         <button
           type="button"
@@ -203,11 +220,17 @@ export function MemoryPanel() {
   const [savedName, setSavedName] = useState(false);
   const [editing, setEditing] = useState<string | null>(null); // entryId | "new"
   const [report, setReport] = useState("");
+  const [maskWords, setMaskWords] = useState<string[]>([]);
+  const [maskInput, setMaskInput] = useState("");
+  const [savedMask, setSavedMask] = useState(false);
 
   const reload = useCallback(async () => {
     setEntries(toRigEntries(await store.list()));
     const profile = await store.getProfile();
     if (profile) setDisplayName(profile.displayName);
+    const words = await store.getMaskWords();
+    setMaskWords(words);
+    setMaskInput(words.join("、"));
   }, [store]);
 
   useEffect(() => {
@@ -218,6 +241,15 @@ export function MemoryPanel() {
     await store.setProfile({ displayName: displayName.trim() });
     setSavedName(true);
     setTimeout(() => setSavedName(false), 2000);
+  };
+
+  const saveMask = async () => {
+    const words = parseMaskWords(maskInput);
+    await store.setMaskWords(words);
+    setMaskWords(words);
+    setMaskInput(words.join("、"));
+    setSavedMask(true);
+    setTimeout(() => setSavedMask(false), 2000);
   };
 
   const saveItem = async (entryId: string | "new", item: MeetRigItemV1) => {
@@ -353,6 +385,7 @@ export function MemoryPanel() {
               {editing === e.entryId ? (
                 <ItemForm
                   initial={e.item}
+                  maskWords={maskWords}
                   onSave={(item) => void saveItem(e.entryId, item)}
                   onCancel={() => setEditing(null)}
                 />
@@ -379,6 +412,37 @@ export function MemoryPanel() {
                       {MEET.publicWriting.activeBadge}：{publicFace(e.item)}
                     </p>
                   )}
+                  {!e.item.private &&
+                    (() => {
+                      // 補遺 E chip: detection beats the generic hint (第3便 C);
+                      // both routes lead into 直す — no third action button.
+                      const view = toPublicView(e.item);
+                      const leaks = findMaskLeaks(maskWords, view.title, view.text);
+                      if (leaks.length > 0) {
+                        return (
+                          <button
+                            type="button"
+                            className="m-link"
+                            style={{ color: "var(--shu-deep)" }}
+                            onClick={() => setEditing(e.entryId)}
+                          >
+                            {MEET.maskWords.leakChip}
+                          </button>
+                        );
+                      }
+                      if (!hasPublicVariant(e.item)) {
+                        return (
+                          <button
+                            type="button"
+                            className="m-link"
+                            onClick={() => setEditing(e.entryId)}
+                          >
+                            {MEET.maskWords.hintChip}
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
                   <div className="m-item-actions">
                     <button type="button" className="m-link" onClick={() => setEditing(e.entryId)}>
                       {MEET.memory.edit}
@@ -395,6 +459,7 @@ export function MemoryPanel() {
             <li className="m-item">
               <ItemForm
                 initial={BLANK}
+                maskWords={maskWords}
                 onSave={(item) => void saveItem("new", item)}
                 onCancel={() => setEditing(null)}
               />
@@ -411,6 +476,26 @@ export function MemoryPanel() {
             {MEET.memory.addItem}
           </button>
         )}
+      </section>
+
+      <section className="m-section">
+        <h2 className="m-h2">{MEET.maskWords.heading}</h2>
+        <div className="m-card">
+          <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
+            {MEET.maskWords.note}
+          </p>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input
+              className="m-field"
+              value={maskInput}
+              onChange={(e) => setMaskInput(e.target.value)}
+              placeholder={MEET.maskWords.placeholder}
+            />
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => void saveMask()}>
+              {savedMask ? MEET.maskWords.saved : MEET.maskWords.save}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="m-section">
