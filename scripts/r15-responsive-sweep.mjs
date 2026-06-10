@@ -65,7 +65,7 @@ for (const w of WIDTHS) {
     await page.waitForTimeout(300);
     const ov = await overflow();
     check(`${label}@${w}: no horizontal overflow (${ov}px)`, ov <= 1);
-    await page.screenshot({ path: `${SHOT_DIR}/r15g-${label}-${w}.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOT_DIR}/r15h-${label}-${w}.png`, fullPage: true });
   }
   // host (key-gated): open per width
   await page.goto(`${BASE}/meet/host/`, { waitUntil: "networkidle" });
@@ -75,7 +75,7 @@ for (const w of WIDTHS) {
   await page.waitForTimeout(200);
   const ov = await overflow();
   check(`host@${w}: no horizontal overflow (${ov}px)`, ov <= 1);
-  await page.screenshot({ path: `${SHOT_DIR}/r15g-host-${w}.png`, fullPage: true });
+  await page.screenshot({ path: `${SHOT_DIR}/r15h-host-${w}.png`, fullPage: true });
 }
 
 await browser.close();

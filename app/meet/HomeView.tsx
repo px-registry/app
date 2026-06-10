@@ -334,15 +334,14 @@ export function HomeView() {
 
   return (
     <>
-      {/* 第5便: plain block wrappers — invisible on mobile, a 2-column grid
-          (question side / proposal stream) at desktop width. Layout only. */}
+      {/* 第3便 B-1: the tagline IS the heading. 第6便: it stands full-width
+          above the columns (題字); size differs per breakpoint via CSS. */}
+      <h1 className="m-h1 m-pagetitle">{MEET.lede}</h1>
+      {/* 第6便構図: 主柱=届いた提案（読み物）／側柱=問いの手（sticky panel）.
+          DOM order stays mobile's; the grid places columns. Layout only. */}
       <div className="m-home">
         <div className="m-home-left">
       <section className="m-section">
-        {/* 第3便 B-1: the tagline IS the heading — no 「問い」 label above it. */}
-        <h1 className="m-h1" style={{ fontSize: "1.15rem", lineHeight: 1.6 }}>
-          {MEET.lede}
-        </h1>
         <textarea
           className="m-field"
           rows={2}
@@ -563,12 +562,12 @@ export function HomeView() {
           </>
         )}
       </section>
-        </div>
-      </div>
 
       <BoundaryNote
         lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.order, MEET.boundary.disclosure]}
       />
+        </div>
+      </div>
     </>
   );
 }

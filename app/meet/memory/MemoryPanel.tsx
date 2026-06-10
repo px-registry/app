@@ -515,11 +515,11 @@ export function MemoryPanel() {
 
   return (
     <>
-      {/* 第5便: block wrappers — invisible on mobile, main/side columns at
-          desktop width (publish + backup become the right rail). Layout only. */}
+      {/* 第6便構図: flat zones — DOM keeps the mobile order (名前→記憶→候補
+          →整理→やくそく); the desktop grid places 主柱=記憶 / 側柱=残り.
+          Layout only. */}
       <div className="m-mem">
-        <div className="m-mem-main">
-      <section className="m-section">
+      <section className="m-section m-mem-profile">
         <h2 className="m-h2">{MEET.profile.heading}</h2>
         <div className="m-card">
           <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
@@ -539,7 +539,7 @@ export function MemoryPanel() {
         </div>
       </section>
 
-      <section className="m-section">
+      <section className="m-section m-mem-memory">
         <h2 className="m-h2">{MEET.memory.title}</h2>
         <p className="m-note" style={{ margin: "0 0 0.75rem" }}>
           {MEET.memory.boundary}
@@ -591,14 +591,14 @@ export function MemoryPanel() {
                       {MEET.publicWriting.activeBadge}：{publicFace(e.item)}
                     </p>
                   )}
-                  {!e.item.private &&
-                    (() => {
-                      // 補遺 E chip: detection beats the generic hint (第3便 C);
-                      // both routes lead into 直す — no third action button.
-                      const view = toPublicView(e.item);
-                      const leaks = findMaskLeaks(maskWords, view.title, view.text);
-                      if (leaks.length > 0) {
-                        return (
+                  {/* 第6便: one action line — the leak chip appears ONLY on
+                      detection (no always-on hint), beside 直す / 消す. */}
+                  <div className="m-item-actions">
+                    {!e.item.private &&
+                      (() => {
+                        const view = toPublicView(e.item);
+                        const leaks = findMaskLeaks(maskWords, view.title, view.text);
+                        return leaks.length > 0 ? (
                           <button
                             type="button"
                             className="m-link"
@@ -607,22 +607,8 @@ export function MemoryPanel() {
                           >
                             {MEET.maskWords.leakChip}
                           </button>
-                        );
-                      }
-                      if (!hasPublicVariant(e.item)) {
-                        return (
-                          <button
-                            type="button"
-                            className="m-link"
-                            onClick={() => setEditing(e.entryId)}
-                          >
-                            {MEET.maskWords.hintChip}
-                          </button>
-                        );
-                      }
-                      return null;
-                    })()}
-                  <div className="m-item-actions">
+                        ) : null;
+                      })()}
                     <button type="button" className="m-link" onClick={() => setEditing(e.entryId)}>
                       {MEET.memory.edit}
                     </button>
@@ -658,10 +644,7 @@ export function MemoryPanel() {
         )}
       </section>
 
-        </div>
-
-        <div className="m-mem-side">
-      <section className="m-section">
+      <section className="m-section m-mem-publish">
         <h2 className="m-h2">{MEET.publish.heading}</h2>
         <div className="m-card">
           {displayName.trim() === "" ? (
@@ -701,31 +684,36 @@ export function MemoryPanel() {
         </div>
       </section>
 
-      <section className="m-section">
-        <div className="m-backup">
-          <button type="button" className="m-btn m-btn-quiet" onClick={() => void exportBackup()}>
-            {MEET.memory.exportLabel}
-          </button>
-          <label className="m-btn m-btn-quiet" style={{ cursor: "pointer" }}>
-            {MEET.memory.importLabel}
-            <input
-              type="file"
-              accept="application/json,.json"
-              style={{ display: "none" }}
-              onChange={(e) => void importBackup(e.target.files?.[0])}
-            />
-          </label>
-          <button type="button" className="m-btn m-btn-quiet m-btn-danger" onClick={() => void clearAll()}>
-            {MEET.memory.clearAll}
-          </button>
-        </div>
-        {report && <p className="m-note">{report}</p>}
-        <p className="m-note">{MEET.memory.durability}</p>
+      <section className="m-section m-mem-backup">
+        {/* 第6便: the destructive/housekeeping pile rests behind a quiet fold */}
+        <details className="m-promise">
+          <summary>{MEET.memory.housekeeping}</summary>
+          <div className="m-backup" style={{ marginTop: "0.75rem" }}>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => void exportBackup()}>
+              {MEET.memory.exportLabel}
+            </button>
+            <label className="m-btn m-btn-quiet" style={{ cursor: "pointer" }}>
+              {MEET.memory.importLabel}
+              <input
+                type="file"
+                accept="application/json,.json"
+                style={{ display: "none" }}
+                onChange={(e) => void importBackup(e.target.files?.[0])}
+              />
+            </label>
+            <button type="button" className="m-btn m-btn-quiet m-btn-danger" onClick={() => void clearAll()}>
+              {MEET.memory.clearAll}
+            </button>
+          </div>
+          {report && <p className="m-note">{report}</p>}
+          <p className="m-note">{MEET.memory.durability}</p>
+        </details>
       </section>
-        </div>
-      </div>
 
-      <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.disclosure]} />
+      <div className="m-mem-foot">
+        <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.disclosure]} />
+      </div>
+      </div>
     </>
   );
 }

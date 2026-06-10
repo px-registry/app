@@ -182,6 +182,7 @@ export const MEET = {
     tagsLabel: "タグ（、で区切る）",
     clearAll: "すべて消す",
     confirmClear: "この端末の記憶をすべて消します。よろしいですか？",
+    housekeeping: "整理",
     exportLabel: "控えを保存",
     importLabel: "控えから戻す",
     importReport: (added: number, updated: number): string =>
@@ -210,7 +211,6 @@ export const MEET = {
     historyEdit: "編集",
     historySave: "保存",
     leakChip: "固有名が出ます → 直す",
-    hintChip: "固有名を伏せた書き方にできます → 直す",
   },
 
   /** 第2便 B — 候補に出すときの書き方（公開用の言い方）。 */

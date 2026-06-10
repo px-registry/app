@@ -142,6 +142,12 @@
   line-height: 1.5;
   margin: 0 0 0.4rem;
 }
+/* 題字 (page heading). Mobile keeps the quiet tagline size it always had;
+ * the desktop layer enlarges it to stand above the columns. */
+.m-h1.m-pagetitle {
+  font-size: 1.15rem;
+  line-height: 1.6;
+}
 .m-h2 {
   font-family: var(--mincho);
   font-weight: 600;
@@ -489,23 +495,130 @@ textarea.m-field {
     border-bottom-color: var(--shu);
   }
 
-  /* home: the question side keeps the left hand, proposals stream right */
+  /* 題字 — the page heading stands full-width above the columns */
+  .m-h1.m-pagetitle {
+    font-size: 2rem;
+    line-height: 1.5;
+    letter-spacing: 0.08em;
+    margin: 0 0 2.25rem;
+  }
+
+  /* ── home 構図: 主柱=届いた提案（読み物）, 側柱=問いの手（静かな一枚） ──
+   * DOM keeps the mobile order; the grid swaps the columns. */
   .m-home {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     column-gap: 3.5rem;
     align-items: start;
+  }
+  .m-home-right {
+    grid-column: 1;
+    grid-row: 1;
   }
   .m-home-right .m-item {
     max-width: 65ch;
   }
+  /* the side: ONE framed shape — inner boxes flatten to hairlines + space */
+  .m-home-left {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 4.5rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    padding: 1.4rem 1.5rem;
+  }
+  .m-home-left .m-section {
+    margin: 0;
+    padding: 1.15rem 0;
+    border-top: 1px solid var(--line);
+  }
+  .m-home-left .m-section:first-child {
+    padding-top: 0;
+    border-top: none;
+  }
+  .m-home-left .m-section:last-of-type {
+    padding-bottom: 0;
+  }
+  .m-home-left .m-h2 {
+    font-size: 0.95rem;
+  }
+  .m-home-left .m-card,
+  .m-home-left .m-empty {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+  }
+  .m-home-left .m-itemlist {
+    gap: 0;
+  }
+  .m-home-left .m-item {
+    border: none;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    padding: 0.7rem 0;
+  }
+  .m-home-left .m-item:first-child {
+    border-top: none;
+    padding-top: 0.2rem;
+  }
+  .m-home-left .m-btn {
+    padding: 0.6rem 0.95rem;
+    font-size: 0.88rem;
+  }
+  /* 朱は1画面に1つ（探しに行く）— the per-card CTA keeps a 朱 edge, not a fill */
+  .m-home-right .m-proposal .m-btn-primary {
+    background: var(--surface);
+    border-color: var(--shu-line);
+    color: var(--shu-deep);
+  }
+  .m-home-right .m-proposal .m-btn-primary:hover {
+    background: var(--shu-soft);
+  }
 
-  /* 記憶: main column + quiet right rail (候補に出す / 控え) */
+  /* ── 記憶 構図: 主柱=あなたの記憶, 側柱=名前・候補に出す・整理 ──────────
+   * Flat zones; DOM order stays mobile's (名前→記憶→候補→整理→やくそく). */
   .m-mem {
     display: grid;
     grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    grid-template-rows: auto auto auto 1fr;
     column-gap: 3rem;
     align-items: start;
+  }
+  .m-mem-memory {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+  .m-mem-profile {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .m-mem-publish {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .m-mem-backup {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .m-mem-foot {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  /* the side rail speaks quietly: thin frames, small buttons */
+  .m-mem-profile .m-card,
+  .m-mem-publish .m-card {
+    box-shadow: none;
+  }
+  .m-mem-profile .m-btn,
+  .m-mem-backup .m-btn {
+    padding: 0.6rem 0.95rem;
+    font-size: 0.88rem;
   }
   /* memory cards in two columns; an open editor takes the full row */
   .m-grid2 {
@@ -516,23 +629,31 @@ textarea.m-field {
     grid-column: 1 / -1;
   }
 
-  /* はじめかた: 1・2・3 side by side */
+  /* はじめかた: 1・2・3 side by side, equal height */
   .m-steps {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1.25rem;
-    align-items: start;
+    align-items: stretch;
   }
   .m-steps .m-card + .m-card {
     margin-top: 0;
   }
 
-  /* 進行役: 候補プール＋ながれ left, 提案と読み right */
+  /* 進行役 構図: 主柱=提案と読み, 側柱=候補プール＋ながれ */
   .m-host {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     column-gap: 3rem;
     align-items: start;
+  }
+  .m-host > .m-section:first-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .m-host > .m-section:last-child {
+    grid-column: 1;
+    grid-row: 1;
   }
 
   /* prose blocks keep an editorial measure on the wide paper */
