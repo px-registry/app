@@ -14,8 +14,11 @@ import {
   getOrMintOwnerToken,
   buildOutboundProjection,
   publishProjection,
+  getPublishedSnapshot,
+  setPublishedSnapshot,
 } from "@/lib/meet-net";
 import { RIG_MEMORY_KINDS, type RigMemoryItemV1, type RigMemoryKindV1 } from "@/lib/rig";
+import { BoundaryNote } from "../BoundaryNote.tsx";
 
 type RigEntry = { entryId: string; item: RigMemoryItemV1 };
 
@@ -175,10 +178,37 @@ export function MemoryPanel() {
     await reload();
   };
 
-  // ── publish (公開する) — explicit owner action, never automatic ──────────────
+  // ── publish (候補に出す) — explicit owner action, never automatic ────────────
   const [pubState, setPubState] = useState<"idle" | "busy" | "done" | "failed">("idle");
   const [pubCount, setPubCount] = useState(0);
+  const [snapshot, setSnapshot] = useState("");
   const publicCount = entries.filter((e) => e.item.private === false).length;
+
+  useEffect(() => {
+    setSnapshot(getPublishedSnapshot());
+  }, []);
+
+  // 未反映 diff — what differs between the current projection and what was last
+  // actually pushed from this device (symmetric difference, by item identity).
+  const projection = buildOutboundProjection(entries.map((e) => e.item));
+  const pendingCount = (() => {
+    if (snapshot === "") return 0; // never published from this device — no banner
+    let prev: Array<unknown> = [];
+    try {
+      const v = JSON.parse(snapshot);
+      prev = Array.isArray(v) ? v : [];
+    } catch {
+      prev = [];
+    }
+    const a = new Set(prev.map((p) => JSON.stringify(p)));
+    const b = new Set(
+      projection.map((p) => JSON.stringify({ k: p.kind, t: p.title, x: p.text, g: p.tags })),
+    );
+    let n = 0;
+    for (const s of a) if (!b.has(s)) n++;
+    for (const s of b) if (!a.has(s)) n++;
+    return n;
+  })();
 
   const publish = async () => {
     setPubState("busy");
@@ -193,6 +223,9 @@ export function MemoryPanel() {
     if (r.ok) {
       setPubCount(r.count);
       setPubState("done");
+      const json = JSON.stringify(items.map((p) => ({ k: p.kind, t: p.title, x: p.text, g: p.tags })));
+      setPublishedSnapshot(json);
+      setSnapshot(json);
     } else {
       setPubState("failed");
     }
@@ -225,6 +258,16 @@ export function MemoryPanel() {
         <p className="m-note" style={{ margin: "0 0 0.75rem" }}>
           {MEET.memory.boundary}
         </p>
+        {pendingCount > 0 && pubState !== "busy" && (
+          <div className="m-pending">
+            <span>{MEET.publish.pending(pendingCount)}</span>
+            {displayName.trim() !== "" && (
+              <button type="button" className="m-btn m-btn-quiet" onClick={() => void publish()}>
+                {MEET.publish.update}
+              </button>
+            )}
+          </div>
+        )}
         {entries.length === 0 && editing !== "new" && (
           <div className="m-empty">{MEET.memory.empty}</div>
         )}
@@ -351,10 +394,7 @@ export function MemoryPanel() {
         <p className="m-note">{MEET.memory.durability}</p>
       </section>
 
-      <div className="m-boundary">
-        <p>{MEET.boundary.memory}</p>
-        <p>{MEET.boundary.ai}</p>
-      </div>
+      <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.disclosure]} />
     </>
   );
 }

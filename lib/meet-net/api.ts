@@ -181,7 +181,9 @@ export async function submitLog(input: {
   }
 }
 
-export async function fetchHostView(hostKey: string): Promise<NetResult<{ logs: unknown[]; signals: unknown[] }>> {
+export async function fetchHostView(
+  hostKey: string,
+): Promise<NetResult<{ logs: unknown[]; signals: unknown[]; pool: unknown[] }>> {
   try {
     const { body } = await postJson("/api/meet/host", { hostKey });
     if (!isRecord(body) || body.ok !== true) return { ok: false, error: "host_key" };
@@ -189,6 +191,7 @@ export async function fetchHostView(hostKey: string): Promise<NetResult<{ logs: 
       ok: true,
       logs: Array.isArray(body.logs) ? body.logs : [],
       signals: Array.isArray(body.signals) ? body.signals : [],
+      pool: Array.isArray(body.pool) ? body.pool : [],
     };
   } catch {
     return { ok: false, error: "network" };

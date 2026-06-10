@@ -4,8 +4,13 @@
 //
 // Register: Japanese-native, quiet, honest. The boundary lines are FACTS about
 // the architecture (device-only memory, browser-direct AI, server holds only
-// the public projection + the talk signal) — they must stay true in code.
-// No ranking / no recommendation language anywhere (see ./forbidden.ts).
+// the owner-chosen candidate items + the talk signal) — they must stay true in
+// code. No ranking / no recommendation language anywhere (see ./forbidden.ts).
+//
+// 改修第1便 (fix1): the pool is AI-ONLY — 「候補に出す」 means entering the
+// pool that each participant's AI reads; no human-browsable list exists. A
+// person meets another's items only inside a delivered proposal. Internal
+// words (合図) never appear on screen.
 
 export const MEET = {
   /** Browser-tab / surface title. Naming is provisional (label layer). */
@@ -15,9 +20,11 @@ export const MEET = {
   nav: {
     home: "ホーム",
     memory: "記憶",
-    pool: "公開",
     start: "はじめかた",
   },
+
+  /** 境界の脚注 — 初回は開いて見せ、以降は畳む。 */
+  boundaryTitle: "PXのやくそく",
 
   home: {
     question: {
@@ -36,28 +43,33 @@ export const MEET = {
       removeEntry: "この回を消す",
     },
     signals: {
-      heading: "合図",
-      empty: "いまのところ合図はありません。",
-      incoming: (ref: string): string => `${ref} から「話してみる」の合図が届いています。`,
+      heading: "あなたへの「話してみる」",
+      empty: "いまのところ、届いている「話してみる」はありません。",
+      incoming: (name: string): string => `${name}さんが「話してみる」を押しました。`,
       talkBack: "こちらも話してみる",
-      mutual: "おたがいに合図が出ています。",
+      mutual: "おたがいが「話してみる」を押しました。",
       contactHeading: "連絡のメモ",
-      contactNote: "おたがいが押したので、連絡のメモを交換できます。届くのはこの相手だけです。",
+      contactNote: "連絡のメモを交換できます。届くのはこの相手だけです。",
       contactPlaceholder: "例：LINEのID、メール、電話など、つながれる窓口",
       contactSave: "渡す",
       contactSaved: "渡しました",
-      theirNote: (name: string): string => `${name} からのメモ`,
+      theirNote: (name: string): string => `${name}さんからのメモ`,
       waitingNote: "相手のメモはまだ届いていません。",
     },
   },
 
   connect: {
-    modelLabel: "つかうAI",
+    tabKey: "鍵でつなぐ",
+    tabLocal: "ローカルAI（Ollama）",
     keyLabel: "鍵（APIキー）",
+    keyPlaceholder: "sk-… の鍵をここに貼り付け",
+    detected: (label: string): string => `${label} につながります。`,
+    keyLinksLabel: "鍵の取得：",
     endpointLabel: "つなぎ先（あなたのPC）",
+    detailsLabel: "詳細（モデルを選ぶ）",
     save: "保存",
     saved: "保存しました",
-    connected: "つながっています。",
+    connected: (label: string): string => `つながっています（${label}）。`,
     privacy:
       "鍵はこの端末の中だけに置かれ、PXのサーバーへは送られません。呼び出しはこの端末からあなたの鍵で直接行われます。",
   },
@@ -65,15 +77,17 @@ export const MEET = {
   receive: {
     needKey: "AIがまだつながっていません。",
     needMemory: "記憶の下地がまだありません。",
-    needName: "公開のときの名前がまだありません。",
+    needName: "候補に出すときの名前がまだありません。",
     toStart: "はじめかたへ",
     busy: "あなたのAIが読んでいます…",
+    noKeyLoop:
+      "AIをつながなくても、記憶を候補に出しておけば、ほかの参加者のAIがあなたを見つけます。「話してみる」が届いたらここに出ます。",
     errors: {
       auth: "鍵が通りませんでした。鍵を確かめてください。",
       rate: "少し混んでいます。間をおいてもう一度。",
       provider: "AIから返事が返りませんでした。もう一度お試しください。",
       network: "つながりませんでした。電波の良いところでもう一度。",
-      pool: "公開の候補を読み込めませんでした。もう一度お試しください。",
+      pool: "候補を読み込めませんでした。もう一度お試しください。",
     } as Record<string, string>,
   },
 
@@ -82,15 +96,15 @@ export const MEET = {
     lede: "三つ済ませば、あとは受け取るだけ。",
     step1: {
       heading: "1. AIをつなぐ",
-      body: "ふだん使うAIの鍵をひとつ入れます。鍵はこの端末の中だけに置かれ、PXのサーバーへは送られません。",
+      body: "ふだん使うAIの鍵をひとつ貼ります。鍵はこの端末の中だけに置かれ、PXのサーバーへは送られません。",
     },
     step2: {
       heading: "2. 記憶の下地をつくる",
       body: "プロンプトを自分のAIに貼り、返ってきたものをここに貼り戻します。内容はあなたが確認してから確定します。",
     },
     step3: {
-      heading: "3. 公開するものを選ぶ",
-      body: "公開すると決めた項目だけが、ほかの参加者の候補に並びます。それ以外はこの端末から出ません。",
+      heading: "3. AIの候補に出すものを選ぶ",
+      body: "「出す」にした項目だけが、ほかの参加者のAIが読む候補に入ります。人間の一覧には出ません。それ以外はこの端末から出ません。",
     },
   },
 
@@ -112,17 +126,17 @@ export const MEET = {
     parse: "取り込む",
     reviewHeading: "確認してから確定",
     reviewNote:
-      "公開にした項目だけが、ほかの参加者の候補に出ます。あとからいつでも変えられます。迷ったら非公開のままで。",
-    publicLabel: "公開",
-    privateLabel: "非公開",
+      "「出す」にした項目だけが、ほかの参加者のAIが読む候補に入ります。あとからいつでも変えられます。迷ったら出さないままで。",
+    publicLabel: "出す",
+    privateLabel: "出さない",
     confirm: (n: number): string => `この${n}件で確定する`,
     done: "記憶の下地ができました。",
     redo: "貼り直す",
   },
 
   profile: {
-    heading: "公開のときの名前",
-    note: "公開の項目や合図に添える呼び名です。本名でなくてかまいません。",
+    heading: "候補に出すときの名前",
+    note: "候補や「話してみる」に添える呼び名です。本名でなくてかまいません。",
     placeholder: "例：あや、カフェの人",
     save: "保存",
     saved: "保存しました",
@@ -149,34 +163,26 @@ export const MEET = {
     durability: "ブラウザのデータを消すと、ここも消えます。控えを保存しておくと戻せます。",
   },
 
-  pool: {
-    title: "公開されているもの",
-    note: "それぞれの参加者が公開すると決めた項目だけが、ここに並びます。",
-    empty: "まだ何も公開されていません。",
-    loading: "読み込んでいます…",
-    failed: "読み込めませんでした。電波の良いところでもう一度お試しください。",
-    reload: "もう一度読み込む",
-  },
-
   publish: {
-    heading: "みんなの候補に出す",
+    heading: "AIの候補に出す",
     body: (n: number): string =>
-      `公開の項目（${n}件）を、ほかの参加者から見える候補に出します。出すかどうかはあなたが決めます。`,
-    needName: "先に「公開のときの名前」を決めてください。",
-    none: "公開の項目がまだありません。項目の「非公開」を押すと公開に変わります。",
-    action: "公開する",
-    update: "公開を更新する",
-    done: (n: number): string => `${n}件を出しました。`,
-    unpublishNote: "公開の項目を0件にして更新すると、取り下げになります。",
+      `「出す」にした項目（${n}件）を、ほかの参加者のAIが読む候補に入れます。人間の一覧には出ません。`,
+    needName: "先に「候補に出すときの名前」を決めてください。",
+    none: "「出す」にした項目がまだありません。項目の「出さない」を押すと変わります。",
+    action: "候補に出す",
+    update: "候補を更新する",
+    done: (n: number): string => `${n}件を候補に出しました。`,
+    pending: (n: number): string => `候補の変更が${n}件あります——まだ出ていません。`,
+    unpublishNote: "0件にして更新すると、取り下げになります。",
     failed: "出せませんでした。電波の良いところでもう一度お試しください。",
   },
 
   proposal: {
     talk: "話してみる",
-    talkSent: "合図を出しました",
-    talkNote: "押すと、相手にその合図が表示されます。連絡先はまだ伝わりません。",
+    talkSent: "「話してみる」を伝えました",
+    talkNote: "押すと、相手に「話してみる」が届きます。連絡先はまだ伝わりません。",
     mutualNote: "おたがいが押したら、連絡のメモを交換できます。",
-    noTarget: "相手を特定できなかったため、この提案からは合図を出せません。",
+    noTarget: "相手を特定できなかったため、この提案からは「話してみる」を送れません。",
     readings: {
       heading: "読みを残す",
       options: ["面白い", "腑に落ちる", "突飛", "話したい"] as readonly string[],
@@ -193,18 +199,20 @@ export const MEET = {
     open: "開く",
     failed: "開けませんでした。合鍵を確かめてください。",
     empty: "まだ記録がありません。",
-    signalsHeading: "合図のながれ",
+    poolHeading: "候補プール",
+    signalsHeading: "「話してみる」のながれ",
     logsHeading: "提案と読み",
     readingLabel: "読み",
     noReading: "（読みはまだありません）",
   },
 
   boundary: {
-    memory: "私的な記憶はこの端末の中だけ。PXのサーバーが持つのは、公開すると決めた項目と「話してみる」の合図だけです。",
+    memory:
+      "私的な記憶はこの端末の中だけ。PXのサーバーが持つのは、あなたがAIの候補に出すと決めた項目と「話してみる」だけです。候補は各参加者のAIだけが読み、人間の一覧には出ません。",
     ai: "PXはAIを実行しません。提案をつくるのは、あなたの鍵で動くあなたのAIです。",
     order: "点数も順位もつけません。",
     disclosure:
-      "テストのあいだ、届いた提案とあなたの読みは進行役も読めます（テストの記録のため）。連絡のメモは読めません。",
+      "テストのあいだ、候補の項目・届いた提案・あなたの読みは進行役も読めます（テストの記録のため）。連絡のメモは読めません。",
   },
 } as const;
 

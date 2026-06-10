@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
 import { buildMeetPrompt, toRigPool, parseProposalReply } from "./prompt.ts";
+import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey } from "./models.ts";
 import { RIG_LAW, buildPublicPool, type RigOwnerV1 } from "../rig/rig.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 import type { PoolItemPublic } from "../meet-net/api.ts";
@@ -148,4 +149,23 @@ test("MA-5b: junk replies yield [] without throwing (raw stays the fallback)", (
     assert.ok(Array.isArray(parseProposalReply(raw)));
   }
   assert.equal(parseProposalReply("今日は無い").length, 0);
+});
+
+// ── MA-6 (fix1): key-prefix provider detection — the owner never picks ──────────
+
+test("MA-6: sk-ant-… → anthropic; other sk-… → openai; else null", () => {
+  assert.equal(detectProviderFromKey("sk-ant-abc123"), "anthropic");
+  assert.equal(detectProviderFromKey("  sk-ant-xyz  "), "anthropic");
+  assert.equal(detectProviderFromKey("sk-proj-abc123"), "openai");
+  assert.equal(detectProviderFromKey("sk-abc"), "openai");
+  assert.equal(detectProviderFromKey("api-key-123"), null);
+  assert.equal(detectProviderFromKey(""), null);
+});
+
+test("MA-6b: every per-provider default model exists in the catalog", () => {
+  for (const [provider, id] of Object.entries(DEFAULT_BY_PROVIDER)) {
+    const m = MEET_MODELS.find((x) => x.id === id);
+    assert.ok(m, `default for ${provider} must exist: ${id}`);
+    assert.equal(m!.provider, provider, `default for ${provider} must belong to it`);
+  }
 });

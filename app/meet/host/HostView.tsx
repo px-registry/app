@@ -20,6 +20,7 @@ type LogRow = {
   updatedAt: string;
 };
 type SigRow = { fromName: string; fromRef: string; toRef: string; createdAt: string };
+type PoolRow = { ownerRef: string; kind: string; title: string; text: string; tags: string[] };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -42,6 +43,7 @@ export function HostView() {
   const [state, setState] = useState<"idle" | "busy" | "failed" | "ready">("idle");
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [signals, setSignals] = useState<SigRow[]>([]);
+  const [pool, setPool] = useState<PoolRow[]>([]);
 
   const open = async () => {
     setState("busy");
@@ -68,6 +70,15 @@ export function HostView() {
         fromRef: str(s.fromRef),
         toRef: str(s.toRef),
         createdAt: str(s.createdAt),
+      })),
+    );
+    setPool(
+      r.pool.filter(isRecord).map((p) => ({
+        ownerRef: str(p.ownerRef),
+        kind: str(p.kind),
+        title: str(p.title),
+        text: str(p.text),
+        tags: Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === "string") : [],
       })),
     );
     setState("ready");
@@ -119,7 +130,26 @@ export function HostView() {
       <section className="m-section">
         <h1 className="m-h1">{MEET.host.title}</h1>
 
-        <h2 className="m-h2">{MEET.host.signalsHeading}</h2>
+        <h2 className="m-h2">{MEET.host.poolHeading}</h2>
+        {pool.length === 0 ? (
+          <div className="m-empty">{MEET.host.empty}</div>
+        ) : (
+          <ul className="m-itemlist">
+            {pool.map((p, i) => (
+              <li key={i} className="m-item">
+                <div className="m-item-head">
+                  <span className="m-chip">{MEET.kinds[p.kind] ?? p.kind}</span>
+                  <span className="m-item-tags">{p.ownerRef}</span>
+                </div>
+                {p.title && <p className="m-item-title">{p.title}</p>}
+                <p className="m-item-text">{p.text}</p>
+                {p.tags.length > 0 && <p className="m-item-tags">{p.tags.join(" / ")}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <h2 className="m-h2" style={{ marginTop: "1.5rem" }}>{MEET.host.signalsHeading}</h2>
         {signals.length === 0 ? (
           <div className="m-empty">{MEET.host.empty}</div>
         ) : (

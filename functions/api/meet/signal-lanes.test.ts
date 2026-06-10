@@ -179,13 +179,17 @@ test("host: fail-closed — unconfigured key serves nothing; wrong key 403", asy
   assert.equal((await wrong.res).status, 403);
 });
 
-test("host: with the key, serves logs + signals; contact notes NEVER", async () => {
+test("host: with the key, serves logs + signals + pool; contact notes NEVER", async () => {
   const db = fakeD1(() => []);
   const { res } = post(hostPost, "host", { hostKey: "right" }, db, { FACILITATOR_KEY: "right" });
   const r = await res;
   assert.equal(r.status, 200);
   const body = await r.json();
   assert.ok(Array.isArray(body.logs) && Array.isArray(body.signals));
+  // fix1: the facilitator reading the candidate pool is part of the in-app
+  // disclosure (テストの記録のため) — served here, key-gated.
+  assert.ok(Array.isArray(body.pool));
+  assert.ok(db.calls.some((c) => c.sql.includes("r15_pool_item")), "pool is read");
   for (const c of db.calls) {
     assert.ok(!c.sql.includes("r15_contact_note"), "host never reads contact notes");
   }

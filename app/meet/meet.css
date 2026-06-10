@@ -181,10 +181,23 @@
   background: transparent;
 }
 
+.m-promise {
+  margin: 2.5rem 0 0;
+}
+.m-promise summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.m-promise[open] summary {
+  color: var(--shu-deep);
+}
+
 .m-boundary {
   border-left: 2px solid var(--shu-line);
   padding: 0.15rem 0 0.15rem 0.9rem;
-  margin: 2.5rem 0 0;
+  margin: 0.6rem 0 0;
   display: grid;
   gap: 0.45rem;
 }
@@ -378,6 +391,21 @@ textarea.m-field {
 }
 .m-warnings li {
   font-size: 0.82rem;
+  color: var(--shu-deep);
+}
+
+/* 未反映バナー — quiet band, not an alarm */
+.m-pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border: 1px solid var(--shu-line);
+  background: var(--shu-soft);
+  border-radius: var(--radius-btn);
+  padding: 0.55rem 0.8rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
   color: var(--shu-deep);
 }
 

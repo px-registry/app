@@ -107,3 +107,30 @@ test("M-5: app/meet never hardcodes RIG_LAW text", () => {
     assert.ok(!code.includes("出会いの法"), `${rel} must not inline the law heading`);
   }
 });
+
+// ── M-6 (fix1): the pool is AI-ONLY — no human-browsable list exists ────────────
+//
+// 公開→「AIの候補に出す」: another participant's items may appear to a HUMAN
+// only inside a delivered proposal. The /meet/pool surface was removed and must
+// stay removed; the pool fetch exists solely to assemble the AI prompt (home).
+
+test("M-6: no /meet/pool route exists", () => {
+  const names = readdirSync(root("app/meet"), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name);
+  assert.ok(!names.includes("pool"), "app/meet/pool must not exist (AI-only pool)");
+});
+
+test("M-6b: fetchPool is referenced only by the prompt-assembly surface (home)", () => {
+  for (const { rel, code } of sourcesUnder("app/meet")) {
+    if (rel.endsWith("HomeView.tsx")) continue;
+    assert.ok(!/fetchPool/.test(code), `${rel} must not browse the pool (AI-only)`);
+  }
+});
+
+test("M-6c: the candidate wording replaced 公開 in the meet copy", () => {
+  const copy = allMeetCopyStrings().join("\n");
+  assert.ok(copy.includes("候補に出す"), "the AIの候補に出す wording exists");
+  assert.ok(!copy.includes("公開する"), "the old 公開する action wording is gone");
+  assert.ok(copy.includes("人間の一覧には出ません"), "the AI-only fact is stated");
+});

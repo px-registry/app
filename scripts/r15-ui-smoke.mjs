@@ -1,5 +1,10 @@
-// R1.5 UI smoke — drives the real app in a mobile viewport against wrangler
-// local D1, and saves screenshots. Scratch — not committed.
+// R1.5 UI smoke (fix1 / r15b) — drives the real app in a mobile viewport
+// against wrangler local D1, and saves screenshots to the desktop.
+//
+// Prereqs: `npx wrangler pages dev out --port 8788` running, with .dev.vars
+// BETA_USER=px BETA_PASS=local-dev FACILITATOR_KEY=host-local, r15_* tables
+// wiped, and scripts/r15-smoke.ps1 run once (seeds あや/カフェの人 + a mutual
+// pair + one log row).
 import { chromium } from "playwright";
 import { webcrypto } from "node:crypto";
 
@@ -52,98 +57,115 @@ const ctx = await browser.newContext({
 });
 await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
 const page = await ctx.newPage();
-const shot = (name) => page.screenshot({ path: `${SHOT_DIR}/r15-${name}.png`, fullPage: true });
+const shot = (name) => page.screenshot({ path: `${SHOT_DIR}/r15b-${name}.png`, fullPage: true });
 
 try {
-  // 1. home — first visit (prerequisites listed honestly)
+  // 1. home — first visit: prerequisites + AI-less reassurance + open promise
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
   await waitCheck("home renders 今日の問い", page.getByRole("heading", { name: "今日の問い" }));
   await waitCheck("home lists missing steps", page.getByText("AIがまだつながっていません"));
+  await waitCheck("AI-less loop reassurance shown", page.getByText("AIをつながなくても", { exact: false }));
+  await waitCheck("promise open on first visit", page.getByText("PXはAIを実行しません", { exact: false }));
   await shot("01-home-first-visit");
 
-  // 2. はじめかた — key + cold-start intake
+  // 2. nav: 公開 tab is gone; /meet/pool/ is dead
+  check("nav has no 公開 tab", (await page.locator(".m-nav-item", { hasText: "公開" }).count()) === 0);
+  const poolRes = await fetch(`${BASE}/meet/pool/`, { headers: { Authorization: AUTH } });
+  check("/meet/pool/ no longer serves (404)", poolRes.status === 404);
+
+  // 3. はじめかた — key auto-detect + cold-start intake
   await page.goto(`${BASE}/meet/start/`, { waitUntil: "networkidle" });
-  await shot("02-start-top");
-  await page.locator("input[type=password]").fill("sk-ant-local-smoke");
+  check("promise collapsed on later visits", !(await page.getByText("PXはAIを実行しません").isVisible()));
+  const keyInput = page.locator("input[type=password]");
+  await keyInput.fill("sk-proj-smoke-openai");
+  await waitCheck("sk-… detected as OpenAI", page.getByText("OpenAI につながります。"));
+  await keyInput.fill("sk-ant-local-smoke");
+  await waitCheck("sk-ant-… detected as Claude", page.getByText("Claude（Anthropic） につながります。"));
   await page.getByRole("button", { name: "保存", exact: true }).first().click();
-  await waitCheck("key saved → つながっています", page.getByText("つながっています。"));
+  await waitCheck("connected with internal default model", page.getByText("つながっています（Claude Sonnet 4.6）。"));
+  check("key links visible", await page.getByText("鍵の取得：").isVisible());
+  await shot("02-start-key-autodetect");
 
   await page.getByRole("button", { name: "プロンプトをコピー" }).click();
-  await waitCheck("copy button flips to コピーしました", page.getByText("コピーしました"));
+  await waitCheck("copy flips to コピーしました", page.getByText("コピーしました"));
   await page.locator("textarea:not([readonly])").last().fill(SAMPLE);
   await page.getByRole("button", { name: "取り込む" }).click();
   await page.getByRole("button", { name: "この3件で確定する" }).waitFor();
   check("review shows 3 items", (await page.locator(".m-item").count()) === 3);
-  check("private item shows 非公開", (await page.locator(".m-toggle:not(.m-toggle-on)").count()) === 1);
+  check("private item shows 出さない", (await page.locator(".m-toggle:not(.m-toggle-on)").count()) === 1);
   await shot("03-intake-review");
   await page.getByRole("button", { name: "この3件で確定する" }).click();
   await waitCheck("intake done", page.getByText("記憶の下地ができました。"));
 
-  // 3. memory — name, publish
+  // 4. memory — name, 候補に出す
   await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
   await page.locator(".m-itemlist .m-item").first().waitFor();
   check("memory lists 3 items", (await page.locator(".m-itemlist .m-item").count()) === 3);
   await page.locator("input.m-field").first().fill("みどり");
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await page.getByRole("button", { name: "公開する", exact: true }).waitFor();
-  await page.getByRole("button", { name: "公開する", exact: true }).click();
-  await page.getByText("2件を出しました。").waitFor();
-  check("publish 2 public items", true);
+  await page.getByRole("button", { name: "候補に出す", exact: true }).waitFor();
+  await page.getByRole("button", { name: "候補に出す", exact: true }).click();
+  await page.getByText("2件を候補に出しました。").waitFor();
+  check("候補に出す pushes 2 items", true);
   await shot("04-memory-published");
 
-  // 4. pool — sees A(あや) and B(カフェの人), never own items
-  await page.goto(`${BASE}/meet/pool/`, { waitUntil: "networkidle" });
-  await page.getByRole("heading", { name: "あや" }).waitFor();
-  check("pool shows あや", true);
-  await waitCheck("pool shows カフェの人", page.getByRole("heading", { name: "カフェの人" }));
-  check("pool hides own items", (await page.getByText("古い町家の納屋").count()) === 0);
-  await shot("05-pool");
-
-  // 5. signal A -> browser owner; talk back to mutual; contact note exchange
+  // 5. fix1-1 regression: ADD an item AFTER publishing → banner → update → served
+  await page.getByRole("button", { name: "項目を足す" }).click();
+  await page.locator(".m-form input.m-field").first().fill("週末の手伝い");
+  await page.locator(".m-form textarea.m-field").fill("日曜の午前なら体が空いている");
+  await page.locator(".m-form .m-toggle").click(); // 出さない → 出す
+  await page.locator(".m-form").getByRole("button", { name: "保存", exact: true }).click();
+  await waitCheck("未反映バナー appears", page.getByText("候補の変更が1件あります", { exact: false }));
+  await shot("05-pending-banner");
+  // both the banner and the publish card offer the update — press the banner's
+  await page.getByRole("button", { name: "候補を更新する" }).first().click();
+  await page.getByText("3件を候補に出しました。").waitFor();
   const myToken = await page.evaluate(() => localStorage.getItem("pxmeet:owner-token"));
-  check("owner token minted", typeof myToken === "string" && myToken.length >= 32);
   const myRef = await deriveRef(myToken);
-  const sig = await api("/api/meet/signal", { ownerToken: TOK_A, toRef: myRef, fromName: "あや", anchor: "納屋 × 活版印刷" });
-  check("seeded signal from あや", sig.status === 201);
+  const poolView = await fetch(`${BASE}/api/meet/pool?me=${await deriveRef(TOK_A)}`, {
+    headers: { Authorization: AUTH },
+  }).then((r) => r.json());
+  check(
+    "added item reaches the served pool (regression #1)",
+    poolView.items.some((i) => i.title === "週末の手伝い"),
+  );
+  check(
+    "banner cleared after update",
+    !(await page.getByText("候補の変更が", { exact: false }).isVisible().catch(() => false)),
+  );
 
+  // 6. signal from あや → talk back → mutual → contact note
+  const sig = await api("/api/meet/signal", { ownerToken: TOK_A, toRef: myRef, fromName: "あや", anchor: "納屋 × 活版印刷" });
+  check("seeded 話してみる from あや", sig.status === 201);
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  await page.getByText("あや から「話してみる」の合図").waitFor();
-  await shot("06-home-incoming-signal");
+  await waitCheck("section heading あなたへの「話してみる」", page.getByRole("heading", { name: "あなたへの「話してみる」" }));
+  await waitCheck("incoming copy (押しました)", page.getByText("あやさんが「話してみる」を押しました。"));
+  await shot("06-home-incoming");
   await page.getByRole("button", { name: "こちらも話してみる" }).click();
-  await page.getByText("おたがいに合図が出ています。").waitFor();
-  check("mutual state shown", true);
+  await page.getByText("おたがいが「話してみる」を押しました。").waitFor();
   await page.getByPlaceholder("例：LINEのID、メール、電話など、つながれる窓口").fill("メール: midori@example.jp");
   await page.getByRole("button", { name: "渡す", exact: true }).click();
   await page.getByRole("button", { name: "渡しました" }).waitFor();
   check("contact note handed over", true);
   await shot("07-home-mutual-contact");
-
-  // A's inbox should now carry みどり's note (server-side mutual join)
   const inboxA = await api("/api/meet/inbox", { ownerToken: TOK_A });
-  check(
-    "あや receives みどり's note",
-    inboxA.body?.notes?.some((n) => n.note === "メール: midori@example.jp"),
-  );
+  check("あや receives みどり's note", inboxA.body?.notes?.some((n) => n.note === "メール: midori@example.jp"));
 
-  // 6. receive attempt with a fake key — honest typed error, loop not broken
+  // 7. receive attempt (fake key) — honest typed error
   await page.getByRole("button", { name: "提案を受け取る" }).click();
-  await page.locator("p.m-note[aria-live=polite]").waitFor({ timeout: 30000 });
-  const errText = await page.locator("p.m-note[aria-live=polite]").innerText();
+  await page.locator("p.m-note[aria-live=polite]").first().waitFor({ timeout: 30000 });
+  const errText = await page.locator("p.m-note[aria-live=polite]").first().innerText();
   check("receive shows an honest typed error (fake key)", errText.trim().length > 0);
   console.log("    receive error copy: " + errText.trim());
   await shot("08-home-receive-error");
 
-  // 7. 進行役 — key-gated host view
+  // 8. 進行役 — pool now visible (disclosed), logs + signals, key-gated
   await page.goto(`${BASE}/meet/host/`, { waitUntil: "networkidle" });
-  await page.locator("input[type=password]").fill("wrong-key");
-  await page.getByRole("button", { name: "開く" }).click();
-  await page.getByText("開けませんでした").waitFor();
-  check("host rejects wrong key", true);
   await page.locator("input[type=password]").fill("host-local");
   await page.getByRole("button", { name: "開く" }).click();
-  await page.getByRole("heading", { name: "提案と読み" }).waitFor();
-  check("host shows 提案と読み", true);
-  await waitCheck("host shows signal flow", page.getByRole("heading", { name: "合図のながれ" }));
+  await waitCheck("host shows 候補プール", page.getByRole("heading", { name: "候補プール" }));
+  await waitCheck("host shows 提案と読み", page.getByRole("heading", { name: "提案と読み" }));
+  await waitCheck("host shows 「話してみる」のながれ", page.getByRole("heading", { name: "「話してみる」のながれ" }));
   await shot("09-host");
 } finally {
   await browser.close();

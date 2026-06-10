@@ -7,7 +7,14 @@
 // credential; PX has no AI endpoint and relays nothing (持たない). STOP #2
 // decision includes keys: owner-local persistence, cleared by the owner.
 
-import { DEFAULT_MODEL_ID, MEET_MODELS, findModel, type MeetModel } from "./models.ts";
+import {
+  DEFAULT_MODEL_ID,
+  DEFAULT_BY_PROVIDER,
+  MEET_MODELS,
+  findModel,
+  detectProviderFromKey,
+  type MeetModel,
+} from "./models.ts";
 
 const KEY_STORE: Record<"openai" | "anthropic", string> = {
   openai: "pxai:openai",
@@ -47,4 +54,28 @@ export function isConnected(): boolean {
   const m = getModel();
   if (m.provider === "ollama") return true; // endpoint has a default
   return getKey(m.provider).trim().length > 0;
+}
+
+/**
+ * fix1 one-action connect: detect the provider from the key prefix, store the
+ * key, and point the current model at that provider's default (unless the
+ * owner already picked a model of the same provider in 詳細). Returns the
+ * detected provider, or null when the key shape is unknown (nothing stored).
+ */
+export function saveDetectedKey(key: string): "anthropic" | "openai" | null {
+  const provider = detectProviderFromKey(key);
+  if (provider === null) return null;
+  setKey(provider, key.trim());
+  if (getModel().provider !== provider) {
+    setModel(DEFAULT_BY_PROVIDER[provider]);
+  }
+  return provider;
+}
+
+/** fix1: switch to the local lane (Ollama) with its default model. */
+export function switchToLocalLane(endpoint: string): void {
+  setEndpoint(endpoint.trim());
+  if (getModel().provider !== "ollama") {
+    setModel(DEFAULT_BY_PROVIDER.ollama);
+  }
 }

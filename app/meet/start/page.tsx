@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import { ColdStartIntake } from "./ColdStartIntake.tsx";
 import { KeyConnect } from "./KeyConnect.tsx";
+import { BoundaryNote } from "../BoundaryNote.tsx";
 
 // R1.5 はじめかた — the three steps as a single quiet scroll. Step 2 (cold-start
 // paste-back) is live; step 1 gains the key widget in Slice 3; step 3 links to
@@ -32,15 +33,12 @@ export default function MeetStart() {
             <Link href="/meet/memory/" style={{ color: "var(--shu-deep)" }}>
               {MEET.nav.memory}
             </Link>
-            で項目ごとに選べます。
+            で項目ごとに選び、「{MEET.publish.action}」で出します。
           </p>
         </div>
       </section>
 
-      <div className="m-boundary">
-        <p>{MEET.boundary.memory}</p>
-        <p>{MEET.boundary.ai}</p>
-      </div>
+      <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai]} />
     </>
   );
 }

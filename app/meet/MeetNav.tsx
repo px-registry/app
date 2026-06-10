@@ -7,7 +7,6 @@ import { MEET } from "@/lib/meet/copy.ts";
 const ITEMS = [
   { href: "/meet/", label: MEET.nav.home },
   { href: "/meet/memory/", label: MEET.nav.memory },
-  { href: "/meet/pool/", label: MEET.nav.pool },
   { href: "/meet/start/", label: MEET.nav.start },
 ] as const;
 

@@ -1,7 +1,17 @@
 // R1.5 meet AI lane — barrel. app/meet imports ONLY from here; the gates pin
 // fetch to generate.ts and localStorage to keys.ts.
 
-export { MEET_MODELS, DEFAULT_MODEL_ID, findModel, type MeetModel, type ProviderId } from "./models.ts";
+export {
+  MEET_MODELS,
+  DEFAULT_MODEL_ID,
+  DEFAULT_BY_PROVIDER,
+  PROVIDER_LABELS,
+  UNKNOWN_KEY_HINT,
+  findModel,
+  detectProviderFromKey,
+  type MeetModel,
+  type ProviderId,
+} from "./models.ts";
 export {
   getModel,
   setModel,
@@ -10,6 +20,8 @@ export {
   getEndpoint,
   setEndpoint,
   isConnected,
+  saveDetectedKey,
+  switchToLocalLane,
   DEFAULT_OLLAMA_ENDPOINT,
 } from "./keys.ts";
 export { buildMeetPrompt, toRigPool, parseProposalReply, type ProposalCard } from "./prompt.ts";

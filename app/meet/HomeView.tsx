@@ -43,6 +43,7 @@ import {
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection } from "./SignalsSection.tsx";
+import { BoundaryNote } from "./BoundaryNote.tsx";
 
 type GenState = { phase: "idle" } | { phase: "busy" } | { phase: "error"; code: string };
 
@@ -209,6 +210,11 @@ export function HomeView() {
               {!hasItems && <li>{MEET.receive.needMemory}</li>}
               {displayName === "" && <li>{MEET.receive.needName}</li>}
             </ul>
+            {!connected && (
+              <p className="m-note" style={{ marginTop: "0.5rem" }}>
+                {MEET.receive.noKeyLoop}
+              </p>
+            )}
             <p className="m-note" style={{ marginTop: "0.5rem" }}>
               <Link href="/meet/start/" style={{ color: "var(--shu-deep)" }}>
                 {MEET.receive.toStart}
@@ -250,12 +256,9 @@ export function HomeView() {
         )}
       </section>
 
-      <div className="m-boundary">
-        <p>{MEET.boundary.memory}</p>
-        <p>{MEET.boundary.ai}</p>
-        <p>{MEET.boundary.order}</p>
-        <p>{MEET.boundary.disclosure}</p>
-      </div>
+      <BoundaryNote
+        lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.order, MEET.boundary.disclosure]}
+      />
     </>
   );
 }

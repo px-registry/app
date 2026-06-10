@@ -20,3 +20,24 @@ export function getOrMintOwnerToken(): string {
 export function clearOwnerToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
+
+// ── small owner-local UI state (still: the ONLY localStorage file) ─────────────
+
+const SNAPSHOT_KEY = "pxmeet:published-snapshot";
+const BOUNDARY_KEY = "pxmeet:boundary-seen";
+
+/** The projection as last successfully published (JSON) — for the 未反映 diff. */
+export function getPublishedSnapshot(): string {
+  return localStorage.getItem(SNAPSHOT_KEY) ?? "";
+}
+export function setPublishedSnapshot(json: string): void {
+  localStorage.setItem(SNAPSHOT_KEY, json);
+}
+
+/** The boundary note is shown open once, then collapsed on later visits. */
+export function boundarySeen(): boolean {
+  return localStorage.getItem(BOUNDARY_KEY) === "1";
+}
+export function markBoundarySeen(): void {
+  localStorage.setItem(BOUNDARY_KEY, "1");
+}
