@@ -400,6 +400,9 @@ export function MemoryPanel() {
   const [displayName, setDisplayName] = useState("");
   const [intro, setIntroState] = useState("");
   const [introAi, setIntroAi] = useState<"idle" | "busy" | "failed">("idle");
+  // 第8便 C: the drafted intro itself passes the 伝わる言い方 detection —
+  // surviving jargon is OFFERED for replacement, never silently shipped.
+  const [introOffer, setIntroOffer] = useState<MaskPair[] | null>(null);
   // effect-initialized — isConnected() touches localStorage (prerender-unsafe)
   const [panelConnected, setPanelConnected] = useState(false);
   const [savedName, setSavedName] = useState(false);
@@ -454,6 +457,23 @@ export function MemoryPanel() {
     }
     setIntroState(draft);
     setIntroAi("idle");
+    // jargon pass over the draft (same lane, deterministic presence filter)
+    const d = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildDetectPrompt("", draft),
+    });
+    const pairs = d.ok ? filterDetections(parseDetectReply(d.text), "", draft) : [];
+    setIntroOffer(pairs.length > 0 ? pairs : null);
+  };
+
+  const applyIntroOffer = (pairs: MaskPair[]) => {
+    if (pairs.length > 0) {
+      setIntroState((cur) => applyMasks("", cur, pairs).text);
+      void updateMaskWords(mergeMaskWords(maskWords, pairs.map((p) => p.word)));
+    }
+    setIntroOffer(null);
   };
 
   /** The byproduct list grows from 伏せる taps (and shrinks via 編集). */
@@ -601,6 +621,30 @@ export function MemoryPanel() {
             <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
               {MEET.profile.introFailed}
             </p>
+          )}
+          {introOffer !== null && (
+            <div className="m-card" style={{ marginTop: "0.5rem" }} aria-live="polite">
+              <p className="m-note" style={{ margin: 0 }}>
+                {MEET.maskWords.offerLead}
+              </p>
+              <p className="m-item-text" style={{ margin: "0.3rem 0" }}>
+                {introOffer
+                  .map((p) => MEET.maskWords.offerPair(p.word, p.mask !== "" ? p.mask : "●●"))
+                  .join(" ／ ")}
+              </p>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="m-btn m-btn-quiet"
+                  onClick={() => applyIntroOffer(introOffer)}
+                >
+                  {MEET.maskWords.maskAll}
+                </button>
+                <button type="button" className="m-btn m-btn-quiet" onClick={() => applyIntroOffer([])}>
+                  {MEET.maskWords.keepAsIs}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </section>

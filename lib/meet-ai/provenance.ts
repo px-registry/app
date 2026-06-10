@@ -6,7 +6,7 @@
 // proposal only when its addressee resolves to a real ownerRef of the pool
 // that was actually sent. Pure; display-side (the raw reply stays inspectable).
 
-import type { ProposalCard, BasisMap } from "./prompt.ts";
+import { parseReplyOutcome, type ProposalCard, type BasisMap } from "./prompt.ts";
 
 /** Cards keep their ORIGINAL index — readings are keyed by it. */
 export type GatedCard = { card: ProposalCard; index: number };
@@ -23,6 +23,26 @@ export type GatedCards = { kept: GatedCard[]; excluded: GatedCard[] };
  *     Entries WITHOUT a basis map (pre-第7便 shelf) keep the to-only gate,
  *     so old proposals don't vanish retroactively.
  */
+/**
+ * 第8便 B — 沈黙の禁止 (the decision table, pure and pinned): every entry
+ * shows exactly one face. There is no fourth, silent outcome.
+ *   "cards"      — at least one card passed the gate (excluded note beside it)
+ *   "none-today" — a recognized reply with nothing to show (今日は無い;
+ *                  all-excluded included; raw stays in the fold)
+ *   "raw"        — a format miss; the verbatim reply IS the body
+ */
+export type EntryFace = "cards" | "none-today" | "raw";
+
+export function entryFace(
+  raw: string,
+  cards: ProposalCard[],
+  refs: Record<string, string>,
+  basis?: BasisMap,
+): EntryFace {
+  if (cards.length === 0) return parseReplyOutcome(raw).parsed ? "none-today" : "raw";
+  return gateCardsByProvenance(cards, refs, basis).kept.length > 0 ? "cards" : "none-today";
+}
+
 export function gateCardsByProvenance(
   cards: ProposalCard[],
   refs: Record<string, string>,

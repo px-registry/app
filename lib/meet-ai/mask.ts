@@ -31,7 +31,10 @@ export function buildDetectPrompt(title: string, text: string): string {
  */
 export function buildIntroPrompt(items: Array<{ kind: string; title: string; text: string }>): string {
   return [
-    "次の公開項目だけを材料に、この人の「ひとこと紹介」を一行書いてください。",
+    // 第8便 C: a faithful summary of the memory reads as insider-speak to a
+    // stranger — the line must land with someone meeting this person FIRST.
+    "次の公開項目だけを材料に、初見の人に伝わる「ひとこと紹介」を一行書いてください。",
+    "内輪の言葉・固有名・プロジェクト名は使わない。何をしている人か・何が好きかを、日常の言葉で。",
     "盛らない・誇張しない・材料に無いことを足さない。60字以内。",
     "一人称・呼びかけ・依頼文は使わない。",
     '返答は次の形のJSONだけ（前後に説明文を付けない）：{"intro":"ひとこと紹介"}',

@@ -114,6 +114,8 @@ export const MEET = {
       provider: "AIから返事が返りませんでした。もう一度お試しください。",
       network: "つながりませんでした。電波の良いところでもう一度。",
       pool: "候補を読み込めませんでした。もう一度お試しください。",
+      // 第8便 B — 沈黙の禁止: ANY unexpected failure still says something.
+      unknown: "うまくいきませんでした。画面を読み込み直して、もう一度お試しください。",
     } as Record<string, string>,
   },
 

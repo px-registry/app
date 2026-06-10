@@ -230,7 +230,18 @@ export function HomeView() {
     setPoolBusy(false);
   };
 
+  // 第8便 B — 沈黙の禁止: 探しに行く always ends in something VISIBLE —
+  // (a) cards, (b) 今日は無い, or (c) an honest error. Any unexpected throw
+  // anywhere in the pipeline lands in (c) instead of a swallowed rejection.
   const receive = async () => {
+    try {
+      await receiveInner();
+    } catch {
+      setGen({ phase: "error", code: "unknown" });
+    }
+  };
+
+  const receiveInner = async () => {
     setGen({ phase: "busy" });
     await memory.setQuestion(question);
     const items = (await memory.listRigItems()).map((e) => e.item);

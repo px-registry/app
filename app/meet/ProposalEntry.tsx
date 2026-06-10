@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
-import { parseReplyOutcome, gateCardsByProvenance } from "@/lib/meet-ai";
+import { gateCardsByProvenance, entryFace } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
 import { RIG_PRIVATE_ECHO_NOTE } from "@/lib/rig";
 
@@ -123,6 +123,9 @@ export function ProposalEntry({
   // 第7便 C: with a basis map (new entries), a card must also point at a real
   // served item OF ITS ADDRESSEE; pre-第7便 entries keep the to-only gate.
   const { kept, excluded } = gateCardsByProvenance(entry.cards, entry.refs, entry.basisItems);
+  // 第8便 B — 沈黙の禁止: the pinned decision table picks the entry's face;
+  // every generation renders as cards, 今日は無い, or the verbatim raw.
+  const face = entryFace(entry.raw, entry.cards, entry.refs, entry.basisItems);
 
   const rawFold = (
     <details>
@@ -146,22 +149,16 @@ export function ProposalEntry({
           {RIG_PRIVATE_ECHO_NOTE}
         </p>
       )}
-      {entry.cards.length === 0 ? (
-        // A RECOGNIZED empty array means the model said 今日は無い — show that,
-        // not the raw markup. Only a true format miss falls back to the raw.
-        parseReplyOutcome(entry.raw).parsed ? (
-          <>
-            <p className="m-item-text">{MEET.home.proposals.noneToday}</p>
-            {rawFold}
-          </>
-        ) : (
-          <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
-            {entry.raw}
-          </p>
-        )
+      {face === "raw" ? (
+        // a true format miss — the verbatim reply IS the honest body
+        <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+          {entry.raw}
+        </p>
       ) : (
         <div style={{ display: "grid", gap: "0.9rem" }}>
-          {kept.length === 0 && <p className="m-item-text">{MEET.home.proposals.noneToday}</p>}
+          {face === "none-today" && (
+            <p className="m-item-text">{MEET.home.proposals.noneToday}</p>
+          )}
           {kept.map(({ card, index }) => {
             const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
             const sent = sentRefs.has(toRef);

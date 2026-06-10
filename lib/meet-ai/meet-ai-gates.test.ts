@@ -22,7 +22,7 @@ import {
 } from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
 import { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
-import { gateCardsByProvenance } from "./provenance.ts";
+import { gateCardsByProvenance, entryFace } from "./provenance.ts";
 import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
 import { toPublicView } from "../meet-memory/public-view.ts";
 import { RIG_LAW, buildPublicPool, type RigOwnerV1 } from "../rig/rig.ts";
@@ -264,11 +264,14 @@ test("MA-7: buildDetectPrompt — targets, restraint, JSON-pair contract", () =>
   assert.ok(p.includes("text: Protocol X を広めたい"));
 });
 
-test("MA-7d (第7便 B): intro draft — public-material prompt + fail-closed parse", () => {
+test("MA-7d (第7便 B / 第8便 C): intro draft — first-meeting plainness + fail-closed parse", () => {
   const p = buildIntroPrompt([
     { kind: "have", title: "工房", text: "活版印刷ができる" },
     { kind: "want", title: "", text: "週末の相棒" },
   ]);
+  assert.ok(p.includes("初見の人に伝わる"), "第8便 C: lands with a stranger");
+  assert.ok(p.includes("内輪の言葉・固有名・プロジェクト名は使わない"));
+  assert.ok(p.includes("日常の言葉で"));
   assert.ok(p.includes("盛らない"), "no-embellishment stated");
   assert.ok(p.includes("60字以内"));
   assert.ok(p.includes('{"intro"'), "JSON contract stated");
@@ -363,6 +366,48 @@ test("MA-9e: the format block demands to + basisItemId; parse carries it lenient
   const cards = parseProposalReply(reply);
   assert.equal(cards[0].basisItemId, "p3", "trimmed through parse");
   assert.equal(cards[1].basisItemId, "", "absent → empty (the gate drops it)");
+});
+
+// ── MA-10 (第8便 B): 沈黙の禁止 — every reply lands on a visible face ───────────
+// The decision table the UI renders from, pinned per failure path. There is
+// no fourth outcome; a generation can never end as nothing on screen.
+
+test("MA-10: every path lands on cards / none-today / raw — never silence", () => {
+  const refs = { あや: "a".repeat(16) };
+  const basis = { p1: { ownerRef: "あや", title: "工房", text: "活版印刷" } };
+  const face = (raw: string, withBasis = true) =>
+    entryFace(raw, parseProposalReply(raw), refs, withBasis ? basis : undefined);
+
+  // 旧形式 (no basisItemId) — real input shape from the migration window
+  assert.equal(
+    face('```json\n[{"to":"あや","line1":"納屋 × 工房","line2":"週末に一度"}]\n```'),
+    "none-today",
+    "old-format cards are all-excluded → 今日は無い (note + raw fold), not silence",
+  );
+  // same old-format against a LEGACY entry (no basis map) → still displays
+  assert.equal(
+    face('```json\n[{"to":"あや","line1":"納屋 × 工房","line2":"週末に一度"}]\n```', false),
+    "cards",
+  );
+  // 散文混じり (Hiroto-style prose reply) — format miss → verbatim raw
+  assert.equal(
+    face("いい相手が見つかりました。あやさんと話すと良いと思います。ぜひご連絡ください。"),
+    "raw",
+  );
+  // recognized empty
+  assert.equal(face("```json\n[]\n```"), "none-today");
+  // basis 欠落だけでなく発明相手も同じ面に落ちる
+  assert.equal(
+    face('```json\n[{"to":"AI研究者コミュニティ","line1":"x","line2":"y","basisItemId":"p1"}]\n```'),
+    "none-today",
+  );
+  // 壊れ JSON
+  assert.equal(face('```json\n[{"to":"あや",'), "raw");
+  // a valid new-format card passes through to cards
+  assert.equal(
+    face('```json\n[{"to":"あや","line1":"x","line2":"y","basisItemId":"p1"}]\n```'),
+    "cards",
+  );
 });
 
 // ── MA-6 (fix1): key-prefix provider detection — the owner never picks ──────────
