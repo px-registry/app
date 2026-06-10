@@ -41,3 +41,29 @@ export function boundarySeen(): boolean {
 export function markBoundarySeen(): void {
   localStorage.setItem(BOUNDARY_KEY, "1");
 }
+
+// ── 第9便 B — 見回りの last-run (device-local; the 6h throttle's memory) ──────
+
+const PATROL_GLOBAL_KEY = "pxmeet:patrol-last";
+const PATROL_MAP_KEY = "pxmeet:patrol-by-question";
+
+export function getPatrolLastRun(): string {
+  return localStorage.getItem(PATROL_GLOBAL_KEY) ?? "";
+}
+export function getPatrolByQuestion(): Record<string, string> {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(PATROL_MAP_KEY) ?? "{}");
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v)) if (typeof val === "string") out[k] = val;
+    return out;
+  } catch {
+    return {};
+  }
+}
+export function markPatrolRun(questionEntryId: string, at: string): void {
+  localStorage.setItem(PATROL_GLOBAL_KEY, at);
+  const map = getPatrolByQuestion();
+  map[questionEntryId] = at;
+  localStorage.setItem(PATROL_MAP_KEY, JSON.stringify(map));
+}

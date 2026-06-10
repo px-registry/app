@@ -174,3 +174,21 @@ test("MN-7: private phrasing of a 書き方-item never survives the outbound pro
   // untouched items pass through verbatim
   assert.ok(out.includes("床を張る人"));
 });
+
+// ── MN-8 (第9便 C): serve count is COUNT-ONLY — no viewer identity column ──────
+
+test("MN-8: r15_question_serve stores no viewer id (one-way dedup only)", () => {
+  // strip SQL comments — the pin reads the SCHEMA, not the prose around it
+  const sql = read("migrations/0009_r15_question_serve.sql")
+    .replace(/--[^\n]*/g, "")
+    .toLowerCase();
+  assert.ok(sql.includes("create table r15_question_serve"));
+  for (const banned of ["viewer", "reader_ref", "from_ref", "me_ref", "token", "display_name"]) {
+    assert.ok(!sql.includes(banned), `serve table must not carry a ${banned} column`);
+  }
+  assert.ok(sql.includes("dedup"), "the one-way dedup token is the only per-viewer trace");
+  // and the writer (pool.ts) derives it one-way, never binding the raw viewer
+  const pool = read("functions/api/meet/pool.ts");
+  assert.ok(/sha-?256/i.test(pool), "dedup is a digest");
+  assert.ok(!/INSERT[^;]*viewer/i.test(pool), "no viewer column write");
+});

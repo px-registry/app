@@ -43,6 +43,25 @@ export function entryFace(
   return gateCardsByProvenance(cards, refs, basis).kept.length > 0 ? "cards" : "none-today";
 }
 
+/**
+ * 第9便 A: outcome entries widen the table by two EXPLICIT faces — a pool
+ * with nobody in it and an honest error are recorded entries too (見回り runs
+ * while nobody watches; its ending must be findable later). Still no fourth
+ * silent outcome.
+ */
+export type WholeFace = EntryFace | "pool-empty" | "error";
+
+export function faceOfEntry(e: {
+  outcome?: "pool-empty" | "error";
+  raw: string;
+  cards: ProposalCard[];
+  refs: Record<string, string>;
+  basisItems?: BasisMap;
+}): WholeFace {
+  if (e.outcome !== undefined) return e.outcome;
+  return entryFace(e.raw, e.cards, e.refs, e.basisItems);
+}
+
 export function gateCardsByProvenance(
   cards: ProposalCard[],
   refs: Record<string, string>,

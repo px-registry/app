@@ -43,7 +43,15 @@ export { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply 
 export {
   gateCardsByProvenance,
   entryFace,
+  faceOfEntry,
   type EntryFace,
+  type WholeFace,
   type GatedCard,
   type GatedCards,
 } from "./provenance.ts";
+export {
+  pickPatrolTarget,
+  PATROL_INTERVAL_MS,
+  type PatrolQuestion,
+  type PatrolDecision,
+} from "./patrol.ts";

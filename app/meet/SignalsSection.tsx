@@ -88,6 +88,9 @@ export function SignalsSection({
   return (
     <section className="m-section">
       <h2 className="m-h2">{MEET.home.signals.heading}</h2>
+      <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
+        {MEET.home.signals.subnote}
+      </p>
       {incoming.length === 0 ? (
         <div className="m-empty">{MEET.home.signals.empty}</div>
       ) : (

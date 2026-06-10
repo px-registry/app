@@ -56,19 +56,31 @@ async function outcome(prevEntries) {
     await page.waitForTimeout(500);
   }
   await page.waitForTimeout(600);
-  const entries = await page.locator(".m-item", { hasText: "が読みました" }).count();
+  // 第9便 A: EVERY ending is a dated entry (が読みました = generation,
+  // 探しに行きました = pool-empty/error fact) — an entry IS a visible outcome
+  // (the faces are pinned by MA-10/10b). Under-button stays as last resort.
+  const entries =
+    (await page.locator(".m-item", { hasText: "が読みました" }).count()) +
+    (await page.locator(".m-item", { hasText: "探しに行きました" }).count());
   const cards = await page.locator(".m-proposal").count();
   const none = await page.getByText("今日は無い、という日もあります。", { exact: false }).first().isVisible().catch(() => false);
-  const err = await page.locator("section .m-note[aria-live]").allInnerTexts().catch(() => []);
+  const err = await page.locator("[aria-live]").allInnerTexts().catch(() => []);
   const honestError = err.some((t) => /ませんでした|もう一度|今日は無い/.test(t));
   return { newEntry: entries > prevEntries, cards, none, honestError, entries };
 }
 
+async function countEntries() {
+  return (
+    (await page.locator(".m-item", { hasText: "が読みました" }).count()) +
+    (await page.locator(".m-item", { hasText: "探しに行きました" }).count())
+  );
+}
+
 async function pressAndJudge(label) {
-  const prev = await page.locator(".m-item", { hasText: "が読みました" }).count();
+  const prev = await countEntries();
   await page.getByRole("button", { name: "探しに行く" }).click();
   const o = await outcome(prev);
-  const visible = (o.newEntry && (o.cards > 0 || o.none)) || o.none || o.honestError;
+  const visible = o.newEntry || o.none || o.honestError;
   check(`${label}: outcome visible (a/b/c)`, visible);
   console.log(`    entry+:${o.newEntry} cards:${o.cards} none:${o.none} err:${o.honestError}`);
   return o;

@@ -181,6 +181,7 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
     "0006_publication_state.sql",
     "0007_r15_meet.sql",
     "0008_r15_intro.sql",
+    "0009_r15_question_serve.sql",
   ]);
 });
 

@@ -53,13 +53,14 @@ try {
   await page.getByRole("button", { name: "この2件で確定する" }).click();
   await page.getByText("記憶の下地ができました。").waitFor();
 
-  // ── A-1. EMPTY pool → no generation at all, honest two lines ────────────────
+  // ── A-1. EMPTY pool → no model run; 第9便: the fact is a DATED ENTRY ─────────
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
   check("home heading is the tagline", await page.getByRole("heading", { name: "お互いの記憶から、思いがけない接点を。" }).isVisible());
   await page.getByRole("button", { name: "探しに行く" }).click();
   await page.getByText("いまは候補に出ている参加者がいません。").waitFor({ timeout: 10000 });
-  check("pool-0 short circuit: 今日は無い + 補足 (no model run)", await page.getByText("今日は無い、という日もあります。", { exact: false }).isVisible());
-  check("no proposal entry was created", (await page.locator(".m-item", { hasText: "が読みました" }).count()) === 0);
+  check("pool-0 short circuit: 今日は無い + 補足 as an entry (no model run)", await page.getByText("今日は無い、という日もあります。", { exact: false }).first().isVisible());
+  check("no GENERATION entry was created (no model ran)", (await page.locator(".m-item", { hasText: "が読みました" }).count()) === 0);
+  check("the pool-empty fact IS an entry (探しに行きました)", (await page.locator(".m-item", { hasText: "探しに行きました" }).count()) === 1);
   await page.screenshot({ path: `${SHOT_DIR}/r15e-03-pool-empty-short-circuit.png`, fullPage: true });
 
   // ── A-2. real pool → cards display ONLY for real addressees ─────────────────

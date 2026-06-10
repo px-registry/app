@@ -34,6 +34,20 @@ export type ReceivedProposalV1 = {
   basisItems?: Record<string, { ownerRef: string; title: string; text: string }>;
   /** ownerRef → ひとこと紹介 at generation time (may be ""). 第7便 B. */
   intros?: Record<string, string>;
+  /**
+   * 第9便 A/B: how this entry came to be. "patrol" = 見回り (the automatic
+   * run on opening home — still the owner's device and key, never PX).
+   */
+  via?: "manual" | "patrol";
+  /** patrol provenance: the placed question (title) that drove the run. */
+  patrolQuestion?: string;
+  /**
+   * 第9便 A: a NON-generation ending recorded as an honest entry — the
+   * outcome lives at the top of AIが見つけた提案, not as a side note.
+   * Absent = a normal generation (the entryFace three faces apply).
+   */
+  outcome?: "pool-empty" | "error";
+  errorCode?: string;
   /** Non-blocking: the reply may echo the owner's own private text. */
   echoFlag: boolean;
   /** Owner's readings per card index. */

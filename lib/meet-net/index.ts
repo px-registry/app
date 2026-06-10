@@ -9,6 +9,9 @@ export {
   setPublishedSnapshot,
   boundarySeen,
   markBoundarySeen,
+  getPatrolLastRun,
+  getPatrolByQuestion,
+  markPatrolRun,
 } from "./local.ts";
 export { buildOutboundProjection, type OutboundPoolItem } from "./projection.ts";
 export {

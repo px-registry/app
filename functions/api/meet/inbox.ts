@@ -83,6 +83,16 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       .bind(me)
       .all<MyNoteRow>();
 
+    // 気配 (第9便 C): today's read-count per OWN placed question — counts only,
+    // served back to their owner (a fact, not a score).
+    const day = new Date().toISOString().slice(0, 10);
+    const reads = await env.BOARD
+      .prepare(
+        "SELECT position, COUNT(*) AS n FROM r15_question_serve WHERE owner_ref = ?1 AND day = ?2 GROUP BY position",
+      )
+      .bind(me, day)
+      .all<{ position: number; n: number }>();
+
     return json({
       ok: true,
       incoming: (incoming.results ?? []).map((r) => ({
@@ -96,6 +106,7 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       outgoing: (outgoing.results ?? []).map((r) => ({ toRef: r.to_ref, mutual: r.mutual === 1 })),
       notes: (notes.results ?? []).map((r) => ({ fromRef: r.writer_ref, note: r.note })),
       myNotes: (myNotes.results ?? []).map((r) => ({ peerRef: r.peer_ref, note: r.note })),
+      questionReads: (reads.results ?? []).map((r) => ({ position: r.position, count: r.n })),
     });
   } catch {
     return json({ ok: false, error: "inbox_failed" }, 500);

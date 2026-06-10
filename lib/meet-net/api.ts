@@ -89,6 +89,8 @@ export type InboxData = {
   outgoing: Array<{ toRef: string; mutual: boolean }>;
   notes: Array<{ fromRef: string; note: string }>;
   myNotes: Array<{ peerRef: string; note: string }>;
+  /** 第9便 C — today's read-count per OWN placed question (by projection position). */
+  questionReads: Array<{ position: number; count: number }>;
 };
 
 async function postJson(path: string, body: unknown): Promise<{ status: number; body: unknown }> {
@@ -147,6 +149,11 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
       myNotes: arr(body.myNotes).filter(isRecord).flatMap((r) =>
         isParticipantRef(r.peerRef) && typeof r.note === "string"
           ? [{ peerRef: r.peerRef, note: r.note }]
+          : [],
+      ),
+      questionReads: arr(body.questionReads).filter(isRecord).flatMap((r) =>
+        typeof r.position === "number" && typeof r.count === "number" && r.count >= 0
+          ? [{ position: r.position, count: r.count }]
           : [],
       ),
     };

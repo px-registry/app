@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
-import { gateCardsByProvenance, entryFace } from "@/lib/meet-ai";
+import { gateCardsByProvenance, faceOfEntry } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
 import { RIG_PRIVATE_ECHO_NOTE } from "@/lib/rig";
 
@@ -123,9 +123,10 @@ export function ProposalEntry({
   // 第7便 C: with a basis map (new entries), a card must also point at a real
   // served item OF ITS ADDRESSEE; pre-第7便 entries keep the to-only gate.
   const { kept, excluded } = gateCardsByProvenance(entry.cards, entry.refs, entry.basisItems);
-  // 第8便 B — 沈黙の禁止: the pinned decision table picks the entry's face;
-  // every generation renders as cards, 今日は無い, or the verbatim raw.
-  const face = entryFace(entry.raw, entry.cards, entry.refs, entry.basisItems);
+  // 第8便 B + 第9便 A — 沈黙の禁止: the pinned decision table picks the
+  // entry's face; every run renders as cards, 今日は無い, the verbatim raw,
+  // a pool-empty fact, or an honest error. Never nothing.
+  const face = faceOfEntry(entry);
 
   const rawFold = (
     <details>
@@ -141,15 +142,33 @@ export function ProposalEntry({
   return (
     <li className="m-item">
       <p className="m-item-tags" style={{ margin: "0 0 0.4rem" }}>
-        {fmtDate(entry.createdAt)} ・ {MEET.home.proposals.modelNote(entry.modelLabel)}
+        {fmtDate(entry.createdAt)} ・{" "}
+        {entry.modelLabel !== ""
+          ? MEET.home.proposals.modelNote(entry.modelLabel)
+          : MEET.home.proposals.manualLabel}
         {entry.question !== "" && <>（{entry.question}）</>}
       </p>
+      {entry.via === "patrol" && (
+        // 見回り provenance — which placed question this quiet run served
+        <p className="m-item-tags" style={{ margin: "0 0 0.4rem" }}>
+          {MEET.home.proposals.patrolLabel(entry.patrolQuestion ?? "")}
+        </p>
+      )}
       {entry.echoFlag && (
         <p className="m-warnings" style={{ margin: "0 0 0.5rem" }}>
           {RIG_PRIVATE_ECHO_NOTE}
         </p>
       )}
-      {face === "raw" ? (
+      {face === "pool-empty" ? (
+        // 第9便 A/D: the short-circuit is a dated entry now, not a side note
+        <p className="m-item-text">
+          {MEET.home.proposals.noneToday} {MEET.receive.poolEmptyNote}
+        </p>
+      ) : face === "error" ? (
+        <p className="m-item-text" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+          {MEET.receive.errors[entry.errorCode ?? "unknown"] ?? MEET.receive.errors.unknown}
+        </p>
+      ) : face === "raw" ? (
         // a true format miss — the verbatim reply IS the honest body
         <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
           {entry.raw}

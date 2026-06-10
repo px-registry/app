@@ -38,8 +38,9 @@ export const MEET = {
     place: {
       action: "置いておく",
       confirmHeading: "問いを置く",
+      // 第9便 B: 「探し続け」は実態（開くたびの見回り）に合わせて言い直した。
       confirmNote:
-        "「求めている」の項目になります。置く＝あなたのAIが探し続け、相手のAIもあなたを見つけられる、ということです。",
+        "「求めている」の項目になります。置く＝あなたのAIが、あなたがここを開くたびに見回ります。相手のAIもあなたの問いを見つけられます。",
       titleLabel: "一言タイトル（短縮案・直せます）",
       textLabel: "問いの本文",
       confirm: "この内容で置く",
@@ -55,19 +56,39 @@ export const MEET = {
       needName: "候補に出すには、先に記憶ページで「候補に出すときの名前」を決めてください。",
     },
     proposals: {
-      heading: "届いた提案",
-      empty: "まだ提案はありません。記憶の下地ができたら、ここに届きます。",
+      /** 第9便 命名ゲート: 探しに行く＋見回りの結末がすべてここに並ぶ。 */
+      heading: "AIが見つけた提案",
+      subnote: "あなたのAIが「探しに行く」と「見回り」で見つけたものが、ここに並びます。",
+      /** 空状態は二分岐: 記憶未整備 / 整備済みでまだ探していない（第9便 A）。 */
+      emptyNoMemory: "まだ提案はありません。記憶の下地ができたら、ここに届きます。",
+      emptyReady: "まだ何もありません。問いを書いて「探しに行く」と、あなたのAIがここに提案を並べます。",
       noneToday: "今日は無い、という日もあります。",
       orderNote: "新しく届いた順に並びます。順番に意味はありません。",
       modelNote: (label: string): string => `${label} が読みました`,
+      manualLabel: "探しに行きました",
+      patrolLabel: (q: string): string => `置いた問い「${q}」の見回り`,
       rawShow: "そのままの返事を見る",
       removeEntry: "この回を消す",
       /** provenance gate (第3便 A) — 法の遵守は構造で裏打ちする。 */
       provenanceNote: (n: number): string =>
         `実在の相手に結べない提案は表示していません（${n}枚）。`,
     },
+    /** 第9便 B — 見回り（owner の端末・owner の鍵でのみ走る）。 */
+    patrol: {
+      running: "見回り中…",
+      last: (hhmm: string): string => `最後の見回り：${hhmm}`,
+      offline: "見回りは、この端末でAIがつながっているときに動きます。",
+    },
+    /** 第9便 C — 気配（事実の表示・判定なし・一覧なし）。 */
+    presence: {
+      participants: (n: number): string => `いま候補に出ている参加者：${n}人`,
+      reads: (n: number): string => `今日、この問いは${n}人のAIに読まれました。`,
+      noReads: "今日はまだ読まれていません。",
+    },
     signals: {
       heading: "あなたへの「話してみる」",
+      /** 第9便 D — 役割の一行（相手からの合図が届く場所）。 */
+      subnote: "あなたの問いや候補を相手のAIが見つけたとき、ここに合図が届きます。",
       empty: "いまのところ、届いている「話してみる」はありません。",
       incoming: (name: string): string => `${name}さんが「話してみる」を押しました。`,
       talkBack: "こちらも話してみる",

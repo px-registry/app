@@ -11,7 +11,7 @@
 // facilitator log — the disclosure line sits in the boundary block below.
 // Entries render newest-first — a TIME order only.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import {
@@ -39,6 +39,9 @@ import {
   setPublishedSnapshot,
   projectionSnapshotJson,
   snapshotHas,
+  getPatrolLastRun,
+  getPatrolByQuestion,
+  markPatrolRun,
   type InboxData,
 } from "@/lib/meet-net";
 import {
@@ -50,17 +53,16 @@ import {
   toRigPoolWithRefs,
   parseProposalReply,
   generateProposals,
+  pickPatrolTarget,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
 
-type GenState =
-  | { phase: "idle" }
-  | { phase: "busy" }
-  | { phase: "empty" } // pool had nobody — generation short-circuited (第3便 A)
-  | { phase: "error"; code: string };
+// 第9便 A: endings live as ENTRIES now; under the button only the running
+// indicator and the last-resort line (entry write itself failed) remain.
+type GenState = { phase: "idle" } | { phase: "busy" } | { phase: "error"; code: string };
 type RigEntry = { entryId: string; item: MeetRigItemV1 };
 type PlaceDraft = { title: string; text: string; private: boolean };
 
@@ -124,6 +126,10 @@ export function HomeView() {
   const [editingPlaced, setEditingPlaced] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState("");
   const [poolBusy, setPoolBusy] = useState(false);
+  const [patrolBusy, setPatrolBusy] = useState(false);
+  const [lastPatrolAt, setLastPatrolAt] = useState("");
+  // 第9便 C — 気配: a count, never a list (M-6 stays).
+  const [participants, setParticipants] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     setQuestion(await memory.getQuestion());
@@ -138,6 +144,11 @@ export function HomeView() {
     setReceived(list);
     const ib = await fetchInbox(getOrMintOwnerToken());
     setInbox(ib.ok ? ib : null);
+    setLastPatrolAt(getPatrolLastRun());
+    // 気配: how many participants are in the pool right now (count only)
+    const me = await deriveParticipantRef(getOrMintOwnerToken());
+    const poolNow = await fetchPool(me);
+    setParticipants(poolNow.ok ? new Set(poolNow.items.map((it) => it.participantRef)).size : null);
   }, [memory, shelf]);
 
   useEffect(() => {
@@ -166,6 +177,22 @@ export function HomeView() {
   const poolStale = placedEntries.some(
     (e) => (e.item.private === false) !== snapshotHas(snapshot, toPublicView(e.item)),
   );
+
+  // 第9便 C — 今日この問いを読んだ AI の実数 (server's dedup'd daily count).
+  // Position = the item's index in the outbound projection (what publish sent).
+  const projRows = buildOutboundProjection(rigEntries.map((x) => toPublicView(x.item)));
+  const readsOf = (item: MeetRigItemV1): number | null => {
+    const v = toPublicView(item);
+    const pos = projRows.findIndex(
+      (p) =>
+        p.kind === v.kind &&
+        p.title === v.title &&
+        p.text === v.text &&
+        JSON.stringify(p.tags) === JSON.stringify(v.tags),
+    );
+    if (pos < 0) return null;
+    return inbox?.questionReads.find((r) => r.position === pos)?.count ?? 0;
+  };
 
   const openPlace = () => {
     const q = question.trim();
@@ -230,80 +257,141 @@ export function HomeView() {
     setPoolBusy(false);
   };
 
-  // 第8便 B — 沈黙の禁止: 探しに行く always ends in something VISIBLE —
-  // (a) cards, (b) 今日は無い, or (c) an honest error. Any unexpected throw
-  // anywhere in the pipeline lands in (c) instead of a swallowed rejection.
-  const receive = async () => {
+  // 第9便 A — every ending of a run (cards / 今日は無い / pool-empty / honest
+  // error) lands as a DATED ENTRY at the top of AIが見つけた提案. 第8便's
+  // 沈黙の禁止 continues: should even the entry write fail, the thrown error
+  // surfaces as the last-resort line under the button.
+  const runGeneration = async (
+    q: string,
+    via: "manual" | "patrol",
+    patrolMeta?: { title: string },
+  ) => {
+    const base = {
+      question: q.trim(),
+      modelLabel: "",
+      raw: "",
+      cards: [],
+      refs: {},
+      echoFlag: false,
+      via,
+      ...(via === "patrol" ? { patrolQuestion: patrolMeta?.title ?? "" } : {}),
+    };
     try {
-      await receiveInner();
+      const items = (await memory.listRigItems()).map((e) => e.item);
+      const self: RigOwnerV1 = { ownerId: "self", items };
+      const me = await deriveParticipantRef(getOrMintOwnerToken());
+      const poolRes = await fetchPool(me);
+      if (!poolRes.ok) {
+        await shelf.add({ ...base, outcome: "error", errorCode: "pool" });
+        return;
+      }
+      // 第3便 A: an empty pool means there is nobody to propose — don't run
+      // the model at all (a weak model invents partners; rule 7 is backed).
+      if (poolRes.items.length === 0) {
+        await shelf.add({ ...base, outcome: "pool-empty" });
+        return;
+      }
+      const refs: Record<string, string> = {};
+      const intros: Record<string, string> = {};
+      for (const it of poolRes.items) {
+        if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
+        if (!(it.ownerRef in intros)) intros[it.ownerRef] = it.ownerIntro;
+      }
+      // 第7便 C: stable [p◯] refs ride the prompt; the same map is captured on
+      // the entry so the gate + 「相手の候補から」 can resolve basisItemId.
+      const { pool, basis } = toRigPoolWithRefs(poolRes.items);
+      const prompt = buildMeetPrompt(self, pool, q);
+      const model = getModel();
+      const r = await generateProposals({
+        model,
+        apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+        endpoint: getEndpoint(),
+        prompt,
+      });
+      if (!r.ok) {
+        await shelf.add({ ...base, outcome: "error", errorCode: r.error });
+        return;
+      }
+      const entry = await shelf.add({
+        ...base,
+        modelLabel: model.label,
+        raw: r.text,
+        cards: parseProposalReply(r.text),
+        refs,
+        basisItems: basis,
+        intros,
+        echoFlag: pastedOutputEchoesPrivate(self, r.text),
+      });
+      // Test-disclosed mirror (the boundary block below says so). Best-effort —
+      // a network miss here never blocks the owner's own loop.
+      void submitLog({
+        ownerToken: getOrMintOwnerToken(),
+        clientEntryId: entry.entryId,
+        displayName,
+        question: entry.question,
+        proposalText: entry.raw,
+        reading: readingJson(entry),
+      });
+    } catch {
+      // even the unexpected becomes an honest entry; if THAT fails, rethrow
+      // so the caller's last-resort line appears (no fourth, silent ending).
+      const recorded = await shelf
+        .add({ ...base, outcome: "error", errorCode: "unknown" })
+        .then(() => true)
+        .catch(() => false);
+      if (!recorded) throw new Error("unrecordable");
+    }
+  };
+
+  const receive = async () => {
+    setGen({ phase: "busy" });
+    try {
+      await memory.setQuestion(question);
+      await runGeneration(question, "manual");
+      setGen({ phase: "idle" });
     } catch {
       setGen({ phase: "error", code: "unknown" });
     }
-  };
-
-  const receiveInner = async () => {
-    setGen({ phase: "busy" });
-    await memory.setQuestion(question);
-    const items = (await memory.listRigItems()).map((e) => e.item);
-    const self: RigOwnerV1 = { ownerId: "self", items };
-
-    const me = await deriveParticipantRef(getOrMintOwnerToken());
-    const poolRes = await fetchPool(me);
-    if (!poolRes.ok) {
-      setGen({ phase: "error", code: "pool" });
-      return;
-    }
-    // 第3便 A: an empty pool means there is nobody to propose — don't run the
-    // model at all (a weak model invents partners; rule 7 is backed here).
-    if (poolRes.items.length === 0) {
-      setGen({ phase: "empty" });
-      return;
-    }
-    const refs: Record<string, string> = {};
-    const intros: Record<string, string> = {};
-    for (const it of poolRes.items) {
-      if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
-      if (!(it.ownerRef in intros)) intros[it.ownerRef] = it.ownerIntro;
-    }
-
-    // 第7便 C: stable [p◯] refs ride the prompt; the same map is captured on
-    // the entry so the gate + 「相手の候補から」 can resolve basisItemId.
-    const { pool, basis } = toRigPoolWithRefs(poolRes.items);
-    const prompt = buildMeetPrompt(self, pool, question);
-    const model = getModel();
-    const r = await generateProposals({
-      model,
-      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
-      endpoint: getEndpoint(),
-      prompt,
-    });
-    if (!r.ok) {
-      setGen({ phase: "error", code: r.error });
-      return;
-    }
-    const entry = await shelf.add({
-      question: question.trim(),
-      modelLabel: model.label,
-      raw: r.text,
-      cards: parseProposalReply(r.text),
-      refs,
-      basisItems: basis,
-      intros,
-      echoFlag: pastedOutputEchoesPrivate(self, r.text),
-    });
-    // Test-disclosed mirror (the boundary block below says so). Best-effort —
-    // a network miss here never blocks the owner's own loop.
-    void submitLog({
-      ownerToken: getOrMintOwnerToken(),
-      clientEntryId: entry.entryId,
-      displayName,
-      question: entry.question,
-      proposalText: entry.raw,
-      reading: readingJson(entry),
-    });
-    setGen({ phase: "idle" });
     await reload();
   };
+
+  // ── 第9便 B — 見回り: once per page open, at most every 6h, oldest placed
+  // question first; the owner's device and key only (PX runs nothing). ──────
+  const patrolGuard = useRef(false);
+  useEffect(() => {
+    if (patrolGuard.current) return;
+    patrolGuard.current = true;
+    void (async () => {
+      const rigList = await memory.listRigItems();
+      const placedQs = rigList
+        .filter((e) => isPlacedQuestion(e.item) && e.item.private === false)
+        .map((e) => ({ entryId: e.entryId, title: e.item.title, text: e.item.text }));
+      const target = pickPatrolTarget({
+        connected: isConnected(),
+        questions: placedQs,
+        lastRunGlobal: getPatrolLastRun(),
+        lastRunByQuestion: getPatrolByQuestion(),
+        now: new Date().toISOString(),
+      });
+      if (target === null) return;
+      // condition: a pool with nobody in it doesn't patrol (no model, no entry)
+      const me = await deriveParticipantRef(getOrMintOwnerToken());
+      const probe = await fetchPool(me);
+      if (!probe.ok || probe.items.length === 0) return;
+      // throttle stamps FIRST — a failing patrol must not retry on every open
+      markPatrolRun(target.question.entryId, new Date().toISOString());
+      setPatrolBusy(true);
+      try {
+        await runGeneration(target.question.text, "patrol", { title: target.question.title });
+      } catch {
+        /* the last-resort path needs the button context; patrol stays quiet
+           in the header but its error entry was attempted above */
+      }
+      setPatrolBusy(false);
+      setLastPatrolAt(getPatrolLastRun());
+      await reload();
+    })();
+  }, [memory, reload]);
 
   const talk = async (toRef: string, anchor: string) => {
     await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor });
@@ -416,14 +504,15 @@ export function HomeView() {
             </p>
           </div>
         )}
-        {gen.phase === "error" && (
-          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-            {MEET.receive.errors[gen.code] ?? MEET.receive.errors.provider}
+        {participants !== null && (
+          <p className="m-note" aria-live="polite">
+            {MEET.home.presence.participants(participants)}
           </p>
         )}
-        {gen.phase === "empty" && (
-          <p className="m-note" aria-live="polite">
-            {MEET.home.proposals.noneToday} {MEET.receive.poolEmptyNote}
+        {gen.phase === "error" && (
+          // last resort only — every normal ending is an entry in the 欄 below
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.receive.errors[gen.code] ?? MEET.receive.errors.provider}
           </p>
         )}
 
@@ -482,6 +571,11 @@ export function HomeView() {
       {placedEntries.length > 0 && (
         <section className="m-section">
           <h2 className="m-h2">{MEET.home.place.listHeading}</h2>
+          {!connected && (
+            <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
+              {MEET.home.patrol.offline}
+            </p>
+          )}
           <ul className="m-itemlist">
             {placedEntries.map((e) => (
               <li key={e.entryId} className="m-item">
@@ -498,6 +592,16 @@ export function HomeView() {
                     <p className="m-note" aria-live="polite">
                       {placedState(e.item)}
                     </p>
+                    {e.item.private === false &&
+                      snapshotHas(snapshot, toPublicView(e.item)) &&
+                      (() => {
+                        const n = readsOf(e.item);
+                        return n === null ? null : (
+                          <p className="m-note" style={{ marginTop: "0.15rem" }}>
+                            {n > 0 ? MEET.home.presence.reads(n) : MEET.home.presence.noReads}
+                          </p>
+                        );
+                      })()}
                     <div className="m-item-actions">
                       <button
                         type="button"
@@ -561,8 +665,22 @@ export function HomeView() {
         <div className="m-home-right">
       <section className="m-section">
         <h2 className="m-h2">{MEET.home.proposals.heading}</h2>
+        <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
+          {MEET.home.proposals.subnote}
+        </p>
+        {(patrolBusy || lastPatrolAt !== "") && (
+          <p className="m-item-tags" aria-live="polite" style={{ margin: "0 0 0.5rem" }}>
+            {patrolBusy
+              ? MEET.home.patrol.running
+              : MEET.home.patrol.last(
+                  `${new Date(lastPatrolAt).getHours()}:${String(new Date(lastPatrolAt).getMinutes()).padStart(2, "0")}`,
+                )}
+          </p>
+        )}
         {received.length === 0 ? (
-          <div className="m-empty">{MEET.home.proposals.empty}</div>
+          <div className="m-empty">
+            {hasItems ? MEET.home.proposals.emptyReady : MEET.home.proposals.emptyNoMemory}
+          </div>
         ) : (
           <>
             <p className="m-note" style={{ margin: "0 0 0.6rem" }}>

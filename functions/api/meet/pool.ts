@@ -31,6 +31,13 @@ function parseTags(s: string): string[] {
   }
 }
 
+/** Day-scoped one-way dedup token — never a stored viewer id (第9便 C). */
+async function serveDedup(day: string, viewer: string, owner: string, position: number): Promise<string> {
+  const data = new TextEncoder().encode(`r15-serve:${day}:${viewer}:${owner}:${position}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export const onRequestGet: PagesFunction<MeetEnv> = async ({ request, env }) => {
   const url = new URL(request.url);
   const me = url.searchParams.get("me") ?? "";
@@ -53,6 +60,27 @@ export const onRequestGet: PagesFunction<MeetEnv> = async ({ request, env }) => 
       text: r.text,
       tags: parseTags(r.tags),
     }));
+
+    // 気配 (第9便 C): a placed question (tag 問い) was just served to another
+    // participant's AI — count it once per viewer per day, count only.
+    // Best-effort: a counting miss never breaks the pool serve.
+    if (exclude !== "") {
+      const day = new Date().toISOString().slice(0, 10);
+      const stmts = [];
+      for (const r of results ?? []) {
+        if (!parseTags(r.tags).includes("問い")) continue;
+        const dedup = await serveDedup(day, exclude, r.participant_ref, r.position);
+        stmts.push(
+          env.BOARD
+            .prepare(
+              "INSERT OR IGNORE INTO r15_question_serve (owner_ref, position, day, dedup) VALUES (?1, ?2, ?3, ?4)",
+            )
+            .bind(r.participant_ref, r.position, day, dedup),
+        );
+      }
+      if (stmts.length > 0) await env.BOARD.batch(stmts).catch(() => {});
+    }
+
     return json({ ok: true, items });
   } catch {
     return json({ ok: false, error: "pool_failed" }, 500);

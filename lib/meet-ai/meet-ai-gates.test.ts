@@ -22,7 +22,8 @@ import {
 } from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
 import { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
-import { gateCardsByProvenance, entryFace } from "./provenance.ts";
+import { gateCardsByProvenance, entryFace, faceOfEntry } from "./provenance.ts";
+import { pickPatrolTarget } from "./patrol.ts";
 import { MEET_MODELS, DEFAULT_BY_PROVIDER, detectProviderFromKey, findModel } from "./models.ts";
 import { toPublicView } from "../meet-memory/public-view.ts";
 import { RIG_LAW, buildPublicPool, type RigOwnerV1 } from "../rig/rig.ts";
@@ -408,6 +409,51 @@ test("MA-10: every path lands on cards / none-today / raw — never silence", ()
     face('```json\n[{"to":"あや","line1":"x","line2":"y","basisItemId":"p1"}]\n```'),
     "cards",
   );
+});
+
+test("MA-10b (第9便 A): outcome entries are explicit faces — 見回り endings included", () => {
+  const base = { raw: "", cards: [], refs: {} };
+  assert.equal(faceOfEntry({ ...base, outcome: "pool-empty" }), "pool-empty");
+  assert.equal(faceOfEntry({ ...base, outcome: "error" }), "error");
+  // without an outcome the 三面 table applies unchanged
+  assert.equal(faceOfEntry({ ...base, raw: "```json\n[]\n```" }), "none-today");
+  assert.equal(faceOfEntry({ ...base, raw: "散文だけ" }), "raw");
+});
+
+// ── MA-11 (第9便 B): 見回り — the patrol picker's throttles, pinned ─────────────
+
+const PQ = (id: string) => ({ entryId: id, title: id, text: `${id} の本文` });
+
+test("MA-11: patrol runs only connected + placed + 6h elapsed; oldest first", () => {
+  const now = "2026-06-10T12:00:00.000Z";
+  const base = { connected: true, questions: [PQ("q1"), PQ("q2")], lastRunGlobal: "", lastRunByQuestion: {}, now };
+
+  assert.notEqual(pickPatrolTarget(base), null, "fresh device patrols");
+  assert.equal(pickPatrolTarget({ ...base, connected: false }), null, "未接続では走らない");
+  assert.equal(pickPatrolTarget({ ...base, questions: [] }), null, "置いた問いが無ければ走らない");
+  assert.equal(
+    pickPatrolTarget({ ...base, lastRunGlobal: "2026-06-10T07:00:00.000Z" }),
+    null,
+    "6時間未満は走らない",
+  );
+  assert.notEqual(
+    pickPatrolTarget({ ...base, lastRunGlobal: "2026-06-10T05:59:00.000Z" }),
+    null,
+    "6時間以上で走る",
+  );
+  assert.equal(pickPatrolTarget({ ...base, lastRunGlobal: "broken-date" }), null, "壊れた記録は fail-closed");
+
+  // oldest-unpatrolled first; a never-patrolled question beats any timestamp
+  const picked = pickPatrolTarget({
+    ...base,
+    lastRunByQuestion: { q1: "2026-06-09T00:00:00.000Z" },
+  });
+  assert.equal(picked?.question.entryId, "q2", "never-patrolled first");
+  const picked2 = pickPatrolTarget({
+    ...base,
+    lastRunByQuestion: { q1: "2026-06-01T00:00:00.000Z", q2: "2026-06-09T00:00:00.000Z" },
+  });
+  assert.equal(picked2?.question.entryId, "q1", "longest-unpatrolled next");
 });
 
 // ── MA-6 (fix1): key-prefix provider detection — the owner never picks ──────────

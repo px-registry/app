@@ -153,11 +153,13 @@ try {
   const inboxA = await api("/api/meet/inbox", { ownerToken: TOK_A });
   check("あや receives みどり's note", inboxA.body?.notes?.some((n) => n.note === "メール: midori@example.jp"));
 
-  // 7. receive attempt (fake key) — honest typed error
+  // 7. receive attempt (fake key) — honest typed error, 第9便: as a DATED
+  // ENTRY at the top of AIが見つけた提案
   await page.getByRole("button", { name: "探しに行く" }).click();
-  await page.locator("p.m-note[aria-live=polite]").first().waitFor({ timeout: 30000 });
-  const errText = await page.locator("p.m-note[aria-live=polite]").first().innerText();
-  check("receive shows an honest typed error (fake key)", errText.trim().length > 0);
+  const errEntry = page.locator(".m-item", { hasText: "探しに行きました" }).first();
+  await errEntry.waitFor({ timeout: 30000 });
+  const errText = await errEntry.locator(".m-item-text").first().innerText();
+  check("receive shows an honest typed error ENTRY (fake key)", /ませんでした|もう一度/.test(errText));
   console.log("    receive error copy: " + errText.trim());
   await shot("08-home-receive-error");
 
