@@ -84,6 +84,9 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 
 ## R2 課題（c12-2 記録）
 
+- c18: sent 状態は **ペア単位**（inbox.outgoing の toRef 集合）— 同一相手の全カードが
+  一斉に「伝えてあります」になる。カード（edge）単位化は signal のスキーマ変更が要るため R2。
+
 - EN文言の全面ゲート（現状ドラフト・既存文言は未訳）。
 - EN表示書体 Cormorant Garamond の woff2 同梱（現状OSフォールバックで端末差が出る —
   Hiroto報告の2端末差の根因）。

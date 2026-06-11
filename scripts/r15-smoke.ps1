@@ -78,6 +78,22 @@ $un = PostJson "/api/meet/publish" @{ ownerToken = $tokB; displayName = "カフ�
 $poolA2 = Invoke-RestMethod -Uri "$base/api/meet/pool?me=$refA" -Headers $H
 Check "unpublish empties B from pool" ($un.ok -and (($poolA2.items | Where-Object { $_.participantRef -eq $refB }).Count -eq 0))
 
+# 8b. c18 — refusals are explicit, machine-readable, and store nothing
+try {
+  PostJson "/api/meet/signal" @{ ownerToken = $tokA; toRef = $refB; fromName = "あや"; anchor = "x" } | Out-Null
+  Check "c18: signal to unpublished peer refused (peer_not_in_pool)" $false
+} catch {
+  $body = $null; try { $body = $_.ErrorDetails.Message | ConvertFrom-Json } catch {}
+  Check "c18: signal to unpublished peer refused (peer_not_in_pool)" (($_.Exception.Response.StatusCode.value__ -eq 404) -and ($body.error -eq "peer_not_in_pool"))
+}
+try {
+  PostJson "/api/meet/signal" @{ ownerToken = $tokA; toRef = $refB; fromName = ""; anchor = "x" } | Out-Null
+  Check "c18: empty name refused (from_name)" $false
+} catch {
+  $body = $null; try { $body = $_.ErrorDetails.Message | ConvertFrom-Json } catch {}
+  Check "c18: empty name refused (from_name)" (($_.Exception.Response.StatusCode.value__ -eq 400) -and ($body.error -eq "from_name"))
+}
+
 # 9. re-publish B for the browser smoke
 PostJson "/api/meet/publish" @{ ownerToken = $tokB; displayName = "カフェの人"; items = @(
   @{ kind = "have"; title = "昼だけのカフェ"; text = "平日昼に間借りで開けている"; tags = @("飲食"); position = 0 },

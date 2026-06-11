@@ -56,6 +56,11 @@ try {
   await page.getByRole("button", { name: "取り込む" }).click();
   await page.getByRole("button", { name: "この2件で確定する" }).click();
   await page.getByText("記憶の下地ができました。").waitFor();
+  // c18: signals to a peer OUTSIDE the pool are refused now — みどり must be
+  // in the pool before あや's seed signal can land.
+  await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "候補に出す", exact: true }).click();
+  await page.getByText("2件を候補に出しました。").waitFor();
 
   // mutual pair: あや signals me, I talk back (応答側 — anchor is the material).
   // The owner token is MINTED on the first home visit — visit before reading it.
@@ -94,7 +99,10 @@ try {
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: "コピー", exact: true }).click();
   await page.locator(".m-talkface").getByText("コピーしました").waitFor();
-  check("clipboard carries the edited words", (await page.evaluate(() => navigator.clipboard.readText())) === edited);
+  // readText comes back CRLF-normalized on Windows for multi-line bodies —
+  // compare with newlines folded (the write side sends the exact string)
+  const clip = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n");
+  check("clipboard carries the edited words", clip === edited.replace(/\r\n/g, "\n"));
   await page.reload({ waitUntil: "networkidle" });
   await page.locator(".m-talkface textarea").waitFor();
   await page.waitForFunction(

@@ -212,6 +212,36 @@ try {
   check("c17 tripwire: draft text never reaches a PX endpoint", apiBodies.every((b) => !b.includes(MARKER)));
   check("…while the contact lane did fire (monitor is live)", apiBodies.some((b) => b.includes("midori@example.jp")));
 
+  // 6b. c18 — 死んだ edge への行為は正直に止まる（成功の顔をさせない）
+  const TOK_B = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2";
+  const sigB = await api("/api/meet/signal", { ownerToken: TOK_B, toRef: myRef, fromName: "カフェの人", anchor: "" });
+  check("c18: seeded second signal from カフェの人 (in pool)", sigB.status === 201);
+  // 呼び名空: clear the name, press こちらも話してみる → 誘導一行（旧: 無言）
+  await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
+  await page.locator("input.m-field").first().fill("");
+  await page.getByRole("button", { name: "保存", exact: true }).first().click();
+  await page.getByRole("button", { name: "保存しました" }).waitFor();
+  await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
+  const cafeCard = page.locator(".m-signal", { hasText: "カフェの人" });
+  await cafeCard.getByRole("button", { name: "こちらも話してみる" }).click();
+  await waitCheck("c18: 呼び名空 → 誘導一行", cafeCard.getByText("先に呼び名を決めてください。"));
+  check("c18: 誘導一行は記憶#nameへのリンクを持つ", await cafeCard.getByRole("link", { name: "記憶で書けます" }).isVisible());
+  check("c18: 呼び名空では mutual にならない", (await cafeCard.locator(".m-talkface").count()) === 0);
+  await shot("07b-c18-name-required");
+  // restore the name, then withdraw カフェの人 from the pool → notInPool line
+  await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
+  await page.locator("input.m-field").first().fill("みどり");
+  await page.getByRole("button", { name: "保存", exact: true }).first().click();
+  await page.getByRole("button", { name: "保存しました" }).waitFor();
+  const unpub = await api("/api/meet/publish", { ownerToken: TOK_B, displayName: "カフェの人", items: [] });
+  check("c18: カフェの人 withdrew from the pool", unpub.body?.ok === true);
+  await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
+  await cafeCard.getByRole("button", { name: "こちらも話してみる" }).click();
+  await waitCheck("c18: 取り下げ済み相手 → 正直な一行", cafeCard.getByText("この相手は、いまは候補に出ていません。"));
+  check("c18: sent/mutual に化けない", (await cafeCard.locator(".m-talkface").count()) === 0 && (await cafeCard.getByRole("button", { name: "こちらも話してみる" }).isVisible()));
+  check("c18: 他カード（あや mutual の c17 面）無変化", (await page.locator(".m-signal", { hasText: "あや" }).locator(".m-talkface").count()) === 1);
+  await shot("07c-c18-not-in-pool");
+
   // 7. receive attempt (fake key) — honest typed error, 第9便: as a DATED
   // ENTRY at the top of AIが見つけた提案
   await page.getByRole("button", { name: "探しに行く" }).click();
