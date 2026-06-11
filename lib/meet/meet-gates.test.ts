@@ -177,13 +177,16 @@ test("M-8: no mask-registration wording or keys survive (the list is a byproduct
   }
 });
 
-// ── M-10 (c10): 合図カードの判断材料 — owner自書きの転載は加工ゼロ ───────────────
+// ── M-10 (c10, c11改定): 合図カードの判断材料 — 受け手側は加工ゼロ ───────────────
 //
 // The signal card shows the sender's ひとこと紹介 (their CURRENT published
-// intro, copied by the inbox endpoint) and the anchor (掛け合わせ式). Both are
-// owner-authored: the UI must render them VERBATIM — no slicing, casing,
-// rewriting. The intro row disappears entirely when empty (no empty frame),
-// and carries no label (自書きの一言は地の文として立つ).
+// intro, copied by the inbox endpoint) and the anchor. The anchor is the
+// string the SENDER composed for this recipient (c11: 送信側で受け手宛てに
+// 組み替えた文字列。パース不能時は line1 先頭80字の verbatim — see
+// lib/meet-ai/anchor.ts, pinned by MA-12). On the RECEIVING side both render
+// VERBATIM — no slicing, casing, rewriting. The intro row disappears entirely
+// when empty (no empty frame), and carries no label (自書きの一言は地の文と
+// して立つ).
 
 test("M-10: signal card renders fromIntro / anchor verbatim; empty intro drops the row", () => {
   const src = read("app/meet/SignalsSection.tsx");

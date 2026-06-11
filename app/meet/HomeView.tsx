@@ -54,6 +54,7 @@ import {
   parseProposalReply,
   generateProposals,
   pickPatrolTarget,
+  anchorForRecipient,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { useT } from "@/lib/i18n/context.tsx";
@@ -401,7 +402,12 @@ export function HomeView() {
     })();
   }, [memory, reload]);
 
-  const talk = async (toRef: string, anchor: string) => {
+  // c11: the anchor leaves this device RECIPIENT-addressed — the sender
+  // recomposes their own line1 (あなた=送り手 → あなた=受け手) before sending;
+  // a parse miss falls back to the verbatim head (fail-close, never blocks).
+  // The receiver still renders whatever arrived verbatim (M-10).
+  const talk = async (toRef: string, line1: string, to: string) => {
+    const anchor = anchorForRecipient(line1, to, displayName);
     await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor });
     await reload();
   };
