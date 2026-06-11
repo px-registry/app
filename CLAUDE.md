@@ -23,6 +23,11 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
 
 - **罠: `--branch main` は Preview 扱い**（secrets 無し→Basic 認証 401）で px-r15.pages.dev は更新されない。
   production branch は `stage-r15-five-test`。
+- **プレビュー確認（c11 Phase 0 で開通）**: px-r15 の Preview 環境には secrets を CLI で置けない
+  （`wrangler pages secret put` は production のみ）→ 別プロジェクト **px-r15-preview**
+  （production branch=`preview-go-check`・BETA/FACILITATOR secrets 設定済・**D1 は本番と共有**）。
+  更新は `npx wrangler pages deploy out --project-name px-r15-preview --branch preview-go-check --commit-dirty=true`。
+  URL は px-r15-preview.pages.dev（資格情報は本番と同じ）。**テスト終了後に project を削除する。**
 - **罠: HTML キャッシュ**。`public/_headers` が HTML=no-cache / `/_next/static`=immutable を配る
   （第8便の沈黙 regression の真因）。_headers では catch-all を `!` で解除しないとルールが合成される。
   既にキャッシュ済みの端末には効かない→その場合はハードリロード（Ctrl+F5）を案内。
