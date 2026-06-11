@@ -1,51 +1,299 @@
 /*
- * R1.5 meet surface — editorial tokens & base styles. Scoped under .meet-scope
+ * R1.5 meet surface — visual refresh (墨と紙の二相). Scoped under .meet-scope
  * so the rest of px-app (dark registry theme) is untouched.
  *
- * Lineage:
- *   paper / line / ink     px-table app/globals.css warm-paper palette (既存トークン)
- *   radius / shadow        px-table --radius-* / --shadow-* values
- *   --shu                  朱 — calm vermillion, the single accent of this surface
- *   headings               Shippori Mincho (next/font/google, unicode-range sliced
- *                          → no tofu, lazy slices → fast); body = system JA sans
- *                          (user-written text can never tofu)
+ * Token discipline (指示書 §3-1): component rules NEVER write a colour, shadow
+ * or letter-spacing literal — they reference tokens only. Every colour literal
+ * in this file sits on a custom-property definition line (pinned by
+ * lib/meet/visual-gates.test.ts). The two phases share ONE token structure:
+ * paper is the default on .meet-scope, sumi overrides under
+ * html[data-theme="sumi"] (set before paint by THEME_INIT_SCRIPT).
+ *
+ * Lineage: px-home-ja-paper-v3.html / px-home-ja-sumi-v3.html (正本).
+ * 減灯 confirmed: no glow box-shadow, no drop-shadow(glow), pulse is a still
+ * point. The ring's sacred trio (outer 1.8 / inner 0.4 / gap 6) lives in
+ * Ring.tsx; the decorative mini rings here scale the same ratio down.
  */
 
 .meet-scope {
-  /* paper */
-  --paper: #fcfaf6;
-  --surface: #ffffff;
-  --surface-2: #f7f3ec;
-  --line: #ece6db;
-  --line-2: #e1d9cb;
-  /* ink */
-  --ink: #23262e;
-  --text: #525965;
-  --muted: #9197a1;
-  /* 朱 */
-  --shu: #b04437;
-  --shu-deep: #9a392d;
-  --shu-soft: rgba(176, 68, 55, 0.07);
-  --shu-line: rgba(176, 68, 55, 0.34);
-  /* shape */
-  --radius-card: 14px;
-  --radius-btn: 11px;
-  --radius-lg: 16px;
-  --shadow-soft: 0 1px 2px rgba(30, 24, 12, 0.04), 0 10px 28px -18px rgba(30, 24, 12, 0.14);
+  /* ── 紙 (paper) — the default phase ─────────────────────────────────────── */
+  --ground: #f4f1e9;
+  --ground-hi: #fcfbf8;
+  --ground-lo: #e9e5d8;
+  --card: #ffffff;
+  --ink: #1c1a16;
+  --text: #2a2722;
+  --sub: #6d675a; /* floor for type under 13px */
+  --faint: #9c9584; /* rules & ornament ONLY — never type */
+  --line: #e4dfd0;
+  --line-deep: #d2ccb9;
+  --line-soft: rgba(28, 26, 22, 0.07);
+  --shu: #b5391f;
+  --shu-hot: #cd4a28;
+  --shu-deep: #92301a;
+  --shu-lit: #b5391f; /* 傍点 — paper keeps plain 朱 */
+  --shu-line: rgba(181, 57, 31, 0.32);
+  --shu-soft: rgba(181, 57, 31, 0.06);
+  --shu-ring: rgba(181, 57, 31, 0.1);
+  --shu-state: #b5391f; /* statechip / chip.on text */
+  --ok: #3e7a52;
+  --ok-halo: rgba(62, 122, 82, 0.22);
+  --sel: rgba(181, 57, 31, 0.16);
+
+  /* 印の和色 — owner picks; PX never assigns (no hash colouring) */
+  --seal-ame: #6e4520;
+  --seal-seiji: #3c5a50;
+  --seal-rikyu: #5a5240;
+  --seal-text: #f4efe4;
+
+  /* washes & wells (translucent surfaces) */
+  --wash: rgba(255, 255, 255, 0.75);
+  --wash-soft: rgba(255, 255, 255, 0.7);
+  --well: #fcfbf8;
+  --well-border: #d2ccb9;
+  --card-top: #e4dfd0;
+  --card-face: #ffffff;
+  --card-border-hover: #d2ccb9;
+  --ghost-bg: rgba(255, 255, 255, 0.7);
+  --ghost-bg-hover: #ffffff;
+  --hover-wash: rgba(28, 26, 22, 0.05);
+  --current-wash: rgba(28, 26, 22, 0.07);
+
+  /* scene (fixed pseudo-element; background-attachment:fixed is BANNED — iOS) */
+  --scene:
+    radial-gradient(1100px 640px at -10% -6%, rgba(255, 255, 255, 0.85), transparent 56%),
+    radial-gradient(1200px 700px at 86% -14%, rgba(205, 74, 40, 0.05), transparent 60%),
+    radial-gradient(1500px 980px at 50% 120%, rgba(28, 26, 22, 0.15), transparent 62%),
+    linear-gradient(178deg, #fcfbf8 0%, #f4f1e9 52%, #e9e5d8 100%);
+  --grain-opacity: 0.05;
+  --grain-blend: multiply;
+
+  --header-bg: linear-gradient(180deg, rgba(252, 251, 248, 0.92), rgba(252, 251, 248, 0.78));
+  --meter-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
+  --meter-border: rgba(28, 26, 22, 0.1);
+  --meter-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(28, 26, 22, 0.04);
+  --shadow-1:
+    0 1px 1px rgba(28, 26, 22, 0.04), 0 2px 4px rgba(28, 26, 22, 0.04),
+    0 14px 34px -14px rgba(28, 26, 22, 0.13);
+  --shadow-2:
+    0 1px 1px rgba(28, 26, 22, 0.05), 0 3px 6px rgba(28, 26, 22, 0.05),
+    0 20px 44px -16px rgba(28, 26, 22, 0.18);
+  --well-inset: inset 0 1px 2px rgba(28, 26, 22, 0.03);
+  --btn-fill-bg: linear-gradient(180deg, #cd4a28 0%, #b5391f 100%);
+  --btn-fill-border: #92301a;
+  --btn-fill-text: #fff8f4;
+  --btn-fill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 2px 6px rgba(146, 48, 26, 0.22);
+  --btn-fill-active: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+  --btn-text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  --signal-border: rgba(181, 57, 31, 0.3);
+  --signal-bg:
+    radial-gradient(440px 210px at 90% -32%, rgba(206, 77, 45, 0.06), transparent 64%),
+    linear-gradient(180deg, #fffefb, #fffcf6);
+  --emptyface-bg:
+    radial-gradient(640px 300px at 50% -20%, rgba(255, 255, 255, 0.8), transparent 70%),
+    rgba(255, 255, 255, 0.45);
+
   /* type */
-  --mincho: var(--font-shippori), "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
-  --sans-ja: -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+  --display-en: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --mincho: var(--font-shippori), "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --ui: var(--font-inter), "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+    "Yu Gothic", sans-serif;
+  --mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+  --ls-body: 0.03em;
+  --ls-wide: 0.04em;
+  --ls-chip: 0.06em;
+  --ls-h1: 0.08em;
+  --ls-h3: 0.1em;
+  --ls-h2: 0.12em;
+  --ls-lab: 0.18em;
+  --ls-btn: 0.22em;
+  --ls-eyebrow: 0.22em;
+  --ls-brand: 0.28em;
+  --ls-tate: 0.34em;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+
+  --radius-card: 14px;
+  --radius-btn: 10px;
   --inset-b: env(safe-area-inset-bottom, 0px);
 
   min-height: 100dvh;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--sans-ja);
-  font-size: 16px;
-  line-height: 1.75;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 13.5px;
+  line-height: 1.95;
+  letter-spacing: var(--ls-body);
+  line-break: strict;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   display: flex;
   flex-direction: column;
+}
+
+/* ── 墨 (sumi) — the same token structure, inverted ─────────────────────────── */
+html[data-theme="sumi"] .meet-scope {
+  --ground: #1a1a1a;
+  --ground-hi: #1a1a1a;
+  --ground-lo: #161616;
+  --card: #222120;
+  --ink: #ece7da; /* the "strong" pole inverts to cream */
+  --text: #e4e0d6;
+  --sub: #a6a195;
+  --faint: #6e6a61;
+  --line: rgba(236, 231, 218, 0.12);
+  --line-deep: rgba(236, 231, 218, 0.28);
+  --line-soft: rgba(236, 231, 218, 0.07);
+  --shu: #c8492b;
+  --shu-hot: #d4583a;
+  --shu-deep: #e9a48e; /* inline accent TEXT on dark — stays readable */
+  --shu-lit: #e06443; /* 傍点 — one step brighter in the dark */
+  --shu-line: rgba(200, 73, 43, 0.38);
+  --shu-soft: rgba(200, 73, 43, 0.07);
+  --shu-ring: rgba(200, 73, 43, 0.1);
+  --shu-state: #e9a48e;
+  --ok: #5fa776;
+  --ok-halo: rgba(95, 167, 118, 0.25);
+  --sel: rgba(200, 73, 43, 0.3);
+
+  --seal-text: #ece7da;
+
+  --wash: rgba(255, 255, 255, 0.03);
+  --wash-soft: rgba(255, 255, 255, 0.02);
+  --well: rgba(0, 0, 0, 0.22);
+  --well-border: rgba(236, 231, 218, 0.12);
+  --card-top: rgba(255, 255, 255, 0.04);
+  --card-face: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 38%), #222120;
+  --card-border-hover: rgba(236, 231, 218, 0.18);
+  --ghost-bg: rgba(255, 255, 255, 0.03);
+  --ghost-bg-hover: rgba(255, 255, 255, 0.05);
+  --hover-wash: rgba(255, 255, 255, 0.05);
+  --current-wash: rgba(255, 255, 255, 0.07);
+
+  --scene:
+    radial-gradient(1100px 520px at 80% -10%, rgba(200, 73, 43, 0.045), transparent 60%),
+    radial-gradient(900px 480px at -10% 4%, rgba(236, 231, 218, 0.025), transparent 58%),
+    linear-gradient(180deg, #1a1a1a 0%, #161616 100%);
+  --grain-opacity: 0.03;
+  --grain-blend: overlay;
+
+  --header-bg: rgba(26, 26, 26, 0.82);
+  --meter-bg: rgba(255, 255, 255, 0.02);
+  --meter-border: rgba(236, 231, 218, 0.12);
+  --meter-shadow: none;
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35), 0 14px 36px -18px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 1px 0 rgba(0, 0, 0, 0.35), 0 14px 36px -18px rgba(0, 0, 0, 0.5);
+  --well-inset: none;
+  --btn-fill-bg: linear-gradient(180deg, #d4583a, #a93a22);
+  --btn-fill-border: rgba(255, 150, 118, 0.28);
+  --btn-fill-text: #fff6f1;
+  --btn-fill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --btn-fill-active: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  --btn-text-shadow: none;
+  --signal-border: rgba(200, 73, 43, 0.34);
+  --signal-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 40%), #222120;
+  --emptyface-bg: rgba(255, 255, 255, 0.018);
+}
+
+.meet-scope ::selection {
+  background: var(--sel);
+  color: var(--ink);
+}
+
+/* fixed scene + film grain — body::before 方式 (iOS-safe), scoped to the
+   surface. The grain breaks gradient banding; 紙5% multiply / 墨3% overlay. */
+.meet-scope::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: var(--scene);
+}
+.meet-scope::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+}
+
+.meet-scope .mono {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 輪 — the stateful Ring component (Ring.tsx owns the sacred trio) ──────── */
+.m-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.m-ring svg {
+  display: block;
+}
+.m-ring.is-open {
+  color: var(--shu);
+}
+/* the close: open → pair animates the arc shut (~300ms); the blanket
+   reduced-motion rule below makes it an instant swap */
+.m-ring-arc {
+  transition:
+    stroke-dasharray 0.3s var(--ease),
+    stroke-dashoffset 0.3s var(--ease),
+    stroke-width 0.3s var(--ease),
+    stroke 0.3s var(--ease);
+}
+/* 印 — owner-chosen character + 和色; rendered only when data exists */
+.m-seal {
+  position: absolute;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mincho);
+  font-weight: 600;
+  color: var(--seal-text);
+  user-select: none;
+}
+.m-seal-ame {
+  background: var(--seal-ame);
+}
+.m-seal-seiji {
+  background: var(--seal-seiji);
+}
+.m-seal-rikyu {
+  background: var(--seal-rikyu);
+}
+
+/* ── 輪 — decorative mini rings (brand / footer). The stateful Ring lives in
+   Ring.tsx and keeps the sacred trio 1.8/0.4/6 verbatim; these tiny marks
+   scale the same ratio down so the proportion holds at 12–13px. ───────────── */
+.m-ringlet {
+  position: relative;
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--ink);
+}
+.m-ringlet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.2px solid currentColor;
+}
+.m-ringlet::after {
+  content: "";
+  position: absolute;
+  inset: 4.4px;
+  border-radius: 50%;
+  border: 0.4px solid currentColor;
 }
 
 /* ── frame ─────────────────────────────────────────────────────────────────── */
@@ -54,35 +302,35 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
+  background: var(--header-bg);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--line-soft);
 }
 .m-top-inner {
   max-width: 30rem;
   margin: 0 auto;
-  padding: 0.65rem 1.25rem;
+  padding: 0.8rem 1.25rem;
   display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 0.8rem;
 }
 .m-wordmark {
-  font-family: var(--mincho);
-  font-weight: 600;
-  font-size: 1.05rem;
-  letter-spacing: 0.14em;
-  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
   text-decoration: none;
+  color: var(--ink);
 }
-.m-wordmark::after {
-  content: "";
-  display: inline-block;
-  width: 0.42em;
-  height: 0.42em;
-  margin-left: 0.5em;
-  border-radius: 50%;
-  background: var(--shu);
-  transform: translateY(-0.08em);
+.m-wordmark .m-word {
+  font-family: var(--display-en);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: var(--ls-brand);
+  text-indent: 0.06em;
+  margin-right: -0.28em;
+  /* optical trim — position, not transform (reduced-motion must not undo it) */
+  position: relative;
+  top: -1px;
 }
 
 .m-main {
@@ -90,7 +338,7 @@
   width: 100%;
   max-width: 30rem;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem calc(5.5rem + var(--inset-b));
+  padding: 0 1.25rem calc(5.5rem + var(--inset-b));
 }
 
 .m-nav {
@@ -99,9 +347,9 @@
   left: 0;
   right: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-soft);
   padding-bottom: var(--inset-b);
 }
 .m-nav-inner {
@@ -115,21 +363,171 @@
   display: block;
   text-align: center;
   padding: 0.85rem 0.25rem 0.95rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: var(--ls-chip);
+  color: var(--sub);
   text-decoration: none;
   border-top: 2px solid transparent;
   margin-top: -1px;
+  transition: color 0.18s var(--ease);
 }
 .m-nav-item[aria-current="page"],
 .m-nav-item[data-active="true"] {
-  color: var(--shu-deep);
+  color: var(--ink);
   border-top-color: var(--shu);
 }
-/* desktop header nav — hidden until the desktop layer turns it on */
 .m-nav-top {
   display: none;
+}
+
+/* header right cluster: theme + language */
+.m-toggles {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.m-langtoggle,
+.m-themetoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.m-toggle-opt {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0.2rem 0.1rem;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: var(--ls-chip);
+  color: var(--sub);
+  cursor: pointer;
+  transition: color 0.16s var(--ease);
+}
+.m-toggle-opt:hover {
+  color: var(--ink);
+}
+.m-toggle-opt.is-active {
+  color: var(--ink);
+}
+.m-toggle-opt:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 2px;
+}
+.m-toggle-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+/* ── hero ──────────────────────────────────────────────────────────────────── */
+
+.m-hero {
+  position: relative;
+  padding: clamp(2.4rem, 7vw, 4.5rem) 0 clamp(1.6rem, 4vw, 2.6rem);
+}
+.m-hero h1 {
+  font-family: var(--mincho);
+  font-size: clamp(24px, 4.2vw, 44px);
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: var(--ls-h1);
+  font-feature-settings: "palt";
+  color: var(--ink);
+  max-width: 20em;
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .m-hero h1 br {
+    display: none;
+  }
+}
+.m-hero h1 .m-shu {
+  color: var(--shu);
+}
+/* 傍点 — the only emphasis dots on the surface (ヒーローの「誰もいない」) */
+.m-hero h1 em {
+  font-style: normal;
+  color: var(--shu-lit);
+  -webkit-text-emphasis: filled dot var(--shu-lit);
+  text-emphasis: filled dot var(--shu-lit);
+  -webkit-text-emphasis-position: over right;
+  text-emphasis-position: over right;
+}
+.m-hero .m-hero-sub {
+  margin: 22px 0 0;
+  font-size: 14px;
+  color: var(--sub);
+  max-width: 36em;
+  line-height: 2.05;
+  letter-spacing: var(--ls-wide);
+}
+/* 縦の銘 — hidden under 1280px */
+.m-tate {
+  position: absolute;
+  top: clamp(2.4rem, 7vw, 4.5rem);
+  right: 0;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  writing-mode: vertical-rl;
+  font-family: var(--mincho);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: var(--ls-tate);
+  color: var(--sub);
+  height: min(21em, 46vh);
+}
+.m-tate::before {
+  content: "";
+  display: block;
+  inline-size: 1px;
+  block-size: 3.2em;
+  background: var(--line-deep);
+  margin-block-end: 1.2em;
+}
+@media (max-width: 1280px) {
+  .m-tate {
+    display: none;
+  }
+}
+
+/* 計器行 — the meter. The pulse is a STILL point (鼓動静止). */
+.m-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+  padding: 9px 18px;
+  border: 1px solid var(--meter-border);
+  border-radius: 999px;
+  background: var(--meter-bg);
+  box-shadow: var(--meter-shadow);
+  font-size: 12px;
+  color: var(--sub);
+}
+.m-meter .m-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.m-meter .m-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 1px var(--ok-halo);
+}
+.m-meter .m-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
 }
 
 /* ── type ──────────────────────────────────────────────────────────────────── */
@@ -138,57 +536,134 @@
   font-family: var(--mincho);
   font-weight: 600;
   font-size: 1.45rem;
-  letter-spacing: 0.06em;
-  line-height: 1.5;
-  margin: 0 0 0.4rem;
-}
-/* 題字 (page heading). Mobile keeps the quiet tagline size it always had;
- * the desktop layer enlarges it to stand above the columns. */
-.m-h1.m-pagetitle {
-  font-size: 1.15rem;
+  letter-spacing: var(--ls-h1);
+  font-feature-settings: "palt";
   line-height: 1.6;
+  color: var(--ink);
+  margin: 1.6rem 0 0.4rem;
 }
 .m-h2 {
   font-family: var(--mincho);
   font-weight: 600;
-  font-size: 1.1rem;
-  letter-spacing: 0.05em;
+  font-size: 17px;
+  letter-spacing: var(--ls-h2);
+  font-feature-settings: "palt";
+  color: var(--ink);
   margin: 0 0 0.5rem;
+}
+.m-eyebrow {
+  font-family: var(--ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--sub);
+  margin: 0;
+}
+.m-secrow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 3px 0 0;
+}
+.m-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1.5px 8px;
+  background: var(--wash);
 }
 .m-lede {
   color: var(--text);
   margin: 0 0 1.25rem;
 }
 .m-note {
-  font-size: 0.82rem;
-  color: var(--muted);
-  line-height: 1.7;
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 2.05;
   margin: 0.5rem 0 0;
 }
 
 /* ── blocks ────────────────────────────────────────────────────────────────── */
 
 .m-section {
-  margin: 0 0 2rem;
+  margin: 0 0 2.2rem;
 }
 .m-card {
-  background: var(--surface);
+  background: var(--card-face);
   border: 1px solid var(--line);
+  border-top-color: var(--card-top);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-soft);
-  padding: 1.1rem 1.15rem;
+  box-shadow: var(--shadow-1);
+  padding: 1.2rem 1.25rem;
 }
 .m-card + .m-card {
   margin-top: 0.75rem;
 }
 .m-empty {
-  border: 1px dashed var(--line-2);
+  border: 1px dashed var(--line-deep);
   border-radius: var(--radius-card);
   padding: 1.4rem 1.15rem;
-  color: var(--muted);
+  color: var(--sub);
   font-size: 0.92rem;
   text-align: center;
   background: transparent;
+}
+
+/* 今日は無い — 沈黙の禁止の一面。空白を埋めず、証拠を添えて、静かに言い切る。 */
+.m-emptyface {
+  margin-top: 1.4rem;
+  padding: clamp(3.2rem, 9vw, 6rem) clamp(1.2rem, 4vw, 3rem);
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--emptyface-bg);
+  box-shadow: var(--shadow-1);
+}
+.m-emptyface h3 {
+  margin: 30px 0 0;
+  font-family: var(--mincho);
+  font-size: clamp(19px, 2.6vw, 24px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  font-feature-settings: "palt";
+  color: var(--ink);
+}
+.m-emptyface .m-ev {
+  margin: 16px auto 0;
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 2.15;
+  max-width: 32em;
+}
+.m-emptyface .m-facts {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 26px;
+  padding: 8px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--wash-soft);
+  font-size: 12px;
+  color: var(--sub);
+}
+.m-emptyface .m-facts .m-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.m-emptyface .m-next {
+  margin: 28px 0 0;
+  font-size: 12px;
+  color: var(--sub);
+  letter-spacing: var(--ls-chip);
 }
 
 .m-promise {
@@ -196,12 +671,35 @@
 }
 .m-promise summary {
   cursor: pointer;
+  list-style: none;
   font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  letter-spacing: var(--ls-chip);
+  color: var(--sub);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.16s var(--ease);
 }
-.m-promise[open] summary {
-  color: var(--shu-deep);
+.m-promise summary:hover {
+  color: var(--ink);
+}
+.m-promise summary::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  transform-origin: 60% 60%;
+  transition: transform 0.2s var(--ease);
+}
+.m-promise[open] summary::before {
+  transform: rotate(45deg);
+}
+.m-promise summary:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 3px;
 }
 
 .m-boundary {
@@ -214,8 +712,8 @@
 .m-boundary p {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.7;
+  color: var(--sub);
+  line-height: 1.9;
 }
 
 /* ── controls ──────────────────────────────────────────────────────────────── */
@@ -228,28 +726,49 @@
   gap: 0.4em;
   border-radius: var(--radius-btn);
   border: 1px solid transparent;
-  font-family: inherit;
-  font-size: 0.95rem;
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: var(--ls-btn);
+  text-indent: 0.22em;
   line-height: 1;
-  padding: 0.85rem 1.2rem;
+  padding: 0.85rem 1.1rem;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    filter 0.18s var(--ease),
+    transform 0.18s var(--ease),
+    box-shadow 0.18s var(--ease),
+    border-color 0.18s var(--ease),
+    background 0.18s var(--ease);
+}
+.m-btn:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 2px;
 }
 .m-btn-primary {
-  background: var(--shu);
-  color: #fff;
+  color: var(--btn-fill-text);
+  background: var(--btn-fill-bg);
+  border-color: var(--btn-fill-border);
+  box-shadow: var(--btn-fill-shadow);
+  text-shadow: var(--btn-text-shadow);
 }
 .m-btn-primary:hover {
-  background: var(--shu-deep);
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.m-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--btn-fill-active);
 }
 .m-btn-quiet {
-  background: var(--surface);
-  border-color: var(--line-2);
+  background: var(--ghost-bg);
+  border-color: var(--line-deep);
   color: var(--ink);
 }
 .m-btn-quiet:hover {
-  border-color: var(--shu-line);
+  border-color: var(--sub);
+  background: var(--ghost-bg-hover);
 }
 .m-btn-wide {
   width: 100%;
@@ -257,24 +776,31 @@
 .m-btn:disabled {
   opacity: 0.45;
   cursor: default;
+  transform: none;
 }
 
 .m-field {
   width: 100%;
   box-sizing: border-box;
-  background: var(--surface);
-  border: 1px solid var(--line-2);
+  background: var(--well);
+  border: 1px solid var(--well-border);
   border-radius: var(--radius-btn);
-  font-family: inherit;
-  font-size: 16px; /* prevents iOS zoom-on-focus */
-  line-height: 1.7;
-  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 16px; /* prevents iOS zoom-on-focus (repo trap — keep ≥16px) */
+  line-height: 1.8;
+  color: var(--text);
   padding: 0.75rem 0.9rem;
+  transition:
+    border-color 0.18s var(--ease),
+    box-shadow 0.18s var(--ease);
+}
+.m-field::placeholder {
+  color: var(--sub);
 }
 .m-field:focus {
   outline: none;
   border-color: var(--shu-line);
-  box-shadow: 0 0 0 3px var(--shu-soft);
+  box-shadow: 0 0 0 3px var(--shu-ring);
 }
 textarea.m-field {
   resize: vertical;
@@ -284,12 +810,41 @@ textarea.m-field {
 .m-chip {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--line-deep);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.8rem;
-  padding: 0.3rem 0.75rem;
+  background: var(--ghost-bg);
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 450;
+  letter-spacing: var(--ls-chip);
+  padding: 6px 14px;
+}
+.m-chip-pick {
+  cursor: pointer;
+  appearance: none;
+  font-family: inherit;
+  transition:
+    color 0.16s var(--ease),
+    border-color 0.16s var(--ease),
+    transform 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+.m-chip-pick:hover {
+  color: var(--ink);
+  border-color: var(--sub);
+  transform: translateY(-1px);
+}
+.m-chip-pick:active {
+  transform: translateY(0);
+}
+.m-chip-pick:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 2px;
+}
+.m-chip-active {
+  color: var(--shu-state);
+  border-color: var(--shu-line);
+  background: var(--shu-soft);
 }
 
 /* ── memory items ──────────────────────────────────────────────────────────── */
@@ -299,13 +854,22 @@ textarea.m-field {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.7rem;
 }
 .m-item {
-  background: var(--surface);
+  background: var(--card-face);
   border: 1px solid var(--line);
+  border-top-color: var(--card-top);
   border-radius: var(--radius-card);
-  padding: 0.85rem 0.95rem;
+  box-shadow: var(--shadow-1);
+  padding: 0.95rem 1.05rem;
+  transition:
+    border-color 0.25s var(--ease),
+    box-shadow 0.25s var(--ease);
+}
+.m-item:hover {
+  border-color: var(--card-border-hover);
+  box-shadow: var(--shadow-2);
 }
 .m-item-head {
   display: flex;
@@ -318,6 +882,7 @@ textarea.m-field {
   margin: 0;
   font-weight: 600;
   font-size: 0.95rem;
+  color: var(--ink);
 }
 .m-item-text {
   margin: 0.1rem 0 0;
@@ -326,45 +891,59 @@ textarea.m-field {
 }
 .m-item-tags {
   margin: 0.3rem 0 0;
-  color: var(--muted);
+  color: var(--sub);
   font-size: 0.78rem;
 }
 .m-item-actions {
   display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  gap: 1.1rem;
+  margin-top: 0.55rem;
 }
 .m-link {
   appearance: none;
   background: none;
   border: none;
-  padding: 0;
+  padding: 0 0 1px;
   font-family: inherit;
   font-size: 0.82rem;
-  color: var(--shu-deep);
+  color: var(--sub);
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-deep);
+  transition:
+    color 0.16s var(--ease),
+    border-color 0.16s var(--ease);
+}
+.m-link:hover {
+  color: var(--shu-deep);
+  border-bottom-color: var(--shu-deep);
+}
+.m-link:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 2px;
 }
 
 /* 公開/非公開 toggle — quiet pill, 朱 when public */
 .m-toggle {
   appearance: none;
-  border: 1px solid var(--line-2);
-  background: var(--surface-2);
-  color: var(--muted);
+  border: 1px solid var(--line-deep);
+  background: var(--ghost-bg);
+  color: var(--sub);
   border-radius: 999px;
   font-family: inherit;
   font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--ls-wide);
   padding: 0.3rem 0.8rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    color 0.16s var(--ease),
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease);
 }
 .m-toggle-on {
   border-color: var(--shu-line);
   background: var(--shu-soft);
-  color: var(--shu-deep);
+  color: var(--shu-state);
 }
 
 .m-kindrow {
@@ -372,16 +951,6 @@ textarea.m-field {
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-bottom: 0.6rem;
-}
-.m-chip-pick {
-  cursor: pointer;
-  appearance: none;
-  font-family: inherit;
-}
-.m-chip-active {
-  border-color: var(--shu-line);
-  background: var(--shu-soft);
-  color: var(--shu-deep);
 }
 
 .m-form {
@@ -404,7 +973,6 @@ textarea.m-field {
   color: var(--shu-deep);
 }
 
-/* 未反映バナー — quiet band, not an alarm */
 .m-pending {
   display: flex;
   align-items: center;
@@ -419,11 +987,6 @@ textarea.m-field {
   color: var(--shu-deep);
 }
 
-.m-proposal {
-  border-left: 2px solid var(--shu-line);
-  padding-left: 0.8rem;
-}
-
 .m-backup {
   display: flex;
   flex-wrap: wrap;
@@ -434,42 +997,353 @@ textarea.m-field {
   border-color: var(--shu-line);
 }
 
-/* step number — 朱の丸数字 */
 .m-stepnum {
   font-family: var(--mincho);
   font-weight: 600;
   color: var(--shu-deep);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--ls-wide);
+}
+
+/* ── 置いてある問い rows — ring + body, hairline separators ──────────────────── */
+
+.m-q {
+  display: flex;
+  gap: 14px;
+  padding: 1rem 2px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.m-q .m-q-ring {
+  margin-top: 4px;
+}
+.m-q-ring.is-idle {
+  color: var(--faint);
+}
+.m-q-ring.is-wait {
+  color: var(--ok);
+}
+.m-q .m-q-body {
+  flex: 1;
+  min-width: 0;
+}
+.m-q .m-item-title {
+  font-size: 13px;
+  line-height: 1.75;
+}
+.m-q .m-item-text {
+  font-size: 12px;
+  color: var(--sub);
+}
+.m-state-on {
+  color: var(--ok);
+  font-weight: 500;
+}
+.m-qlist {
+  gap: 0;
+}
+.m-qlist .m-q:last-child {
+  border-bottom: none;
+}
+
+/* ── 提案カード (entry) ─────────────────────────────────────────────────────── */
+
+.m-entry {
+  background: var(--card-face);
+  border: 1px solid var(--line);
+  border-top-color: var(--card-top);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+  padding: 0;
+  transition:
+    border-color 0.25s var(--ease),
+    box-shadow 0.25s var(--ease),
+    transform 0.25s var(--ease);
+}
+.m-entry:hover {
+  border-color: var(--card-border-hover);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.m-entry-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.m-entry-when {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--sub);
+}
+.m-entry-pill {
+  font-size: 11px;
+  color: var(--sub);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: var(--wash);
+}
+.m-entry-inner {
+  padding: 1.1rem 1.15rem 1.05rem;
+}
+.m-cardhead {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+}
+.m-cardhead h3 {
+  font-family: var(--mincho);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: var(--ls-h3);
+  font-feature-settings: "palt";
+  color: var(--ink);
+  line-height: 1.4;
+  margin: 0;
+}
+.m-cardhead .m-ring {
+  color: var(--sub);
+}
+.m-statechip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--shu-state);
+  white-space: nowrap;
+  border: 1px solid var(--shu-line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--shu-soft);
+}
+.m-statechip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--shu);
+}
+.m-entry-body {
+  margin: 0.85rem 0 0;
+  font-size: 14px;
+  line-height: 2.05;
+  color: var(--text);
+  max-width: 42em;
+}
+.m-basis {
+  margin-top: 0.9rem;
+  padding: 12px 15px;
+  background: var(--well);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  box-shadow: var(--well-inset);
+}
+.m-basis summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: var(--ls-lab);
+  color: var(--sub);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.16s var(--ease);
+}
+.m-basis summary:hover {
+  color: var(--ink);
+}
+.m-basis summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  transform-origin: 60% 60%;
+  transition: transform 0.2s var(--ease);
+}
+.m-basis[open] summary::before {
+  transform: rotate(45deg);
+}
+.m-basis .m-item-text {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.95;
+}
+.m-rawfold summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: var(--sub);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.16s var(--ease);
+}
+.m-rawfold summary:hover {
+  color: var(--ink);
+}
+.m-rawfold summary::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  transform-origin: 60% 60%;
+  transition: transform 0.2s var(--ease);
+}
+.m-rawfold[open] summary::before {
+  transform: rotate(45deg);
+}
+.m-proposal {
+  border-left: 2px solid var(--shu-line);
+  padding-left: 0.9rem;
+}
+
+/* ── 合図カード — in（片側）/ pair（相互）の2態 ─────────────────────────────── */
+
+.m-signal {
+  background: var(--signal-bg);
+  border: 1px solid var(--signal-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+  padding: 1.15rem 1.2rem;
+}
+/* 片側だけの合図：枠は静か。あなたが押した瞬間に朱が立つ */
+.m-signal.is-in {
+  border-color: var(--line);
+  background: var(--card-face);
+}
+.m-signal .m-sighead {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.m-sighead .m-ring {
+  color: var(--shu);
+}
+.m-sighead h4 {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.9;
+  color: var(--ink);
+  margin: 0;
+}
+.m-pairline {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.95;
+  color: var(--text);
+  padding-left: 14px;
+  border-left: 2px solid var(--shu-line);
+}
+.m-accent {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--shu-state);
+  line-height: 2;
+}
+.m-wait {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.m-respond {
+  margin-top: 0.9rem;
+}
+.m-foot-row {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  gap: 1.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── footer ────────────────────────────────────────────────────────────────── */
+
+.m-foot {
+  border-top: 1px solid var(--line-soft);
+  padding: 1.8rem 1.25rem calc(1.6rem + var(--inset-b));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 11px;
+}
+.m-foot .m-ringlet {
+  width: 12px;
+  height: 12px;
+  color: var(--sub);
+}
+.m-foot .m-ringlet::before {
+  border-width: 1.1px;
+}
+.m-foot .m-ringlet::after {
+  inset: 4px;
+}
+.m-foot .m-kk {
+  font-family: var(--display-en);
+  font-size: 14px;
+  letter-spacing: var(--ls-h3);
+  color: var(--sub);
+}
+
+/* ── entrance (正本どおり; reduced-motion stops it) ─────────────────────────── */
+
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.m-hero h1 {
+  animation: m-rise 0.7s var(--ease) both;
+}
+.m-hero .m-hero-sub {
+  animation: m-rise 0.7s 0.08s var(--ease) both;
+}
+.m-hero .m-meter {
+  animation: m-rise 0.7s 0.16s var(--ease) both;
+}
+.m-tate {
+  animation: m-rise 0.9s 0.26s var(--ease) both;
 }
 
 @media (min-width: 40rem) {
-  .m-main {
-    padding-top: 2.25rem;
-  }
   .m-h1 {
     font-size: 1.6rem;
   }
 }
 
-/* ── desktop (第5便, ≥64rem): the paper widens — mobile below stays as-is ────
- *
- * Additive only: same tokens, same type, no new colour. The thumb bar becomes
- * a header line, the single column becomes columns, reading width stays
- * editorial (~65ch caps where prose flows).
- */
+/* ── desktop (≥64rem): the paper widens — v3 frame proportions ──────────────── */
 @media (min-width: 64rem) {
   .m-top-inner,
-  .m-main {
+  .m-main,
+  .m-foot {
     max-width: 72rem;
     padding-left: 3rem;
     padding-right: 3rem;
   }
   .m-main {
-    padding-top: 3rem;
     padding-bottom: 4.5rem; /* no bottom tab bar at this width */
   }
 
-  /* nav: the thumb bar yields to the header row */
   .m-nav {
     display: none;
   }
@@ -477,112 +1351,83 @@ textarea.m-field {
     display: block;
     margin-left: auto;
   }
+  .m-toggles {
+    margin-left: 1.25rem;
+  }
   .m-nav-top .m-nav-inner {
     max-width: none;
     display: flex;
-    gap: 1.75rem;
+    gap: 0.4rem;
   }
   .m-nav-top .m-nav-item {
-    padding: 0.15rem 0;
-    font-size: 0.85rem;
+    padding: 0.35rem 0.85rem;
+    font-size: 13px;
     margin-top: 0;
     border-top: none;
-    border-bottom: 2px solid transparent;
+    border-radius: 8px;
+    transition:
+      color 0.18s var(--ease),
+      background 0.18s var(--ease);
+  }
+  .m-nav-top .m-nav-item:hover {
+    color: var(--ink);
+    background: var(--hover-wash);
   }
   .m-nav-top .m-nav-item[aria-current="page"],
   .m-nav-top .m-nav-item[data-active="true"] {
+    color: var(--ink);
+    background: var(--current-wash);
     border-top-color: transparent;
-    border-bottom-color: var(--shu);
   }
 
-  /* 題字 — the page heading stands full-width above the columns */
   .m-h1.m-pagetitle {
     font-size: 2rem;
     line-height: 1.5;
-    letter-spacing: 0.08em;
-    margin: 0 0 2.25rem;
+    margin: 2rem 0 2.25rem;
   }
 
-  /* ── home 構図: 主柱=届いた提案（読み物）, 側柱=問いの手（静かな一枚） ──
-   * DOM keeps the mobile order; the grid swaps the columns. */
+  /* ── home 構図: 主柱=AIが見つけた提案（7fr）, 側柱=問いの手（4fr） ──────── */
   .m-home {
     display: grid;
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    column-gap: 3.5rem;
+    grid-template-columns: minmax(0, 7fr) minmax(320px, 4fr);
+    column-gap: clamp(28px, 3.4vw, 56px);
     align-items: start;
   }
   .m-home-right {
     grid-column: 1;
     grid-row: 1;
   }
-  .m-home-right .m-item {
-    max-width: 65ch;
-  }
-  /* the side: ONE framed shape — inner boxes flatten to hairlines + space */
   .m-home-left {
     grid-column: 2;
     grid-row: 1;
-    position: sticky;
-    top: 4.5rem;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-soft);
-    padding: 1.4rem 1.5rem;
   }
+  /* the rail: quiet sections separated by hairlines (v3 rail) */
   .m-home-left .m-section {
     margin: 0;
-    padding: 1.15rem 0;
-    border-top: 1px solid var(--line);
+    padding: 1.6rem 0;
+    border-top: 1px solid var(--line-soft);
   }
   .m-home-left .m-section:first-child {
     padding-top: 0;
     border-top: none;
   }
-  .m-home-left .m-section:last-of-type {
-    padding-bottom: 0;
-  }
-  .m-home-left .m-h2 {
-    font-size: 0.95rem;
-  }
-  .m-home-left .m-card,
-  .m-home-left .m-empty {
-    border: none;
-    box-shadow: none;
-    background: transparent;
-    padding: 0;
-    text-align: left;
-  }
-  .m-home-left .m-itemlist {
-    gap: 0;
-  }
-  .m-home-left .m-item {
-    border: none;
-    border-top: 1px solid var(--line);
-    border-radius: 0;
-    background: transparent;
-    padding: 0.7rem 0;
-  }
-  .m-home-left .m-item:first-child {
-    border-top: none;
-    padding-top: 0.2rem;
-  }
   .m-home-left .m-btn {
-    padding: 0.6rem 0.95rem;
-    font-size: 0.88rem;
+    padding: 0.7rem 0.95rem;
+    font-size: 12.5px;
   }
   /* 朱は1画面に1つ（探しに行く）— the per-card CTA keeps a 朱 edge, not a fill */
-  .m-home-right .m-proposal .m-btn-primary {
-    background: var(--surface);
+  .m-home-right .m-proposal-talk.m-btn-primary {
+    background: var(--ghost-bg);
     border-color: var(--shu-line);
     color: var(--shu-deep);
+    box-shadow: none;
+    text-shadow: none;
   }
-  .m-home-right .m-proposal .m-btn-primary:hover {
+  .m-home-right .m-proposal-talk.m-btn-primary:hover {
     background: var(--shu-soft);
   }
 
-  /* ── 記憶 構図: 主柱=あなたの記憶, 側柱=名前・候補に出す・整理 ──────────
-   * Flat zones; DOM order stays mobile's (名前→記憶→候補→整理→やくそく). */
+  /* ── 記憶 構図 (unchanged skeleton) ─────────────────────────────────────── */
   .m-mem {
     display: grid;
     grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
@@ -610,17 +1455,15 @@ textarea.m-field {
     grid-column: 1;
     grid-row: 4;
   }
-  /* the side rail speaks quietly: thin frames, small buttons */
   .m-mem-profile .m-card,
   .m-mem-publish .m-card {
     box-shadow: none;
   }
   .m-mem-profile .m-btn,
   .m-mem-backup .m-btn {
-    padding: 0.6rem 0.95rem;
-    font-size: 0.88rem;
+    padding: 0.7rem 0.95rem;
+    font-size: 12.5px;
   }
-  /* memory cards in two columns; an open editor takes the full row */
   .m-grid2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
@@ -629,7 +1472,7 @@ textarea.m-field {
     grid-column: 1 / -1;
   }
 
-  /* はじめかた: 1・2・3 side by side, equal height */
+  /* はじめかた: 1・2・3 side by side */
   .m-steps {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -640,7 +1483,7 @@ textarea.m-field {
     margin-top: 0;
   }
 
-  /* 進行役 構図: 主柱=提案と読み, 側柱=候補プール＋ながれ */
+  /* 進行役 構図 */
   .m-host {
     display: grid;
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
@@ -656,9 +1499,23 @@ textarea.m-field {
     grid-row: 1;
   }
 
-  /* prose blocks keep an editorial measure on the wide paper */
   .m-boundary,
   .m-lede {
     max-width: 65ch;
+  }
+}
+
+/* reduced-motion: stop motion ONLY — static optical trims (top:-1px) stay */
+@media (prefers-reduced-motion: reduce) {
+  .meet-scope *,
+  .meet-scope *::before,
+  .meet-scope *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .meet-scope .m-btn-primary:hover,
+  .meet-scope .m-chip-pick:hover,
+  .meet-scope .m-entry:hover {
+    transform: none !important;
   }
 }
