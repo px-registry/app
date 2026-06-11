@@ -116,12 +116,11 @@ export function SignalsSection({
                   <Ring state={sig.mutual ? "pair" : "open"} size={26} />
                   <h4>{MEET.home.signals.incoming(sig.fromName)}</h4>
                 </div>
-                {sig.fromIntro.trim() !== "" && (
-                  <p className="m-item-tags" style={{ margin: "0.4rem 0 0" }}>
-                    {sig.fromName}——{sig.fromIntro}
-                  </p>
-                )}
                 {sig.anchor !== "" && <p className="m-pairline">{sig.anchor}</p>}
+                {/* c10: 判断材料 — 相手のひとこと紹介（owner自書き・公開済みの転載）。
+                    式の下に引用の体で、ラベルなし・加工ゼロ（表示値=保存値）。
+                    空なら行ごと出さない。 */}
+                {sig.fromIntro.trim() !== "" && <p className="m-introline">{sig.fromIntro}</p>}
                 {sig.mutual ? (
                   <ContactExchange
                     peerRef={sig.fromRef}

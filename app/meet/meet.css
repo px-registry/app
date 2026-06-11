@@ -1228,6 +1228,16 @@ textarea.m-field {
   padding-left: 14px;
   border-left: 2px solid var(--shu-line);
 }
+/* c10: 相手のひとこと紹介 — 自書きの一言は地の文として立つ（ラベルなし）。
+   pairline と同系の引用枠だが、罫は朱でなく地の罫で一段控えめ。 */
+.m-introline {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.95;
+  color: var(--text);
+  padding-left: 14px;
+  border-left: 2px solid var(--line-deep);
+}
 .m-accent {
   margin: 10px 0 0;
   font-size: 12px;
