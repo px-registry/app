@@ -42,6 +42,14 @@ export { anchorForRecipient, MAX_ANCHOR } from "./anchor.ts";
 export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";
 export { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
 export {
+  FIRST_NOTE_PROMPT,
+  buildFirstNotePrompt,
+  parseFirstNoteReply,
+  firstNoteMaterialFor,
+  type FirstNoteMaterial,
+  type FirstNoteEntryLike,
+} from "./firstnote.ts";
+export {
   gateCardsByProvenance,
   entryFace,
   faceOfEntry,

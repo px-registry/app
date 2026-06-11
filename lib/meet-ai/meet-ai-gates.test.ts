@@ -22,6 +22,12 @@ import {
 } from "./prompt.ts";
 import { probeOllama } from "./generate.ts";
 import { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
+import {
+  FIRST_NOTE_PROMPT,
+  buildFirstNotePrompt,
+  parseFirstNoteReply,
+  firstNoteMaterialFor,
+} from "./firstnote.ts";
 import { gateCardsByProvenance, entryFace, faceOfEntry } from "./provenance.ts";
 import { anchorForRecipient, MAX_ANCHOR } from "./anchor.ts";
 import { pickPatrolTarget } from "./patrol.ts";
@@ -668,4 +674,85 @@ test("MA-6d: probeOllama — reachable lists models; unreachable/odd is fail-clo
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+// ── MA-13 (c17): 第一信の下書き — prompt verbatim・材料・fail-closed parse ──────
+
+test("MA-13: FIRST_NOTE_PROMPT is the c17 指示書 §2 text, verbatim", () => {
+  assert.equal(
+    FIRST_NOTE_PROMPT,
+    [
+      "あなたは、ownerの最初のひとことを下書きする取次です。",
+      "材料: 提案の3行（接点）、相手の公開項目、ownerの呼び名とひとこと紹介（あれば）。",
+      "書き方:",
+      "- 届いた接点から始める。自己紹介や挨拶の定型から始めない。",
+      "- 1文目: どの接点の話かを自分の言葉で言う（「PXで『◯◯ × ◯◯』という接点が届きました」の形でよい）。",
+      "- 2文目: なぜ気になったかを一言。",
+      "- 3文目: 相手の公開項目について一つだけ聞く。または、15分で試せる小さな一歩を一つ提案する。",
+      "- 全体で2〜4文。敬体。約束・価格・大きな計画は書かない。決めすぎない。",
+      "- 出力は本文のみ。前置き・説明・引用符を付けない。",
+    ].join("\n"),
+  );
+});
+
+test("MA-13b: buildFirstNotePrompt — verbatim head; absent materials are omitted", () => {
+  const full = buildFirstNotePrompt({
+    lines: ["言い切りの一文", "あなたの納屋 × ［あや］の活版印刷", "相手の手がかり"],
+    basis: { title: "工房", text: "活版印刷ができる" },
+    ownerName: "みどり",
+    ownerIntro: "手を動かす場づくりが好き",
+  });
+  assert.ok(full.startsWith(FIRST_NOTE_PROMPT + "\n"), "instruction rides verbatim at the head");
+  assert.ok(full.includes("【材料】"));
+  assert.ok(full.includes("- あなたの納屋 × ［あや］の活版印刷"));
+  assert.ok(full.includes("相手の公開項目: 工房 — 活版印刷ができる"));
+  assert.ok(full.includes("ownerの呼び名: みどり"));
+  assert.ok(full.includes("ownerのひとこと紹介: 手を動かす場づくりが好き"));
+
+  // the instruction text itself names every material — judge OMISSION on the
+  // 【材料】 block alone
+  const thin = buildFirstNotePrompt({ lines: [], basis: null, ownerName: "", ownerIntro: " " });
+  const thinMaterials = thin.slice(thin.indexOf("【材料】"));
+  assert.ok(!thinMaterials.includes("接点:"), "no lines → no empty heading to hallucinate into");
+  assert.ok(!thinMaterials.includes("相手の公開項目"), "no basis → omitted");
+  assert.ok(!thinMaterials.includes("呼び名"), "no name → omitted");
+  assert.ok(!thinMaterials.includes("ひとこと紹介"), "blank intro → omitted");
+  // a title-less basis item renders text-only (no dangling dash)
+  const bare = buildFirstNotePrompt({ lines: ["接点"], basis: { title: " ", text: "本文だけ" }, ownerName: "", ownerIntro: "" });
+  assert.ok(bare.includes("相手の公開項目: 本文だけ"));
+});
+
+test("MA-13c: parseFirstNoteReply — fences/one quote pair stripped; empty → null", () => {
+  assert.equal(parseFirstNoteReply("PXで接点が届きました。気になっています。"), "PXで接点が届きました。気になっています。");
+  assert.equal(parseFirstNoteReply("```\n本文です。\n```"), "本文です。");
+  assert.equal(parseFirstNoteReply("「本文です。」"), "本文です。");
+  // inner quotes survive — only a WRAPPING pair is unwrapped
+  assert.equal(
+    parseFirstNoteReply("PXで『納屋 × 活版印刷』という接点が届きました。"),
+    "PXで『納屋 × 活版印刷』という接点が届きました。",
+  );
+  assert.equal(parseFirstNoteReply(""), null);
+  assert.equal(parseFirstNoteReply("   \n  "), null);
+  assert.equal(parseFirstNoteReply("``````"), null);
+});
+
+test("MA-13d: firstNoteMaterialFor — gate-kept card wins; anchor fallback; invented card never feeds", () => {
+  const entry = {
+    cards: [
+      { to: "実在しない人", line1: "x", line2: "", line3: "", basisItemId: "p9" },
+      { to: "あや", line1: "言い切り", line2: "式の行", line3: "", basisItemId: "p1" },
+    ],
+    refs: { あや: "aaaa1111" },
+    basisItems: { p1: { ownerRef: "あや", title: "工房", text: "活版印刷ができる" } },
+  };
+  // 起点側: the kept card supplies the 3行 (empty line3 dropped) + the basis item
+  const m = firstNoteMaterialFor("aaaa1111", [entry], "");
+  assert.deepEqual(m.lines, ["言い切り", "式の行"]);
+  assert.deepEqual(m.basis, { title: "工房", text: "活版印刷ができる" });
+  // an invented addressee resolves nothing — even when it is the only card
+  const invented = firstNoteMaterialFor("zzzz9999", [entry], "届いた接点の行");
+  assert.deepEqual(invented.lines, ["届いた接点の行"], "anchor fallback (応答側)");
+  assert.equal(invented.basis, null);
+  // no entries + no anchor → thin material, never a throw
+  assert.deepEqual(firstNoteMaterialFor("aaaa1111", [], " "), { lines: [], basis: null });
 });
