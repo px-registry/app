@@ -122,6 +122,9 @@ export const MEET = {
       contactSaved: "渡しました",
       theirNote: (name: string): string => `${name}さんからのメモ`,
       waitingNote: "相手のメモはまだ届いていません。",
+      /** c18 — 行為時検証の正直な結末（文言は指示書 §3 ゲート済）。 */
+      notInPool: "この相手は、いまは候補に出ていません。",
+      nameFirst: "先に呼び名を決めてください。",
     },
   },
 
@@ -313,7 +316,8 @@ export const MEET = {
 
   proposal: {
     talk: "話してみる",
-    talkSent: "「話してみる」を伝えました",
+    /** c18: ペア単位の状態だと読める形（カード単位でない — edge単位化は R2）。 */
+    talkSent: "この相手には「話してみる」を伝えてあります。",
     talkNote: "押すと、相手に「話してみる」が届きます。連絡先はまだ伝わりません。",
     mutualNote: "おたがいが押したら、連絡のメモを交換できます。",
     /** 第7便 D — basisItemId の項目1件だけを開く折りたたみ。 */

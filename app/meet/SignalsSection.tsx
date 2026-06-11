@@ -13,6 +13,7 @@
 // ONLY on this device (firstnote lane); sending is copy → outside channel.
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import { useT } from "@/lib/i18n/context.tsx";
 import type { InboxData, InboxIncoming } from "@/lib/meet-net";
@@ -221,12 +222,15 @@ export function SignalsSection({
   inbox: InboxData | null;
   /** c17: per-peer face data (basis + saved draft), owner-local only. */
   firstNotes: Record<string, FirstNoteFaceData>;
-  onTalkBack: (toRef: string) => Promise<void>;
+  /** c18: the send result comes back — a refusal renders an honest line. */
+  onTalkBack: (toRef: string) => Promise<{ ok: boolean; code: string }>;
   onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
   onMakeFirstNote: (peerRef: string) => Promise<string | null>;
   onSaveFirstNote: (peerRef: string, text: string) => Promise<void>;
 }) {
   const t = useT();
+  // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by peer).
+  const [backNotes, setBackNotes] = useState<Record<string, string>>({});
   const incoming = inbox?.incoming ?? [];
   return (
     <section className="m-section">
@@ -290,11 +294,36 @@ export function SignalsSection({
                       <button
                         type="button"
                         className="m-btn m-btn-primary m-btn-wide"
-                        onClick={() => void onTalkBack(sig.fromRef)}
+                        onClick={() =>
+                          void onTalkBack(sig.fromRef).then((r) =>
+                            setBackNotes((prev) => ({
+                              ...prev,
+                              [sig.fromRef]: r.ok ? "" : r.code,
+                            })),
+                          )
+                        }
                       >
                         {MEET.home.signals.talkBack}
                       </button>
                     </div>
+                    {(backNotes[sig.fromRef] ?? "") !== "" && (
+                      // c18: refusal lines — dead edge / missing name / honest error
+                      <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+                        {backNotes[sig.fromRef] === "peer_not_in_pool" ? (
+                          MEET.home.signals.notInPool
+                        ) : backNotes[sig.fromRef] === "from_name" ? (
+                          <>
+                            {MEET.home.signals.nameFirst}{" "}
+                            <Link className="m-rowlink" href="/meet/memory/#name">
+                              {MEET.receive.nameWhere}
+                            </Link>
+                            。
+                          </>
+                        ) : (
+                          MEET.receive.errors[backNotes[sig.fromRef]] ?? MEET.receive.errors.unknown
+                        )}
+                      </p>
+                    )}
                     <p className="m-note">{MEET.proposal.mutualNote}</p>
                   </>
                 )}

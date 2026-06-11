@@ -248,6 +248,33 @@ test("M-11b: the face order stands — eyebrow→接点→basis→作る→texta
   assert.ok(src.includes("MEET.firstNote.contactOpen"), "the fold carries the gated heading");
 });
 
+// ── M-12 (c18): 死んだ edge への行為に成功の顔をさせない ─────────────────────────
+//
+// 話してみる / こちらも話してみる は送信結果を読み、棄却は正直な一行になる。
+// 文言は指示書 §3 verbatim。sent 文言はペア単位だと読める形。
+
+test("M-12: c18 文言 — the gated refusal lines + pair-scoped sent, verbatim", () => {
+  assert.equal(MEET.home.signals.notInPool, "この相手は、いまは候補に出ていません。");
+  assert.equal(MEET.home.signals.nameFirst, "先に呼び名を決めてください。");
+  assert.equal(MEET.proposal.talkSent, "この相手には「話してみる」を伝えてあります。");
+  assert.equal(MEET.receive.nameWhere, "記憶で書けます", "the reused link wording stands");
+});
+
+test("M-12b: both send surfaces read the result and branch on the codes", () => {
+  for (const rel of ["app/meet/ProposalEntry.tsx", "app/meet/SignalsSection.tsx"]) {
+    const src = read(rel);
+    assert.ok(src.includes("peer_not_in_pool"), `${rel} must branch on peer_not_in_pool`);
+    assert.ok(src.includes("from_name"), `${rel} must branch on from_name`);
+    assert.ok(src.includes("notInPool"), `${rel} must render the dead-edge line`);
+    assert.ok(src.includes("nameFirst"), `${rel} must render the name lead-in`);
+    assert.ok(src.includes("/meet/memory/#name"), `${rel} must link the existing name field`);
+    assert.ok(
+      src.includes("MEET.receive.errors.unknown"),
+      `${rel} must keep an honest fallback (沈黙の禁止 — no fourth ending)`,
+    );
+  }
+});
+
 // ── M-9 (第7便 D): 相手の候補から is ONE item — never a browsable list ──────────
 
 test("M-9: the basis fold resolves a single basisItemId; basisItems is never iterated", () => {

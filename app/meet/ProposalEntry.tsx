@@ -9,6 +9,7 @@
 // honestly whether the test record was written.
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import { gateCardsByProvenance, faceOfEntry } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
@@ -126,11 +127,20 @@ export function ProposalEntry({
   /** refs this owner has already signalled (from the inbox outgoing list). */
   sentRefs: ReadonlySet<string>;
   /** c11/c13: the caller composes the recipient-addressed anchor from the
-   *  card's lines (v3: 式 is line2; v2 stock: line1) and the addressee. */
-  onTalk: (toRef: string, line1: string, line2: string, to: string) => Promise<void>;
+   *  card's lines (v3: 式 is line2; v2 stock: line1) and the addressee.
+   *  c18: the send RESULT comes back — a refusal renders an honest line. */
+  onTalk: (
+    toRef: string,
+    line1: string,
+    line2: string,
+    to: string,
+  ) => Promise<{ ok: boolean; code: string }>;
   onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<boolean>;
   onRemove: (entryId: string) => Promise<void>;
 }) {
+  // c18 — 沈黙の禁止: the outcome of pressing 話してみる lands on THIS card.
+  // Keyed by card index; "" = cleared (a later success wipes an old line).
+  const [talkNotes, setTalkNotes] = useState<Record<number, string>>({});
   // 第7便 C: with a basis map (new entries), a card must also point at a real
   // served item OF ITS ADDRESSEE; pre-第7便 entries keep the to-only gate.
   const { kept, excluded } = gateCardsByProvenance(entry.cards, entry.refs, entry.basisItems);
@@ -232,10 +242,33 @@ export function ProposalEntry({
                       type="button"
                       className="m-btn m-btn-primary m-proposal-talk"
                       style={{ marginTop: "0.7rem" }}
-                      onClick={() => void onTalk(toRef, card.line1, card.line2, card.to)}
+                      onClick={() =>
+                        void onTalk(toRef, card.line1, card.line2, card.to).then((r) =>
+                          setTalkNotes((prev) => ({ ...prev, [index]: r.ok ? "" : r.code })),
+                        )
+                      }
                     >
                       {MEET.proposal.talk}
                     </button>
+                  )}
+                  {(talkNotes[index] ?? "") !== "" && (
+                    // c18: refusal lines — dead edge / missing name / honest error.
+                    // The button stays above (再試行可); sent never flips here.
+                    <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+                      {talkNotes[index] === "peer_not_in_pool" ? (
+                        MEET.home.signals.notInPool
+                      ) : talkNotes[index] === "from_name" ? (
+                        <>
+                          {MEET.home.signals.nameFirst}{" "}
+                          <Link className="m-rowlink" href="/meet/memory/#name">
+                            {MEET.receive.nameWhere}
+                          </Link>
+                          。
+                        </>
+                      ) : (
+                        MEET.receive.errors[talkNotes[index]] ?? MEET.receive.errors.unknown
+                      )}
+                    </p>
                   )}
                   <ReadingEditor
                     initial={entry.readings[index]}

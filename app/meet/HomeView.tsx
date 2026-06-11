@@ -442,15 +442,26 @@ export function HomeView() {
   // v3 puts the 式 on line2 (line1 is the 言い切り); v2 stock had it on line1 —
   // staged search, and a parse miss falls back to the verbatim head
   // (fail-close, never blocks). The receiver renders verbatim (M-10).
-  const talk = async (toRef: string, line1: string, line2: string, to: string) => {
+  //
+  // c18: the RESULT is read and returned — a refused signal (withdrawn peer,
+  // missing name) must not wear a success face. The sent state stays server-
+  // truth: a refusal writes no outgoing row, so no card flips.
+  const talk = async (
+    toRef: string,
+    line1: string,
+    line2: string,
+    to: string,
+  ): Promise<{ ok: boolean; code: string }> => {
     const anchor = anchorForRecipient(line1, line2, to, displayName);
-    await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor });
+    const r = await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor });
     await reload();
+    return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
   };
 
-  const talkBack = async (toRef: string) => {
-    await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor: "" });
+  const talkBack = async (toRef: string): Promise<{ ok: boolean; code: string }> => {
+    const r = await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor: "" });
     await reload();
+    return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
   };
 
   const saveContact = async (peerRef: string, note: string): Promise<boolean> => {
