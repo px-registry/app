@@ -69,9 +69,12 @@ function ReadingEditor({
     schedule();
   };
 
+  // c16-2 テストの帯: eyebrow＋注記＋チップ＋ひとことを一つの視覚ユニットに——
+  // これは計器であって製品の恒久機能ではない（research mode 日没の視覚的先行）。
   return (
-    <div style={{ marginTop: "0.5rem" }}>
-      <p className="m-note" style={{ margin: "0 0 0.35rem" }}>
+    <div className="m-testband">
+      <p className="m-eyebrow">{MEET.proposal.readings.eyebrow}</p>
+      <p className="m-note" style={{ margin: "0.3rem 0 0.35rem" }}>
         {MEET.proposal.readings.note}
       </p>
       <div className="m-kindrow" style={{ marginBottom: "0.35rem" }}>

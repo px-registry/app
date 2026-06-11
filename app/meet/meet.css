@@ -955,6 +955,14 @@ textarea.m-field {
   margin-bottom: 0.6rem;
 }
 
+/* c16-2 テストの帯 — 注記＋チップ＋ひとことを一つの計器ユニットに括る細罫。 */
+.m-testband {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.8rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+}
+
 .m-form {
   display: grid;
   gap: 0.35rem;

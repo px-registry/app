@@ -153,6 +153,36 @@ test("VR-11: c15 gated copy — two-step clear, pool notice, intake modes", asyn
   assert.ok(!panel.includes("window.confirm"), "no browser-native confirm — the two-step UI carries it");
 });
 
+// ── VR-12 (c16): 反応チップ「わからない」＋テストの帯 ───────────────────────────
+//
+// 2026-06-11 Hiroto 裁定「わからないがわかれば対策ができる。テスト項目だと
+// わかるようにUIで示す」。チップは知覚系（〜わからない）→行動系（話したい）の
+// 並び verbatim。帯は注記＋チップ＋ひとことを一つの計器ユニットに括る
+// （research mode 日没の視覚的先行——MEET_FINAL_SPEC §3）。
+
+test("VR-12: c16 — the five chips verbatim, the band, the eyebrow", async () => {
+  const { MEET } = await import("./copy.ts");
+  assert.deepEqual(
+    [...MEET.proposal.readings.options],
+    ["面白い", "腑に落ちる", "突飛", "わからない", "話したい"],
+    "わからない sits after 突飛 — 知覚系の末尾; 話したい (行動系) stays last",
+  );
+  assert.equal(MEET.proposal.readings.eyebrow, "テストのしつもん");
+  assert.equal(
+    MEET.proposal.readings.note,
+    "この読みはテストの記録です。提案の質を良くするために進行役が読みます。相手には伝わりません。",
+    "the existing notice moved INTO the band, wording untouched",
+  );
+  // the band is one visual unit: eyebrow leads, note/chips/note-field ride inside
+  const entry = read("app/meet/ProposalEntry.tsx");
+  const band = entry.slice(entry.indexOf('"m-testband"'));
+  assert.ok(entry.includes('className="m-testband"'), "the band wraps the reading editor");
+  for (const inside of ["readings.eyebrow", "readings.note", "readings.options", "notePlaceholder"]) {
+    assert.ok(band.includes(inside), `${inside} sits inside the band`);
+  }
+  assert.ok(css().includes(".m-testband"), "the band rule exists (thin rule, tokens only — VR-1 scans it)");
+});
+
 test("VR-7: visual-refresh i18n keys — both dictionaries, no forbidden term", () => {
   const enKeys = Object.keys(en).filter((k) => k.startsWith("meet."));
   const jaKeys = Object.keys(ja).filter((k) => k.startsWith("meet."));
