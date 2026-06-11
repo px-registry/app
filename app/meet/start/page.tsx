@@ -26,7 +26,9 @@ export default function MeetStart() {
 
           <div className="m-card" id="step-intake">
             <h2 className="m-h2 m-stepnum">{MEET.start.step2.heading}</h2>
-            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
+            <p style={{ margin: "0 0 0.4rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
+            {/* c14: 下地は他人に読める形で生まれる（取り込み時翻訳）の予告 */}
+            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.legible}</p>
             <ColdStartIntake />
           </div>
 
