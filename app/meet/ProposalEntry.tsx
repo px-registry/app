@@ -198,10 +198,11 @@ export function ProposalEntry({
                       {card.to}——{partnerIntro}
                     </p>
                   )}
-                  {/* 提案本文 — rule9 エンジンの出力をそのまま（行数を加工しない） */}
+                  {/* 提案本文 — rule9（3行）エンジンの出力をそのまま（行数を加工しない） */}
                   <div className="m-entry-body">
                     <p style={{ margin: 0 }}>{card.line1}</p>
                     {card.line2 && <p style={{ margin: 0 }}>{card.line2}</p>}
+                    {card.line3 && <p style={{ margin: 0 }}>{card.line3}</p>}
                   </div>
                   {basisItem !== undefined && (
                     // 第7便 D: exactly ONE grounding item — never the partner's

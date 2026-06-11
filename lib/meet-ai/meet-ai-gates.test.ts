@@ -321,7 +321,7 @@ test("MA-9: the OBSERVED invented-partner reply is fully excluded by the gate", 
 
 test("MA-9b: real addressees pass, invented ones drop — original indices kept", () => {
   const cards = parseProposalReply(OBSERVED_INVENTED_REPLY);
-  cards.push({ to: "あや", line1: "納屋 × 工房", line2: "週末に一度", basisItemId: "" });
+  cards.push({ to: "あや", line1: "納屋 × 工房", line2: "週末に一度", line3: "", basisItemId: "" });
   const refs = { あや: "a".repeat(16), カフェの人: "b".repeat(16) };
   const gated = gateCardsByProvenance(cards, refs);
   assert.equal(gated.kept.length, 1);
@@ -331,7 +331,7 @@ test("MA-9b: real addressees pass, invented ones drop — original indices kept"
 });
 
 test("MA-9c: fail-closed on odd ref values (empty string never resolves)", () => {
-  const cards = [{ to: "ゆら", line1: "x", line2: "", basisItemId: "" }];
+  const cards = [{ to: "ゆら", line1: "x", line2: "", line3: "", basisItemId: "" }];
   assert.equal(gateCardsByProvenance(cards, { ゆら: "" }).kept.length, 0);
   assert.equal(gateCardsByProvenance(cards, {}).kept.length, 0);
   assert.equal(gateCardsByProvenance([], { あや: "a".repeat(16) }).kept.length, 0);
@@ -345,7 +345,13 @@ test("MA-9d: with a basis map, basisItemId must resolve AND belong to the addres
     p1: { ownerRef: "あや", title: "工房", text: "活版印刷ができる" },
     p2: { ownerRef: "カフェの人", title: "昼カフェ", text: "間借りで開けている" },
   };
-  const card = (to: string, basisItemId: string) => ({ to, line1: "x", line2: "y", basisItemId });
+  const card = (to: string, basisItemId: string) => ({
+    to,
+    line1: "x",
+    line2: "y",
+    line3: "",
+    basisItemId,
+  });
 
   // resolvable + addressee's own item → kept
   assert.equal(gateCardsByProvenance([card("あや", "p1")], refs, basis).kept.length, 1);
@@ -367,6 +373,36 @@ test("MA-9e: the format block demands to + basisItemId; parse carries it lenient
   const cards = parseProposalReply(reply);
   assert.equal(cards[0].basisItemId, "p3", "trimmed through parse");
   assert.equal(cards[1].basisItemId, "", "absent → empty (the gate drops it)");
+});
+
+// ── MA-9f (rule 9 3行版, 2026-06-11 裁定): the third line rides the card ────────
+//
+// The LAW demands 3 lines of the model (法文 + format block); the PARSER stays
+// lenient — a 2-line card (pre-3行 shelf entries, a model that omits line3)
+// renders as-is rather than dropping. Drops belong to the provenance gate
+// alone (fail-close is about grounding, not prose length).
+
+test("MA-9f: law + format block carry the 3rd line; parse is lenient about it", () => {
+  const p = buildMeetPrompt(SELF, pool(), "");
+  assert.ok(p.includes("各提案は3行"), "the law's 3-line shape reaches the prompt");
+  assert.ok(
+    p.includes("3行目：相手の公開項目から一つだけ、相手の手がかりを平易に書く。"),
+    "the 裁定文 of the third line is verbatim in the prompt",
+  );
+  assert.ok(p.includes('"line3"'), "format block names line3");
+  assert.ok(!p.includes("各提案は2行"), "the 2-line shape is extinct (2行には戻さない)");
+  const reply =
+    '[{"to":"あや","line1":"x","line2":"y","line3":"古い町家の納屋がある人","basisItemId":"p1"},{"to":"あや","line1":"x","line2":"y","basisItemId":"p1"}]';
+  const cards = parseProposalReply(reply);
+  assert.equal(cards[0].line3, "古い町家の納屋がある人", "line3 survives parse verbatim");
+  assert.equal(cards[1].line3, "", "absent line3 → empty string, card NOT dropped");
+  const refs = { あや: "a".repeat(16) };
+  const basis = { p1: { ownerRef: "あや", title: "納屋", text: "ひと部屋あいている" } };
+  assert.equal(
+    gateCardsByProvenance(cards, refs, basis).kept.length,
+    2,
+    "a 2-line card still displays (length is the law's demand, not the gate's)",
+  );
 });
 
 // ── MA-10 (第8便 B): 沈黙の禁止 — every reply lands on a visible face ───────────

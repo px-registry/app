@@ -9,7 +9,8 @@
 //
 // A FORMAT block is appended AFTER the law — a technical output contract
 // (machine-readable cards) that adds no ranking and contradicts nothing in the
-// law; the law's 2-line card shape maps 1:1 onto line1/line2.
+// law; the law's 3-line card shape (rule 9, 2026-06-11 裁定) maps 1:1 onto
+// line1/line2/line3.
 
 import {
   buildOwnerPrompt,
@@ -26,7 +27,7 @@ const QUESTION_HEADING = "【今日の問い】";
 const FORMAT_BLOCK = [
   "【返答の形】",
   "次の形のJSONだけを返してください（前後に説明文を付けない）：",
-  '[{ "to": "相手の名前（プールの[名前]と同じ表記）", "line1": "1行目（あなたの○○ × ［相手名］の○○）", "line2": "2行目（そこから生まれそうなものを一つ）", "basisItemId": "根拠にした相手の項目の参照（[p3] と書かれた項目なら p3）" }]',
+  '[{ "to": "相手の名前（プールの[名前]と同じ表記）", "line1": "1行目（あなたの○○ × ［相手名］の○○）", "line2": "2行目（そこから生まれそうなものを一つ）", "line3": "3行目（相手の公開項目から一つだけ、相手の手がかりを平易に）", "basisItemId": "根拠にした相手の項目の参照（[p3] と書かれた項目なら p3）" }]',
   "basisItemId は、その相手の公開項目に実際に付いている参照だけを使う。",
   "今日は無い場合は [] を返す。",
 ].join("\n");
@@ -106,7 +107,14 @@ export function buildMeetPrompt(
 
 // ── Parsing the model's reply (fail-closed; raw text is kept either way) ───────
 
-export type ProposalCard = { to: string; line1: string; line2: string; basisItemId: string };
+export type ProposalCard = {
+  to: string;
+  line1: string;
+  line2: string;
+  /** rule 9 3行版 — 相手の手がかり ("" on pre-3行 entries / a model that omits it) */
+  line3: string;
+  basisItemId: string;
+};
 
 /**
  * `parsed` distinguishes the two empty-card cases the UI must not conflate
@@ -165,12 +173,17 @@ export function parseReplyOutcome(raw: string): ReplyOutcome {
   for (const c of parsed) {
     if (!isRecord(c)) continue;
     if (typeof c.to !== "string" || typeof c.line1 !== "string") continue;
+    // line2/line3 stay lenient at PARSE time, like basisItemId below: the law
+    // demands 3 lines of the MODEL, but a shorter card is displayed as-is
+    // rather than dropped (the provenance gate alone decides drops — fail-close
+    // is about grounding, not prose length; pre-3行 entries keep rendering).
     const line2 = typeof c.line2 === "string" ? c.line2 : "";
+    const line3 = typeof c.line3 === "string" ? c.line3 : "";
     // basisItemId is kept lenient at PARSE time ("" when absent/odd) — the
     // provenance gate is where a missing/false basis drops the card.
     const basisItemId = typeof c.basisItemId === "string" ? c.basisItemId.trim() : "";
     if (c.to.trim() === "" || c.line1.trim() === "") continue;
-    cards.push({ to: c.to.trim(), line1: c.line1, line2, basisItemId });
+    cards.push({ to: c.to.trim(), line1: c.line1, line2, line3, basisItemId });
   }
   return { parsed: true, cards };
 }
