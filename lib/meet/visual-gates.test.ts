@@ -186,7 +186,8 @@ test("VR-12: c16 — the five chips verbatim, the band, the eyebrow", async () =
   assert.equal(MEET.proposal.readings.unknownChip, MEET.proposal.readings.options[3]);
   assert.equal(
     MEET.proposal.readings.notePlaceholderUnknown,
-    "例：相手が何をしている人かわからない／自分に関係する理由がわからない",
+    "例：相手が何の人かわからない",
+    "14字 — a placeholder that fits whole at 390px (no mid-sentence cut)",
   );
   assert.ok(
     entry.includes("notePlaceholderUnknown") && entry.includes("unknownChip"),
