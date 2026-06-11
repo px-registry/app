@@ -203,6 +203,51 @@ test("M-10: signal card renders fromIntro / anchor verbatim; empty intro drops t
   }
 });
 
+// ── M-11 (c17): この接点で話す — 文言・面の構成・連絡メモの従属 ──────────────────
+//
+// Handoff Lite: the pair card leads with the first-note face; the contact-note
+// exchange survives unchanged but subordinate (a fold titled 連絡メモを開く).
+// The §3 strings are pinned EXACTLY — they passed Hiroto's naming gate as
+// written in the 指示書 and must not drift.
+
+test("M-11: c17 文言 — the gated strings, verbatim", () => {
+  assert.equal(MEET.firstNote.eyebrow, "この接点で話す");
+  assert.equal(MEET.firstNote.make, "最初の一言を作る");
+  assert.equal(MEET.firstNote.copyAction, "コピー");
+  assert.equal(MEET.firstNote.assist, "AIが下書きします。送るのはあなたです。");
+  assert.equal(
+    MEET.firstNote.failed,
+    "下書きを作れませんでした。もう一度試すか、自分の言葉でどうぞ。",
+  );
+  assert.equal(MEET.firstNote.contactOpen, "連絡メモを開く");
+});
+
+test("M-11b: the face order stands — eyebrow→接点→basis→作る→textarea→コピー→補助文", () => {
+  const src = read("app/meet/SignalsSection.tsx");
+  const markers = [
+    "MEET.firstNote.eyebrow",
+    'className="m-pairline"',
+    "MEET.proposal.basisShow",
+    "MEET.firstNote.make",
+    "<textarea",
+    "MEET.firstNote.copyAction",
+    "MEET.firstNote.assist",
+  ];
+  let last = -1;
+  for (const m of markers) {
+    const i = src.indexOf(m);
+    assert.ok(i > last, `face order broken at: ${m}`);
+    last = i;
+  }
+  assert.ok(!/readOnly/.test(src), "the draft textarea stays editable (owner's words win)");
+  // the contact exchange follows the face, inside the subordinate fold
+  const faceUse = src.indexOf("<TalkFace");
+  const fold = src.indexOf('className="m-contactfold"');
+  const contact = src.indexOf("<ContactExchange");
+  assert.ok(faceUse >= 0 && fold > faceUse && contact > fold, "連絡メモ is subordinate to the face");
+  assert.ok(src.includes("MEET.firstNote.contactOpen"), "the fold carries the gated heading");
+});
+
 // ── M-9 (第7便 D): 相手の候補から is ONE item — never a browsable list ──────────
 
 test("M-9: the basis fold resolves a single basisItemId; basisItems is never iterated", () => {

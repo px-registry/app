@@ -301,6 +301,16 @@ export const MEET = {
     failed: "出せませんでした。電波の良いところでもう一度お試しください。",
   },
 
+  /** c17 Handoff Lite — mutual 直後の「この接点で話す」面（文言は指示書 §3 ゲート済）。 */
+  firstNote: {
+    eyebrow: "この接点で話す",
+    make: "最初の一言を作る",
+    copyAction: "コピー",
+    assist: "AIが下書きします。送るのはあなたです。",
+    failed: "下書きを作れませんでした。もう一度試すか、自分の言葉でどうぞ。",
+    contactOpen: "連絡メモを開く",
+  },
+
   proposal: {
     talk: "話してみる",
     talkSent: "「話してみる」を伝えました",

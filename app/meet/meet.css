@@ -963,6 +963,53 @@ textarea.m-field {
   border-radius: var(--radius-btn);
 }
 
+/* c17 この接点で話す — pair が閉じた直後の主面。連絡メモはこの下の fold に従う。 */
+.m-talkface {
+  margin-top: 0.8rem;
+  padding: 0.7rem 0.8rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+}
+.m-talkface .m-pairline {
+  margin-top: 8px;
+}
+.m-talkface .m-basis {
+  margin-top: 0.6rem;
+}
+.m-talkface textarea.m-field {
+  resize: vertical;
+}
+.m-contactfold {
+  margin-top: 0.7rem;
+}
+.m-contactfold summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: var(--sub);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.16s var(--ease);
+}
+.m-contactfold summary:hover {
+  color: var(--ink);
+}
+.m-contactfold summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  transform-origin: 60% 60%;
+  transition: transform 0.2s var(--ease);
+}
+.m-contactfold[open] summary::before {
+  transform: rotate(45deg);
+}
+
 .m-form {
   display: grid;
   gap: 0.35rem;

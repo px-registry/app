@@ -17,6 +17,7 @@ import { MEET } from "@/lib/meet/copy.ts";
 import {
   openMeetMemory,
   openReceived,
+  openFirstNotes,
   PLACED_QUESTION_TAG,
   draftPlacedQuestionTitle,
   isPlacedQuestion,
@@ -55,11 +56,14 @@ import {
   generateProposals,
   pickPatrolTarget,
   anchorForRecipient,
+  buildFirstNotePrompt,
+  parseFirstNoteReply,
+  firstNoteMaterialFor,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { useT } from "@/lib/i18n/context.tsx";
 import { ProposalEntry } from "./ProposalEntry.tsx";
-import { SignalsSection } from "./SignalsSection.tsx";
+import { SignalsSection, type FirstNoteFaceData } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
 import { Ring } from "./Ring.tsx";
 
@@ -122,6 +126,8 @@ export function HomeView() {
   const t = useT();
   const memory = useMemo(() => openMeetMemory(), []);
   const shelf = useMemo(() => openReceived(), []);
+  // c17: 第一信の下書きレーン — edge 単位・端末のみ（serverへ送らない）
+  const notesLane = useMemo(() => openFirstNotes(), []);
 
   const [question, setQuestion] = useState("");
   const [rigEntries, setRigEntries] = useState<RigEntry[]>([]);
@@ -130,6 +136,8 @@ export function HomeView() {
   const [connected, setConnected] = useState(false);
   const [received, setReceived] = useState<ReceivedProposalV1[]>([]);
   const [inbox, setInbox] = useState<InboxData | null>(null);
+  // c17: per-pair face data (basis + saved draft) for 「この接点で話す」
+  const [firstNotes, setFirstNotes] = useState<Record<string, FirstNoteFaceData>>({});
   const [gen, setGen] = useState<GenState>({ phase: "idle" });
   const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null);
   const [editingPlaced, setEditingPlaced] = useState<string | null>(null);
@@ -153,12 +161,23 @@ export function HomeView() {
     setReceived(list);
     const ib = await fetchInbox(getOrMintOwnerToken());
     setInbox(ib.ok ? ib : null);
+    // c17: face data per mutual pair — basis from the owner-local shelf (the
+    // same provenance gate the display uses), draft from the firstnote lane.
+    const fn: Record<string, FirstNoteFaceData> = {};
+    if (ib.ok) {
+      for (const sig of ib.incoming) {
+        if (!sig.mutual) continue;
+        const m = firstNoteMaterialFor(sig.fromRef, list, sig.anchor);
+        fn[sig.fromRef] = { basis: m.basis, draft: await notesLane.get(sig.fromRef) };
+      }
+    }
+    setFirstNotes(fn);
     setLastPatrolAt(getPatrolLastRun());
     // 気配: how many participants are in the pool right now (count only)
     const me = await deriveParticipantRef(getOrMintOwnerToken());
     const poolNow = await fetchPool(me);
     setParticipants(poolNow.ok ? new Set(poolNow.items.map((it) => it.participantRef)).size : null);
-  }, [memory, shelf]);
+  }, [memory, shelf, notesLane]);
 
   useEffect(() => {
     void reload();
@@ -438,6 +457,34 @@ export function HomeView() {
     const r = await saveContactNote({ ownerToken: getOrMintOwnerToken(), peerRef, note });
     if (r.ok) await reload();
     return r.ok;
+  };
+
+  // ── c17: 第一信 — owner の鍵・owner の端末でだけ生成し、端末にだけ残す ────────
+  // The send is copy → outside channel; nothing here calls lib/meet-net.
+  const makeFirstNote = async (peerRef: string): Promise<string | null> => {
+    const anchor = inbox?.incoming.find((s) => s.fromRef === peerRef)?.anchor ?? "";
+    const m = firstNoteMaterialFor(peerRef, received, anchor);
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildFirstNotePrompt({ ...m, ownerName: displayName, ownerIntro: intro }),
+    });
+    if (!r.ok) return null;
+    const text = parseFirstNoteReply(r.text);
+    if (text === null) return null; // 空出力も正直なエラー一行へ（fail-close）
+    await notesLane.save(peerRef, text); // reload しても下書きが残る
+    setFirstNotes((prev) => ({ ...prev, [peerRef]: { basis: m.basis, draft: text } }));
+    return text;
+  };
+
+  const saveFirstNote = async (peerRef: string, text: string): Promise<void> => {
+    await notesLane.save(peerRef, text);
+    setFirstNotes((prev) => ({
+      ...prev,
+      [peerRef]: { basis: prev[peerRef]?.basis ?? null, draft: text },
+    }));
   };
 
   // 補遺 D: auto-saved readings report honestly — 「記録しました」 may be said
@@ -775,7 +822,14 @@ export function HomeView() {
         </section>
       )}
 
-      <SignalsSection inbox={inbox} onTalkBack={talkBack} onSaveContact={saveContact} />
+      <SignalsSection
+        inbox={inbox}
+        firstNotes={firstNotes}
+        onTalkBack={talkBack}
+        onSaveContact={saveContact}
+        onMakeFirstNote={makeFirstNote}
+        onSaveFirstNote={saveFirstNote}
+      />
         </div>
 
         <div className="m-home-right">
