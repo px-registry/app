@@ -56,9 +56,11 @@ import {
   pickPatrolTarget,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
+import { useT, useLang } from "@/lib/i18n/context.tsx";
 import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
+import { Ring } from "./Ring.tsx";
 
 // 第9便 A: endings live as ENTRIES now; under the button only the running
 // indicator and the last-resort line (entry write itself failed) remain.
@@ -110,7 +112,14 @@ function PlacedEdit({
   );
 }
 
+function fmtHm(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function HomeView() {
+  const t = useT();
+  const [lang] = useLang();
   const memory = useMemo(() => openMeetMemory(), []);
   const shelf = useMemo(() => openReceived(), []);
 
@@ -443,14 +452,58 @@ export function HomeView() {
 
   return (
     <>
-      {/* 第3便 B-1: the tagline IS the heading. 第6便: it stands full-width
-          above the columns (題字); size differs per breakpoint via CSS. */}
-      <h1 className="m-h1 m-pagetitle">{MEET.lede}</h1>
+      {/* 視覚一新: hero — 題字は新ヒーローへ、旧の題字文言は縦の銘に座る。
+          傍点はヒーローの「誰もいない」のみ。<br> は640px未満で消える。 */}
+      <section className="m-hero">
+        <h1>
+          {t("meet.hero.lead")}
+          <br />
+          <span className="m-shu">
+            {t("meet.hero.accentPre")}
+            <em>{t("meet.hero.accentEm")}</em>
+            {t("meet.hero.accentPost")}
+          </span>
+        </h1>
+        <p className="m-hero-sub">{t("meet.hero.sub")}</p>
+        {lang === "ja" && (
+          <div className="m-tate" aria-hidden="true">
+            {t("meet.hero.tate")}
+          </div>
+        )}
+        {/* 計器行 — the patrol fact moved here from the proposals column */}
+        <div className="m-meter" role="status">
+          <span className="m-live">
+            <span className="m-pulse" aria-hidden="true" />
+            {patrolBusy ? (
+              MEET.home.patrol.running
+            ) : lastPatrolAt !== "" ? (
+              <span>
+                {t("meet.meter.lastPre")}
+                <span className="mono">{fmtHm(lastPatrolAt)}</span>
+              </span>
+            ) : (
+              t("meet.meter.auto")
+            )}
+          </span>
+          {lastPatrolAt !== "" && (
+            <>
+              <span className="m-sep" aria-hidden="true" />
+              <span>{t("meet.meter.auto")}</span>
+            </>
+          )}
+          <span className="m-sep" aria-hidden="true" />
+          <span>{t("meet.meter.keys")}</span>
+        </div>
+      </section>
       {/* 第6便構図: 主柱=届いた提案（読み物）／側柱=問いの手（sticky panel）.
           DOM order stays mobile's; the grid places columns. Layout only. */}
       <div className="m-home">
         <div className="m-home-left">
       <section className="m-section">
+        <p className="m-eyebrow">{MEET.home.place.eyebrowAsk}</p>
+        <div className="m-secrow">
+          <h2 className="m-h2">{MEET.home.place.confirmHeading}</h2>
+        </div>
         <textarea
           className="m-field"
           rows={2}
@@ -570,15 +623,29 @@ export function HomeView() {
 
       {placedEntries.length > 0 && (
         <section className="m-section">
-          <h2 className="m-h2">{MEET.home.place.listHeading}</h2>
+          <p className="m-eyebrow">{MEET.home.place.eyebrowResting}</p>
+          <div className="m-secrow">
+            <h2 className="m-h2">{MEET.home.place.listHeading}</h2>
+            <span className="m-badge">{placedEntries.length}</span>
+          </div>
           {!connected && (
             <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
               {MEET.home.patrol.offline}
             </p>
           )}
-          <ul className="m-itemlist">
+          <ul className="m-itemlist m-qlist">
             {placedEntries.map((e) => (
-              <li key={e.entryId} className="m-item">
+              <li key={e.entryId} className="m-q">
+                <Ring
+                  state="resting"
+                  size={20}
+                  className={`m-q-ring ${
+                    e.item.private === false && snapshotHas(snapshot, toPublicView(e.item))
+                      ? "is-wait"
+                      : "is-idle"
+                  }`}
+                />
+                <div className="m-q-body">
                 {editingPlaced === e.entryId ? (
                   <PlacedEdit
                     item={e.item}
@@ -590,7 +657,15 @@ export function HomeView() {
                     {e.item.title && <p className="m-item-title">{e.item.title}</p>}
                     <p className="m-item-text">{e.item.text}</p>
                     <p className="m-note" aria-live="polite">
-                      {placedState(e.item)}
+                      <span
+                        className={
+                          placedState(e.item) === MEET.home.place.stateWaiting
+                            ? "m-state-on"
+                            : undefined
+                        }
+                      >
+                        {placedState(e.item)}
+                      </span>
                     </p>
                     {e.item.private === false &&
                       snapshotHas(snapshot, toPublicView(e.item)) &&
@@ -637,6 +712,7 @@ export function HomeView() {
                     </div>
                   </>
                 )}
+                </div>
               </li>
             ))}
           </ul>
@@ -664,23 +740,43 @@ export function HomeView() {
 
         <div className="m-home-right">
       <section className="m-section">
-        <h2 className="m-h2">{MEET.home.proposals.heading}</h2>
+        <p className="m-eyebrow">{MEET.home.proposals.eyebrow}</p>
+        <div className="m-secrow">
+          <h2 className="m-h2">{MEET.home.proposals.heading}</h2>
+          <span className="m-badge">{received.length}</span>
+        </div>
         <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
           {MEET.home.proposals.subnote}
         </p>
-        {(patrolBusy || lastPatrolAt !== "") && (
-          <p className="m-item-tags" aria-live="polite" style={{ margin: "0 0 0.5rem" }}>
-            {patrolBusy
-              ? MEET.home.patrol.running
-              : MEET.home.patrol.last(
-                  `${new Date(lastPatrolAt).getHours()}:${String(new Date(lastPatrolAt).getMinutes()).padStart(2, "0")}`,
-                )}
-          </p>
-        )}
         {received.length === 0 ? (
-          <div className="m-empty">
-            {hasItems ? MEET.home.proposals.emptyReady : MEET.home.proposals.emptyNoMemory}
-          </div>
+          hasItems && lastPatrolAt !== "" ? (
+            /* 「今日は無い」面 — 沈黙の禁止の一面。証拠（見回り時刻・気配）を添える。 */
+            <section className="m-emptyface" aria-live="polite">
+              <Ring state="resting" size={72} className="m-q-ring is-idle" />
+              <h3>{t("meet.empty.title")}</h3>
+              <p className="m-ev">
+                {t("meet.empty.evPre")}
+                <span className="mono">{fmtHm(lastPatrolAt)}</span>
+                {t("meet.empty.evMid")}
+                <br />
+                {t("meet.empty.evRest")}
+              </p>
+              {participants !== null && (
+                <div className="m-facts">
+                  <span>
+                    {t("meet.empty.herePre")}
+                    <span className="mono">{participants}</span>
+                    {t("meet.empty.herePost")}
+                  </span>
+                </div>
+              )}
+              <p className="m-next">{t("meet.empty.next")}</p>
+            </section>
+          ) : (
+            <div className="m-empty">
+              {hasItems ? MEET.home.proposals.emptyReady : MEET.home.proposals.emptyNoMemory}
+            </div>
+          )
         ) : (
           <>
             <p className="m-note" style={{ margin: "0 0 0.6rem" }}>

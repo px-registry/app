@@ -13,6 +13,7 @@ import { MEET } from "@/lib/meet/copy.ts";
 import { gateCardsByProvenance, faceOfEntry } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
 import { RIG_PRIVATE_ECHO_NOTE } from "@/lib/rig";
+import { Ring } from "./Ring.tsx";
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
@@ -129,10 +130,8 @@ export function ProposalEntry({
   const face = faceOfEntry(entry);
 
   const rawFold = (
-    <details>
-      <summary className="m-note" style={{ cursor: "pointer" }}>
-        {MEET.home.proposals.rawShow}
-      </summary>
+    <details className="m-rawfold">
+      <summary>{MEET.home.proposals.rawShow}</summary>
       <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
         {entry.raw}
       </p>
@@ -140,103 +139,112 @@ export function ProposalEntry({
   );
 
   return (
-    <li className="m-item">
-      <p className="m-item-tags" style={{ margin: "0 0 0.4rem" }}>
-        {fmtDate(entry.createdAt)} ・{" "}
-        {entry.modelLabel !== ""
-          ? MEET.home.proposals.modelNote(entry.modelLabel)
-          : MEET.home.proposals.manualLabel}
-        {entry.question !== "" && <>（{entry.question}）</>}
-      </p>
-      {entry.via === "patrol" && (
-        // 見回り provenance — which placed question this quiet run served
-        <p className="m-item-tags" style={{ margin: "0 0 0.4rem" }}>
-          {MEET.home.proposals.patrolLabel(entry.patrolQuestion ?? "")}
-        </p>
-      )}
-      {entry.echoFlag && (
-        <p className="m-warnings" style={{ margin: "0 0 0.5rem" }}>
-          {RIG_PRIVATE_ECHO_NOTE}
-        </p>
-      )}
-      {face === "pool-empty" ? (
-        // 第9便 A/D: the short-circuit is a dated entry now, not a side note
-        <p className="m-item-text">
-          {MEET.home.proposals.noneToday} {MEET.receive.poolEmptyNote}
-        </p>
-      ) : face === "error" ? (
-        <p className="m-item-text" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-          {MEET.receive.errors[entry.errorCode ?? "unknown"] ?? MEET.receive.errors.unknown}
-        </p>
-      ) : face === "raw" ? (
-        // a true format miss — the verbatim reply IS the honest body
-        <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
-          {entry.raw}
-        </p>
-      ) : (
-        <div style={{ display: "grid", gap: "0.9rem" }}>
-          {face === "none-today" && (
-            <p className="m-item-text">{MEET.home.proposals.noneToday}</p>
-          )}
-          {kept.map(({ card, index }) => {
-            const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
-            const sent = sentRefs.has(toRef);
-            const partnerIntro = (entry.intros?.[card.to] ?? "").trim();
-            const basisItem = entry.basisItems?.[card.basisItemId];
-            return (
-              <div key={index} className="m-proposal">
-                <p className="m-item-title" style={{ margin: 0 }}>
-                  {card.to}
-                </p>
-                {partnerIntro !== "" && (
-                  <p className="m-item-tags" style={{ margin: "0.1rem 0 0" }}>
-                    {card.to}——{partnerIntro}
-                  </p>
-                )}
-                <p className="m-item-text">{card.line1}</p>
-                {card.line2 && <p className="m-item-text">{card.line2}</p>}
-                {basisItem !== undefined && (
-                  // 第7便 D: exactly ONE grounding item — never the partner's
-                  // whole list (the AI-only pool stays human-unbrowsable).
-                  <details style={{ marginTop: "0.3rem" }}>
-                    <summary className="m-note" style={{ cursor: "pointer" }}>
-                      {MEET.proposal.basisShow}
-                    </summary>
-                    <p className="m-item-text">
-                      {basisItem.title.trim() !== ""
-                        ? `${basisItem.title} — ${basisItem.text}`
-                        : basisItem.text}
+    <li className="m-entry">
+      <div className="m-entry-meta">
+        <span className="m-entry-when">{fmtDate(entry.createdAt)}</span>
+        <span>
+          {entry.modelLabel !== ""
+            ? MEET.home.proposals.modelNote(entry.modelLabel)
+            : MEET.home.proposals.manualLabel}
+          {entry.question !== "" && <>（{entry.question}）</>}
+        </span>
+        {entry.via === "patrol" && (
+          // 見回り provenance — which placed question this quiet run served
+          <span className="m-entry-pill">
+            {MEET.home.proposals.patrolLabel(entry.patrolQuestion ?? "")}
+          </span>
+        )}
+      </div>
+      <div className="m-entry-inner">
+        {entry.echoFlag && (
+          <p className="m-warnings" style={{ margin: "0 0 0.5rem" }}>
+            {RIG_PRIVATE_ECHO_NOTE}
+          </p>
+        )}
+        {face === "pool-empty" ? (
+          // 第9便 A/D: the short-circuit is a dated entry now, not a side note
+          <p className="m-item-text">
+            {MEET.home.proposals.noneToday} {MEET.receive.poolEmptyNote}
+          </p>
+        ) : face === "error" ? (
+          <p className="m-item-text" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.receive.errors[entry.errorCode ?? "unknown"] ?? MEET.receive.errors.unknown}
+          </p>
+        ) : face === "raw" ? (
+          // a true format miss — the verbatim reply IS the honest body
+          <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>
+            {entry.raw}
+          </p>
+        ) : (
+          <div style={{ display: "grid", gap: "1.2rem" }}>
+            {face === "none-today" && (
+              <p className="m-item-text">{MEET.home.proposals.noneToday}</p>
+            )}
+            {kept.map(({ card, index }) => {
+              const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
+              const sent = sentRefs.has(toRef);
+              const partnerIntro = (entry.intros?.[card.to] ?? "").trim();
+              const basisItem = entry.basisItems?.[card.basisItemId];
+              return (
+                <div key={index}>
+                  <div className="m-cardhead">
+                    {/* 印データは存在しない（G-1=B）— 輪のみ */}
+                    <Ring state="sent" size={44} />
+                    <h3>{card.to}</h3>
+                    {sent && <span className="m-statechip">{MEET.proposal.talkSent}</span>}
+                  </div>
+                  {partnerIntro !== "" && (
+                    <p className="m-item-tags" style={{ margin: "0.3rem 0 0" }}>
+                      {card.to}——{partnerIntro}
                     </p>
-                  </details>
-                )}
-                <button
-                  type="button"
-                  className={`m-btn ${sent ? "m-btn-quiet" : "m-btn-primary"}`}
-                  style={{ marginTop: "0.45rem" }}
-                  disabled={sent}
-                  onClick={() => void onTalk(toRef, card.line1.slice(0, 80))}
-                >
-                  {sent ? MEET.proposal.talkSent : MEET.proposal.talk}
-                </button>
-                <ReadingEditor
-                  initial={entry.readings[index]}
-                  onSave={(r) => onReading(entry.entryId, index, r)}
-                />
-              </div>
-            );
-          })}
-          {excluded.length > 0 && (
-            <p className="m-note" style={{ margin: 0 }}>
-              {MEET.home.proposals.provenanceNote(excluded.length)}
-            </p>
-          )}
-          {rawFold}
+                  )}
+                  {/* 提案本文 — rule9 エンジンの出力をそのまま（行数を加工しない） */}
+                  <div className="m-entry-body">
+                    <p style={{ margin: 0 }}>{card.line1}</p>
+                    {card.line2 && <p style={{ margin: 0 }}>{card.line2}</p>}
+                  </div>
+                  {basisItem !== undefined && (
+                    // 第7便 D: exactly ONE grounding item — never the partner's
+                    // whole list (the AI-only pool stays human-unbrowsable).
+                    <details className="m-basis">
+                      <summary>{MEET.proposal.basisShow}</summary>
+                      <p className="m-item-text">
+                        {basisItem.title.trim() !== ""
+                          ? `${basisItem.title} — ${basisItem.text}`
+                          : basisItem.text}
+                      </p>
+                    </details>
+                  )}
+                  {!sent && (
+                    <button
+                      type="button"
+                      className="m-btn m-btn-primary m-proposal-talk"
+                      style={{ marginTop: "0.7rem" }}
+                      onClick={() => void onTalk(toRef, card.line1.slice(0, 80))}
+                    >
+                      {MEET.proposal.talk}
+                    </button>
+                  )}
+                  <ReadingEditor
+                    initial={entry.readings[index]}
+                    onSave={(r) => onReading(entry.entryId, index, r)}
+                  />
+                </div>
+              );
+            })}
+            {excluded.length > 0 && (
+              <p className="m-note" style={{ margin: 0 }}>
+                {MEET.home.proposals.provenanceNote(excluded.length)}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="m-foot-row">
+          {face !== "raw" && face !== "pool-empty" && face !== "error" && rawFold}
+          <button type="button" className="m-link" onClick={() => void onRemove(entry.entryId)}>
+            {MEET.home.proposals.removeEntry}
+          </button>
         </div>
-      )}
-      <div className="m-item-actions">
-        <button type="button" className="m-link" onClick={() => void onRemove(entry.entryId)}>
-          {MEET.home.proposals.removeEntry}
-        </button>
       </div>
     </li>
   );

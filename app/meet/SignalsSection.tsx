@@ -8,7 +8,9 @@
 
 import { useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
+import { useT } from "@/lib/i18n/context.tsx";
 import type { InboxData } from "@/lib/meet-net";
+import { Ring } from "./Ring.tsx";
 
 function ContactExchange({
   peerRef,
@@ -28,7 +30,7 @@ function ContactExchange({
 
   return (
     <div style={{ marginTop: "0.6rem" }}>
-      <p className="m-note" style={{ margin: "0 0 0.4rem", color: "var(--shu-deep)" }}>
+      <p className="m-accent">
         {MEET.home.signals.mutual} {MEET.home.signals.contactNote}
       </p>
       {theirNote !== null ? (
@@ -41,7 +43,7 @@ function ContactExchange({
           </p>
         </div>
       ) : (
-        <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
+        <p className="m-wait" style={{ margin: "0 0 0.5rem" }}>
           {MEET.home.signals.waitingNote}
         </p>
       )}
@@ -84,10 +86,15 @@ export function SignalsSection({
   onTalkBack: (toRef: string) => Promise<void>;
   onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
 }) {
+  const t = useT();
   const incoming = inbox?.incoming ?? [];
   return (
     <section className="m-section">
-      <h2 className="m-h2">{MEET.home.signals.heading}</h2>
+      <p className="m-eyebrow">{MEET.home.signals.eyebrow}</p>
+      <div className="m-secrow">
+        <h2 className="m-h2">{MEET.home.signals.heading}</h2>
+        <span className="m-badge">{incoming.length}</span>
+      </div>
       <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
         {MEET.home.signals.subnote}
       </p>
@@ -100,16 +107,20 @@ export function SignalsSection({
               inbox?.notes.find((n) => n.fromRef === sig.fromRef)?.note ?? null;
             const myNote = inbox?.myNotes.find((n) => n.peerRef === sig.fromRef)?.note ?? "";
             return (
-              <li key={sig.fromRef} className="m-item">
-                <p className="m-item-title" style={{ margin: 0 }}>
-                  {MEET.home.signals.incoming(sig.fromName)}
-                </p>
+              <li key={sig.fromRef} className={`m-signal${sig.mutual ? "" : " is-in"}`}>
+                <div className="m-sighead">
+                  {/* 輪が語る: open=相手は挙げた・あなたはまだ / pair=相互。
+                      こちらも押すと弧が閉じて pair へ（~300ms; Ring.tsx）。
+                      印データは存在しない（G-1=B）— 輪のみ。 */}
+                  <Ring state={sig.mutual ? "pair" : "open"} size={52} />
+                  <h4>{MEET.home.signals.incoming(sig.fromName)}</h4>
+                </div>
                 {sig.fromIntro.trim() !== "" && (
-                  <p className="m-item-tags" style={{ margin: "0.1rem 0 0" }}>
+                  <p className="m-item-tags" style={{ margin: "0.4rem 0 0" }}>
                     {sig.fromName}——{sig.fromIntro}
                   </p>
                 )}
-                {sig.anchor !== "" && <p className="m-item-text">{sig.anchor}</p>}
+                {sig.anchor !== "" && <p className="m-pairline">{sig.anchor}</p>}
                 {sig.mutual ? (
                   <ContactExchange
                     peerRef={sig.fromRef}
@@ -120,14 +131,16 @@ export function SignalsSection({
                   />
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      className="m-btn m-btn-primary"
-                      style={{ marginTop: "0.5rem" }}
-                      onClick={() => void onTalkBack(sig.fromRef)}
-                    >
-                      {MEET.home.signals.talkBack}
-                    </button>
+                    <p className="m-wait">{t("meet.signal.notYet")}</p>
+                    <div className="m-respond">
+                      <button
+                        type="button"
+                        className="m-btn m-btn-primary m-btn-wide"
+                        onClick={() => void onTalkBack(sig.fromRef)}
+                      >
+                        {MEET.home.signals.talkBack}
+                      </button>
+                    </div>
                     <p className="m-note">{MEET.proposal.mutualNote}</p>
                   </>
                 )}
