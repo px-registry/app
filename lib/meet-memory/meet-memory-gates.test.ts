@@ -20,7 +20,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { InMemoryMeetBackend } from "./backend.ts";
+import { InMemoryMeetBackend, InMemoryKeyedBackend } from "./backend.ts";
+import { FirstNoteStore, firstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
 import { MeetMemoryStore, MEET_EXPORT_FORMAT } from "./store.ts";
 import { validateNewEntry } from "./validate.ts";
 import { parseColdStartPaste } from "./intake.ts";
@@ -471,6 +472,50 @@ test("MM-15c: tap-apply writes the PUBLIC view only — the private body never m
   assert.deepEqual(words, ["Protocol X", "PX Box"], "folded dedupe");
   assert.deepEqual(findMaskLeaks(words, "別項目", "PX Boxも使う"), ["PX Box"], "propagates to all items");
   assert.deepEqual(findMaskLeaks(words, out.title, out.text), [], "masked view is clean");
+});
+
+// ── MM-17 (c17): 第一信の下書き — edge 単位・端末のみ・複利しない ────────────────
+
+test("MM-17: first-note drafts are edge-keyed upserts (one per peer, isolated)", async () => {
+  const store = new FirstNoteStore(new InMemoryKeyedBackend<FirstNoteDraftV1>(), {
+    now: () => "2026-06-12T00:00:00.000Z",
+  });
+  assert.equal(await store.get("aaaa1111"), "", "no draft yet → empty (textarea starts blank)");
+  await store.save("aaaa1111", "最初の下書き");
+  await store.save("bbbb2222", "別の相手の下書き");
+  assert.equal(await store.get("aaaa1111"), "最初の下書き");
+  assert.equal(await store.get("bbbb2222"), "別の相手の下書き", "edges never bleed");
+  await store.save("aaaa1111", "自分の言葉に直した");
+  assert.equal(await store.get("aaaa1111"), "自分の言葉に直した", "an edge holds ONE draft (upsert)");
+  await store.remove("aaaa1111");
+  assert.equal(await store.get("aaaa1111"), "");
+  assert.equal(firstNoteKey("aaaa1111"), "fnote_aaaa1111", "key derives from the peer (edge 単位)");
+});
+
+test("MM-17b: tripwire — the draft lane exists ONLY on the device side", () => {
+  // server-blind: no Function touches the lane; no migration defines a table
+  for (const src of allFunctionSources()) {
+    assert.ok(!/first[_-]?note/i.test(src), "a Function references the first-note lane");
+  }
+  for (const ent of readdirSync(root("migrations"))) {
+    const sql = read(`migrations/${ent}`).toLowerCase();
+    assert.ok(!/first_?note/.test(sql), `${ent} must not define a first-note table`);
+  }
+  // the network client never grows a lane for it (送り方はコピー→外部チャネル)
+  for (const ent of readdirSync(root("lib/meet-net"), { withFileTypes: true })) {
+    if (!ent.name.endsWith(".ts") || ent.name.endsWith(".test.ts")) continue;
+    const code = stripComments(read(`lib/meet-net/${ent.name}`));
+    assert.ok(!/firstNote|first_note/i.test(code), `lib/meet-net/${ent.name} must not carry the draft`);
+  }
+  // no compounding: prompt assembly (rig + meet-ai prompt) never reads drafts
+  for (const rel of ["lib/rig/rig.ts", "lib/meet-ai/prompt.ts"]) {
+    assert.ok(!/firstNote|FirstNote/.test(stripComments(read(rel))), `${rel} must not read the draft lane`);
+  }
+  // and the lane itself stays as dumb as received: no store/validator import
+  const src = read("lib/meet-memory/firstnote.ts");
+  assert.ok(!/from\s+["']\.\/store\.ts["']/.test(src), "firstnote must not import store.ts");
+  assert.ok(!/from\s+["']\.\/validate\.ts["']/.test(src), "firstnote must not import validate.ts");
+  assert.ok(!/MeetMemoryStore/.test(src), "firstnote must not reference the memory store");
 });
 
 // ── MM-16 (第7便 B): ひとこと紹介 — owner-saved only, validated, optional ───────

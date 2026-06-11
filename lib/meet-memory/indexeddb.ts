@@ -6,10 +6,12 @@
 // sync, no server. A browser data-clear wipes it; that honest caveat is why the
 // UI promotes 控えを保存 (export) — see STOP #2 (hybrid).
 //
-// Two object stores are created up front so later slices need no version bump:
-//   memory   — MeetMemoryEntryV1 (owner-authored substrate; THIS backend)
-//   received — proposals the owner's AI produced + the owner's readings
-//              (separate shelf: never validated into the memory substrate)
+// Object stores (each its own lane, same keyPath discipline):
+//   memory    — MeetMemoryEntryV1 (owner-authored substrate; THIS backend)
+//   received  — proposals the owner's AI produced + the owner's readings
+//               (separate shelf: never validated into the memory substrate)
+//   firstnote — c17: 第一信の下書き, one per edge (peerRef-derived key);
+//               like received, AI output that never re-enters a prompt
 //
 // Imported only from client components via the lib barrel. node:test uses
 // InMemoryMeetBackend instead, so this DOM-only code never loads there.
@@ -19,7 +21,10 @@ import type { KeyedBackend } from "./backend.ts";
 const DB_NAME = "px-meet";
 export const MEMORY_STORE = "memory";
 export const RECEIVED_STORE = "received";
-const VERSION = 1;
+export const FIRSTNOTE_STORE = "firstnote";
+// v2 (c17): + firstnote store. onupgradeneeded creates only what is missing,
+// so a v1 database upgrades in place without touching existing lanes.
+const VERSION = 2;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -31,6 +36,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(RECEIVED_STORE)) {
         db.createObjectStore(RECEIVED_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(FIRSTNOTE_STORE)) {
+        db.createObjectStore(FIRSTNOTE_STORE, { keyPath: "entryId" });
       }
     };
     req.onsuccess = () => resolve(req.result);
