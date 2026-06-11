@@ -62,7 +62,8 @@ const shot = (name) => page.screenshot({ path: `${SHOT_DIR}/r15b-${name}.png`, f
 try {
   // 1. home — first visit: prerequisites + AI-less reassurance + open promise
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  await waitCheck("home renders the tagline heading", page.getByRole("heading", { name: "お互いの記憶から、思いがけない接点を。" }));
+  // 視覚一新: the hero heading replaced the 題字 (the old tagline moved to 縦の銘)
+  await waitCheck("home renders the hero heading", page.getByRole("heading", { name: /あなたのAIが、あなたの人を見つける/ }));
   await waitCheck("home lists missing steps", page.getByText("AIがまだつながっていません"));
   await waitCheck("AI-less loop reassurance shown", page.getByText("AIをつながなくても", { exact: false }));
   await waitCheck("promise open on first visit", page.getByText("PXはAIを実行しません", { exact: false }));
@@ -156,7 +157,8 @@ try {
   // 7. receive attempt (fake key) — honest typed error, 第9便: as a DATED
   // ENTRY at the top of AIが見つけた提案
   await page.getByRole("button", { name: "探しに行く" }).click();
-  const errEntry = page.locator(".m-item", { hasText: "探しに行きました" }).first();
+  // 視覚一新: proposal entries render as .m-entry cards now
+  const errEntry = page.locator(".m-entry", { hasText: "探しに行きました" }).first();
   await errEntry.waitFor({ timeout: 30000 });
   const errText = await errEntry.locator(".m-item-text").first().innerText();
   check("receive shows an honest typed error ENTRY (fake key)", /ませんでした|もう一度/.test(errText));
