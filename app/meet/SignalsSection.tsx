@@ -111,8 +111,9 @@ export function SignalsSection({
                 <div className="m-sighead">
                   {/* 輪が語る: open=相手は挙げた・あなたはまだ / pair=相互。
                       こちらも押すと弧が閉じて pair へ（~300ms; Ring.tsx）。
-                      印データは存在しない（G-1=B）— 輪のみ。 */}
-                  <Ring state={sig.mutual ? "pair" : "open"} size={52} />
+                      c9-5: 印なしの輪は状態記号サイズ=26。印あり=52 は R2 用の規約
+                      （G-1=B: 今回の配布に印データは存在しない＝常に小輪）。 */}
+                  <Ring state={sig.mutual ? "pair" : "open"} size={26} />
                   <h4>{MEET.home.signals.incoming(sig.fromName)}</h4>
                 </div>
                 {sig.fromIntro.trim() !== "" && (

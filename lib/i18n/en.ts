@@ -203,7 +203,6 @@ export const en: Dict = {
   "meet.hero.accentPost": "",
   "meet.hero.sub":
     "Out of each other's memory — connections neither side could have reached alone. Your AI goes looking. You decide.",
-  "meet.hero.tate": "",
   "meet.meter.lastPre": "Last sweep ",
   "meet.meter.auto": "Sweeps automatically when you open",
   "meet.meter.keys": "Your keys never leave this device",

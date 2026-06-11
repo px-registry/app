@@ -200,7 +200,6 @@ export const ja: Dict = {
   "meet.hero.accentPost": "。",
   "meet.hero.sub":
     "お互いの記憶から、ひとりでは届かなかった接点を。探しに行くのはあなたのAI。決めるのは、あなた。",
-  "meet.hero.tate": "お互いの記憶から、思いがけない接点を。",
   "meet.meter.lastPre": "最後の見回り ",
   "meet.meter.auto": "開いた時に自動で見回ります",
   "meet.meter.keys": "鍵はこの端末の中にあります",

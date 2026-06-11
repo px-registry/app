@@ -188,8 +188,9 @@ export function ProposalEntry({
               return (
                 <div key={index}>
                   <div className="m-cardhead">
-                    {/* 印データは存在しない（G-1=B）— 輪のみ */}
-                    <Ring state="sent" size={44} />
+                    {/* c9-5: 印なしの輪は状態記号サイズ=22。印あり=44 は R2 用の規約
+                        （G-1=B: 今回の配布に印データは存在しない＝常に小輪） */}
+                    <Ring state="sent" size={22} />
                     <h3>{card.to}</h3>
                     {sent && <span className="m-statechip">{MEET.proposal.talkSent}</span>}
                   </div>

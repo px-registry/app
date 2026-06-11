@@ -56,7 +56,7 @@ import {
   pickPatrolTarget,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
-import { useT, useLang } from "@/lib/i18n/context.tsx";
+import { useT } from "@/lib/i18n/context.tsx";
 import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
@@ -119,7 +119,6 @@ function fmtHm(iso: string): string {
 
 export function HomeView() {
   const t = useT();
-  const [lang] = useLang();
   const memory = useMemo(() => openMeetMemory(), []);
   const shelf = useMemo(() => openReceived(), []);
 
@@ -465,11 +464,7 @@ export function HomeView() {
           </span>
         </h1>
         <p className="m-hero-sub">{t("meet.hero.sub")}</p>
-        {lang === "ja" && (
-          <div className="m-tate" aria-hidden="true">
-            {t("meet.hero.tate")}
-          </div>
-        )}
+        {/* 縦の銘は c9-1 で撤去（Hiroto 指摘「縦書きは過剰」） */}
         {/* 計器行 — the patrol fact moved here from the proposals column */}
         <div className="m-meter" role="status">
           <span className="m-live">

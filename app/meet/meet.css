@@ -109,11 +109,12 @@
   --ls-btn: 0.22em;
   --ls-eyebrow: 0.22em;
   --ls-brand: 0.28em;
-  --ls-tate: 0.34em;
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
 
   --radius-card: 14px;
   --radius-btn: 10px;
+  /* c9-4: ONE vertical rhythm for desktop section seams (rail/promise) */
+  --section-gap: 56px;
   --inset-b: env(safe-area-inset-bottom, 0px);
 
   min-height: 100dvh;
@@ -472,40 +473,10 @@ html[data-theme="sumi"] .meet-scope {
   margin: 22px 0 0;
   font-size: 14px;
   color: var(--sub);
-  max-width: 36em;
+  max-width: 34em;
   line-height: 2.05;
   letter-spacing: var(--ls-wide);
 }
-/* 縦の銘 — hidden under 1280px */
-.m-tate {
-  position: absolute;
-  top: clamp(2.4rem, 7vw, 4.5rem);
-  right: 0;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  writing-mode: vertical-rl;
-  font-family: var(--mincho);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: var(--ls-tate);
-  color: var(--sub);
-  height: min(21em, 46vh);
-}
-.m-tate::before {
-  content: "";
-  display: block;
-  inline-size: 1px;
-  block-size: 3.2em;
-  background: var(--line-deep);
-  margin-block-end: 1.2em;
-}
-@media (max-width: 1280px) {
-  .m-tate {
-    display: none;
-  }
-}
-
 /* 計器行 — the meter. The pulse is a STILL point (鼓動静止). */
 .m-meter {
   display: inline-flex;
@@ -1331,9 +1302,6 @@ textarea.m-field {
 .m-hero .m-meter {
   animation: m-rise 0.7s 0.16s var(--ease) both;
 }
-.m-tate {
-  animation: m-rise 0.9s 0.26s var(--ease) both;
-}
 
 @media (min-width: 40rem) {
   .m-h1 {
@@ -1343,15 +1311,24 @@ textarea.m-field {
 
 /* ── desktop (≥64rem): the paper widens — v3 frame proportions ──────────────── */
 @media (min-width: 64rem) {
+  /* c9-2 紙の端: the type sits in a 1200px frame; the header/footer RULES stay
+     full-bleed (the paper is wide, the text block is bounded) */
   .m-top-inner,
-  .m-main,
+  .m-main {
+    max-width: 1200px;
+    padding-left: clamp(24px, 5vw, 68px);
+    padding-right: clamp(24px, 5vw, 68px);
+  }
   .m-foot {
-    max-width: 72rem;
-    padding-left: 3rem;
-    padding-right: 3rem;
+    padding-left: clamp(24px, 5vw, 68px);
+    padding-right: clamp(24px, 5vw, 68px);
   }
   .m-main {
     padding-bottom: 4.5rem; /* no bottom tab bar at this width */
+  }
+  /* c9-4 縦の銘撤去に伴いヒーロー下端を一段詰める */
+  .m-hero {
+    padding-bottom: clamp(32px, 4vw, 48px);
   }
 
   .m-nav {
@@ -1396,11 +1373,12 @@ textarea.m-field {
     margin: 2rem 0 2.25rem;
   }
 
-  /* ── home 構図: 主柱=AIが見つけた提案（7fr）, 側柱=問いの手（4fr） ──────── */
+  /* ── home 構図: 主柱=AIが見つけた提案（7fr）, 側柱=問いの手（4fr）。
+     c9-3: 柱の間は罫＋ガター（gap は罫と二重にならないよう詰める）。 ──────── */
   .m-home {
     display: grid;
     grid-template-columns: minmax(0, 7fr) minmax(320px, 4fr);
-    column-gap: clamp(28px, 3.4vw, 56px);
+    column-gap: clamp(12px, 1.2vw, 16px);
     align-items: start;
   }
   .m-home-right {
@@ -1410,20 +1388,29 @@ textarea.m-field {
   .m-home-left {
     grid-column: 2;
     grid-row: 1;
+    border-left: 1px solid var(--line-soft);
+    padding-left: clamp(28px, 3.4vw, 48px);
   }
-  /* the rail: quiet sections separated by hairlines (v3 rail) */
+  /* the rail: quiet sections separated by hairlines (v3 rail);
+     c9-4: the seam rhythm is --section-gap, split across the hairline */
   .m-home-left .m-section {
     margin: 0;
-    padding: 1.6rem 0;
+    padding: calc(var(--section-gap) / 2) 0;
     border-top: 1px solid var(--line-soft);
   }
   .m-home-left .m-section:first-child {
     padding-top: 0;
     border-top: none;
   }
+  .m-home-left .m-section:last-child {
+    padding-bottom: 0;
+  }
   .m-home-left .m-btn {
     padding: 0.7rem 0.95rem;
     font-size: 12.5px;
+  }
+  .m-home-right .m-promise {
+    margin-top: var(--section-gap);
   }
   /* 朱は1画面に1つ（探しに行く）— the per-card CTA keeps a 朱 edge, not a fill */
   .m-home-right .m-proposal-talk.m-btn-primary {

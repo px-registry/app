@@ -62,7 +62,7 @@ const shot = (name) => page.screenshot({ path: `${SHOT_DIR}/r15b-${name}.png`, f
 try {
   // 1. home — first visit: prerequisites + AI-less reassurance + open promise
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
-  // 視覚一新: the hero heading replaced the 題字 (the old tagline moved to 縦の銘)
+  // 視覚一新: the hero heading replaced the 題字（旧題字文言は c9-1 で画面から退いた）
   await waitCheck("home renders the hero heading", page.getByRole("heading", { name: /あなたのAIが、あなたの人を見つける/ }));
   await waitCheck("home lists missing steps", page.getByText("AIがまだつながっていません"));
   await waitCheck("AI-less loop reassurance shown", page.getByText("AIをつながなくても", { exact: false }));
