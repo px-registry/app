@@ -12,7 +12,9 @@ import {
   COLDSTART_NOTE,
   parseColdStartPaste,
   openMeetMemory,
+  toPublicView,
 } from "@/lib/meet-memory";
+import { getPublishedSnapshot, snapshotHas } from "@/lib/meet-net";
 import type { RigMemoryItemV1 } from "@/lib/rig";
 
 type Phase = "paste" | "review" | "done";
@@ -24,6 +26,9 @@ export function ColdStartIntake() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [items, setItems] = useState<RigMemoryItemV1[]>([]);
   const [busy, setBusy] = useState(false);
+  // c15-4: 追加 or 置き換え — the non-destructive side is the default
+  const [mode, setMode] = useState<"add" | "replace">("add");
+  const [poolNotice, setPoolNotice] = useState(false);
 
   const copyPrompt = async () => {
     // Clipboard can be unavailable (permissions, in-app browsers) — the full
@@ -54,6 +59,17 @@ export function ColdStartIntake() {
     setBusy(true);
     try {
       const store = openMeetMemory();
+      // c15-4 置き換え: the OLD cards go first (忘却は owner の行為 — this
+      // explicit choice is it). 出す状態だった項目はプールに押し直しまで残る
+      // ので、c15-3 の注意行を done 面に出す（沈黙の禁止）。
+      if (mode === "replace") {
+        const snap = getPublishedSnapshot();
+        const old = await store.listRigItems();
+        if (old.some((e) => e.item.private === false && snapshotHas(snap, toPublicView(e.item)))) {
+          setPoolNotice(true);
+        }
+        for (const e of old) await store.remove(e.entryId);
+      }
       for (const item of items) {
         await store.create({
           kind: "rig_item",
@@ -71,6 +87,11 @@ export function ColdStartIntake() {
     return (
       <div>
         <p style={{ margin: 0, color: "var(--text)" }}>{MEET.intake.done}</p>
+        {poolNotice && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.memory.poolNotice}
+          </p>
+        )}
         <p className="m-note">
           <a href="/meet/memory/" style={{ color: "var(--shu-deep)" }}>
             {MEET.nav.memory}
@@ -110,7 +131,26 @@ export function ColdStartIntake() {
             </li>
           ))}
         </ul>
-        <div style={{ display: "grid", gap: "0.5rem", marginTop: "1rem" }}>
+        {/* c15-4: 追加（既定・非破壊）か、すべて置き換えるか */}
+        <div className="m-kindrow" style={{ marginTop: "1rem" }}>
+          <button
+            type="button"
+            className={`m-chip m-chip-pick ${mode === "add" ? "m-chip-active" : ""}`}
+            aria-pressed={mode === "add"}
+            onClick={() => setMode("add")}
+          >
+            {MEET.intake.addMode}
+          </button>
+          <button
+            type="button"
+            className={`m-chip m-chip-pick ${mode === "replace" ? "m-chip-active" : ""}`}
+            aria-pressed={mode === "replace"}
+            onClick={() => setMode("replace")}
+          >
+            {MEET.intake.replaceMode}
+          </button>
+        </div>
+        <div style={{ display: "grid", gap: "0.5rem", marginTop: "0.5rem" }}>
           <button type="button" className="m-btn m-btn-primary m-btn-wide" onClick={confirm} disabled={busy}>
             {MEET.intake.confirm(items.length)}
           </button>
