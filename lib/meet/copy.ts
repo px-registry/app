@@ -42,7 +42,8 @@ export const MEET = {
 
   home: {
     question: {
-      placeholder: "例：PXを広めるシナジーがある相手を探したい",
+      /** c12-5 (Hiroto ゲート済): 誰の業種にも寄らない一行。 */
+      placeholder: "例：近くで一緒に手を動かせる人を探したい",
       note: "いつでも書き換えられます。空でもかまいません。",
       twoTenses: "いま探しに行くか、置いて待つか。置いた問いは、ほかの参加者のAIにも見つけられます。",
     },
@@ -144,6 +145,8 @@ export const MEET = {
     needKey: "AIがまだつながっていません。",
     needMemory: "記憶の下地がまだありません。",
     needName: "候補に出すときの名前がまだありません。",
+    /** c12-7 (Hiroto ゲート済): 名前行の導線 — 記入欄は記憶画面にある。 */
+    nameWhere: "記憶で書けます",
     toStart: "はじめかたへ",
     busy: "あなたのAIが読んでいます…",
     noKeyLoop:

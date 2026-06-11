@@ -164,6 +164,22 @@ export function HomeView() {
     void reload();
   }, [reload]);
 
+  // c12-3: the 探しに行く gate re-derives from the CURRENT stored name whenever
+  // this page comes back into view (bfcache restore / tab refocus) — a name
+  // cleared on the memory page must hide the button here without a manual
+  // reload. Display-state sync only; no data behaviour changes.
+  useEffect(() => {
+    const sync = () => {
+      if (document.visibilityState === "visible") void reload();
+    };
+    window.addEventListener("pageshow", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      window.removeEventListener("pageshow", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, [reload]);
+
   const hasItems = rigEntries.length > 0;
   const ready = connected && hasItems && displayName !== "";
   const sentRefs = useMemo(
@@ -541,10 +557,32 @@ export function HomeView() {
         </div>
         {!ready && (
           <div className="m-empty" style={{ marginTop: "0.75rem", textAlign: "left" }}>
+            {/* c12-4: each row carries its own 導線 — the key/memory rows land
+                on their はじめかた step, the name row lands on the 記憶 name
+                field (it lives there, not on はじめかた). */}
             <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
-              {!connected && <li>{MEET.receive.needKey}</li>}
-              {!hasItems && <li>{MEET.receive.needMemory}</li>}
-              {displayName === "" && <li>{MEET.receive.needName}</li>}
+              {!connected && (
+                <li>
+                  <Link className="m-rowlink" href="/meet/start/#step-key">
+                    {MEET.receive.needKey}
+                  </Link>
+                </li>
+              )}
+              {!hasItems && (
+                <li>
+                  <Link className="m-rowlink" href="/meet/start/#step-intake">
+                    {MEET.receive.needMemory}
+                  </Link>
+                </li>
+              )}
+              {displayName === "" && (
+                <li>
+                  {MEET.receive.needName}{" "}
+                  <Link className="m-rowlink" href="/meet/memory/#name">
+                    {MEET.receive.nameWhere}
+                  </Link>
+                </li>
+              )}
             </ul>
             {!connected && (
               <p className="m-note" style={{ marginTop: "0.5rem" }}>

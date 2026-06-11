@@ -576,7 +576,8 @@ export function MemoryPanel() {
           →整理→やくそく); the desktop grid places 主柱=記憶 / 側柱=残り.
           Layout only. */}
       <div className="m-mem">
-      <section className="m-section m-mem-profile">
+      {/* c12-4: home の名前行アンカーの着地点 */}
+      <section className="m-section m-mem-profile" id="name">
         <h2 className="m-h2">{MEET.profile.heading}</h2>
         <div className="m-card">
           <p className="m-note" style={{ margin: "0 0 0.5rem" }}>

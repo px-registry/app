@@ -137,6 +137,27 @@ try {
     !(await page.getByText("候補の変更が", { exact: false }).isVisible().catch(() => false)),
   );
 
+  // 5b. c12-3/4: 名前の往復 — the 探しに行く gate follows the CURRENT name,
+  // and the checklist name row links to the 記憶 name field (#name)
+  await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
+  await page.locator("input.m-field").first().fill("");
+  await page.getByRole("button", { name: "保存", exact: true }).first().click();
+  await page.getByRole("button", { name: "保存しました" }).waitFor();
+  await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
+  check(
+    "cleared name hides 探しに行く (c12-3)",
+    (await page.getByRole("button", { name: "探しに行く", exact: true }).count()) === 0,
+  );
+  await waitCheck("checklist name row returns", page.getByText("候補に出すときの名前がまだありません。"));
+  await page.getByRole("link", { name: "記憶で書けます" }).click();
+  await page.waitForURL(/#name$/);
+  check("name row link lands on 記憶 #name (c12-4)", await page.locator("#name input.m-field").first().isVisible());
+  await page.locator("input.m-field").first().fill("みどり");
+  await page.getByRole("button", { name: "保存", exact: true }).first().click();
+  await page.getByRole("button", { name: "保存しました" }).waitFor();
+  await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
+  await waitCheck("re-named: 探しに行く returns (c12-3)", page.getByRole("button", { name: "探しに行く", exact: true }));
+
   // 6. signal from あや → talk back → mutual → contact note
   const sig = await api("/api/meet/signal", { ownerToken: TOK_A, toRef: myRef, fromName: "あや", anchor: "納屋 × 活版印刷" });
   check("seeded 話してみる from あや", sig.status === 201);

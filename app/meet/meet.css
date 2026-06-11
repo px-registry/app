@@ -903,6 +903,27 @@ textarea.m-field {
   outline: 2px solid var(--shu);
   outline-offset: 2px;
 }
+/* c12-4: checklist row links — quiet underline, accent on hover */
+.m-rowlink {
+  color: var(--shu-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--shu-line);
+  transition: text-decoration-color 0.16s var(--ease);
+}
+.m-rowlink:hover {
+  text-decoration-color: var(--shu-deep);
+}
+.m-rowlink:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 2px;
+}
+/* anchored landings clear the sticky header */
+#name,
+#step-key,
+#step-intake {
+  scroll-margin-top: 5.5rem;
+}
 
 /* 公開/非公開 toggle — quiet pill, 朱 when public */
 .m-toggle {

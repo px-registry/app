@@ -17,13 +17,14 @@ export default function MeetStart() {
         {/* 第5便: plain wrapper — invisible on mobile; the three steps sit
             side by side at desktop width. Layout only. */}
         <div className="m-steps">
-          <div className="m-card">
+          {/* c12-4: the home checklist rows land here by anchor */}
+          <div className="m-card" id="step-key">
             <h2 className="m-h2 m-stepnum">{MEET.start.step1.heading}</h2>
             <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step1.body}</p>
             <KeyConnect />
           </div>
 
-          <div className="m-card">
+          <div className="m-card" id="step-intake">
             <h2 className="m-h2 m-stepnum">{MEET.start.step2.heading}</h2>
             <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
             <ColdStartIntake />
