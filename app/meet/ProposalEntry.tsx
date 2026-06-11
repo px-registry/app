@@ -95,7 +95,12 @@ function ReadingEditor({
         value={note}
         onChange={(e) => setNote(e.target.value)}
         onBlur={flush}
-        placeholder={MEET.proposal.readings.notePlaceholder}
+        placeholder={
+          // c16-1b: わからない選択中は例示へ — 値も保存経路も変えない（placeholder のみ）
+          marks.includes(MEET.proposal.readings.unknownChip)
+            ? MEET.proposal.readings.notePlaceholderUnknown
+            : MEET.proposal.readings.notePlaceholder
+        }
       />
       {status !== "idle" && (
         <p

@@ -317,6 +317,9 @@ export const MEET = {
       /** c16-1: 知覚系（〜わからない）の末尾に「わからない」、行動系（話したい）は最後尾。 */
       options: ["面白い", "腑に落ちる", "突飛", "わからない", "話したい"] as readonly string[],
       notePlaceholder: "ひとこと（あってもなくても）",
+      /** c16-1b: わからない選択中だけ、ひとこと欄の placeholder を例示に切り替える。 */
+      unknownChip: "わからない",
+      notePlaceholderUnknown: "例：相手が何をしている人かわからない／自分に関係する理由がわからない",
       recorded: "記録しました",
       recordFailed: "記録できませんでした",
     },

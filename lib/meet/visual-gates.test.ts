@@ -181,6 +181,17 @@ test("VR-12: c16 — the five chips verbatim, the band, the eyebrow", async () =
     assert.ok(band.includes(inside), `${inside} sits inside the band`);
   }
   assert.ok(css().includes(".m-testband"), "the band rule exists (thin rule, tokens only — VR-1 scans it)");
+  // c16-1b: the unknown-selected placeholder — gated wording; the trigger word
+  // IS the chip (one vocabulary, no drift); placeholder only, no new field/lane
+  assert.equal(MEET.proposal.readings.unknownChip, MEET.proposal.readings.options[3]);
+  assert.equal(
+    MEET.proposal.readings.notePlaceholderUnknown,
+    "例：相手が何をしている人かわからない／自分に関係する理由がわからない",
+  );
+  assert.ok(
+    entry.includes("notePlaceholderUnknown") && entry.includes("unknownChip"),
+    "the hitokoto field switches placeholder on the unknown chip",
+  );
 });
 
 test("VR-7: visual-refresh i18n keys — both dictionaries, no forbidden term", () => {
