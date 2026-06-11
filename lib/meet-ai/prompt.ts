@@ -9,8 +9,8 @@
 //
 // A FORMAT block is appended AFTER the law — a technical output contract
 // (machine-readable cards) that adds no ranking and contradicts nothing in the
-// law; the law's 3-line card shape (rule 9, 2026-06-11 裁定) maps 1:1 onto
-// line1/line2/line3.
+// law; the law's 3-line card shape (rule 9 v3, 2026-06-11 裁定: 言い切り→
+// 平易な式→手がかり) maps 1:1 onto line1/line2/line3.
 
 import {
   buildOwnerPrompt,
@@ -27,7 +27,7 @@ const QUESTION_HEADING = "【今日の問い】";
 const FORMAT_BLOCK = [
   "【返答の形】",
   "次の形のJSONだけを返してください（前後に説明文を付けない）：",
-  '[{ "to": "相手の名前（プールの[名前]と同じ表記）", "line1": "1行目（あなたの○○ × ［相手名］の○○）", "line2": "2行目（そこから生まれそうなものを一つ）", "line3": "3行目（相手の公開項目から一つだけ、相手の手がかりを平易に）", "basisItemId": "根拠にした相手の項目の参照（[p3] と書かれた項目なら p3）" }]',
+  '[{ "to": "相手の名前（プールの[名前]と同じ表記）", "line1": "1行目（提案の中身を一文で言い切る。誘い文にしない）", "line2": "2行目（あなたの◯◯ × ［相手名］の◯◯ — 接点の根拠を、初めて読む人に伝わる平易な言い回しで）", "line3": "3行目（相手の公開項目から一つだけ、相手の手がかりを平易に）", "basisItemId": "根拠にした相手の項目の参照（[p3] と書かれた項目なら p3）" }]',
   "basisItemId は、その相手の公開項目に実際に付いている参照だけを使う。",
   "今日は無い場合は [] を返す。",
 ].join("\n");

@@ -64,8 +64,8 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 `lib/rig/rig.ts` は px-table（法の原本）からの移植。文言改訂は Hiroto 裁定→両 repo 同期
 （直近: rule 9 改訂 = px-table PR #36）。rig-gates.test.ts の独立 verbatim copy が drift を検知する。
 
-- **同期課題: rule9はpx-appで3行版（2026-06-11裁定）。px-table原本（d0b8c29・2行）は未同期。
-  次のpx-table便で同期すること。**
+- **同期課題: px-app=rule9 v3（2026-06-11裁定）。px-table原本（d0b8c29・2行）は未同期 —
+  次のpx-table便で v3へ直接同期（v2を経由しない）。**
 
 ## R2 課題（c12-2 記録）
 
