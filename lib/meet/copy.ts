@@ -205,6 +205,9 @@ export const MEET = {
     publicLabel: "出す",
     privateLabel: "出さない",
     confirm: (n: number): string => `この${n}件で確定する`,
+    /** c15-4 (Hiroto ゲート済): 取り込みの二択。既定は破壊的でない「追加」。 */
+    addMode: "既存の記憶に追加する",
+    replaceMode: "すべて置き換える",
     done: "記憶の下地ができました。",
     redo: "貼り直す",
   },
@@ -237,7 +240,12 @@ export const MEET = {
     textLabel: "本文",
     tagsLabel: "タグ（、で区切る）",
     clearAll: "すべて消す",
-    confirmClear: "この端末の記憶をすべて消します。よろしいですか？",
+    /** c15-2 (Hiroto ゲート済): 二段確認の本文。消すのは記憶カードのみ。
+     *  旧 confirmClear（window.confirm 一段）はこの二段確認に置換された。 */
+    confirmClearN: (n: number): string => `${n}件の記憶をすべて消します。元に戻せません。`,
+    confirmClearGo: "消す",
+    /** c15-3 案B (Hiroto ゲート済): 出した項目を消した時の注意行。 */
+    poolNotice: "候補に出した項目が含まれていました。『候補に出す』を押し直すと反映されます。",
     housekeeping: "整理",
     exportLabel: "控えを保存",
     importLabel: "控えから戻す",

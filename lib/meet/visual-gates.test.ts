@@ -133,6 +133,26 @@ test("VR-10: the legibility block rides the coldstart prompt verbatim", async ()
   );
 });
 
+// ── VR-11 (c15): 忘却は owner の行為 — the gated wording, pinned ───────────────
+
+test("VR-11: c15 gated copy — two-step clear, pool notice, intake modes", async () => {
+  const { MEET } = await import("./copy.ts");
+  assert.equal(MEET.memory.clearAll, "すべて消す");
+  assert.equal(MEET.memory.confirmClearN(3), "3件の記憶をすべて消します。元に戻せません。");
+  assert.equal(MEET.memory.confirmClearGo, "消す");
+  assert.equal(MEET.memory.cancel, "やめる", "the existing word pair serves the confirm");
+  assert.equal(
+    MEET.memory.poolNotice,
+    "候補に出した項目が含まれていました。『候補に出す』を押し直すと反映されます。",
+  );
+  assert.equal(MEET.intake.addMode, "既存の記憶に追加する");
+  assert.equal(MEET.intake.replaceMode, "すべて置き換える");
+  // the one-step window.confirm era is over
+  assert.ok(!("confirmClear" in MEET.memory), "old confirmClear key is extinct");
+  const panel = read("app/meet/memory/MemoryPanel.tsx");
+  assert.ok(!panel.includes("window.confirm"), "no browser-native confirm — the two-step UI carries it");
+});
+
 test("VR-7: visual-refresh i18n keys — both dictionaries, no forbidden term", () => {
   const enKeys = Object.keys(en).filter((k) => k.startsWith("meet."));
   const jaKeys = Object.keys(ja).filter((k) => k.startsWith("meet."));

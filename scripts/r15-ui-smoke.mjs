@@ -194,6 +194,43 @@ try {
   await waitCheck("host shows 提案と読み", page.getByRole("heading", { name: "提案と読み" }));
   await waitCheck("host shows 「話してみる」のながれ", page.getByRole("heading", { name: "「話してみる」のながれ" }));
   await shot("09-host");
+  // 9. c15: 忘却は owner の行為 — 一枚消す→整合の注意行、すべて消す→二段確認→空
+  await page.goto(`${BASE}/meet/memory/`, { waitUntil: "networkidle" });
+  const cardsBefore = await page.locator(".m-itemlist .m-item").count();
+  // delete the PUBLISHED extra item (週末の手伝い) — pool copy stays → notice
+  await page
+    .locator(".m-item", { hasText: "週末の手伝い" })
+    .getByRole("button", { name: "消す", exact: true })
+    .click();
+  await waitCheck(
+    "c15-3: 出した項目を消すと注意行（沈黙の禁止）",
+    page.getByText("候補に出した項目が含まれていました。", { exact: false }),
+  );
+  await waitCheck("c15-3: 未反映バナーも立つ", page.getByText("候補の変更が", { exact: false }));
+  await page.reload({ waitUntil: "networkidle" });
+  check(
+    "c15-1: 一枚消す → reload 後も消えている",
+    (await page.locator(".m-itemlist .m-item").count()) === cardsBefore - 1,
+  );
+  // すべて消す: 二段確認 → やめる → 残る → 消す → 空 → reload 後も空・名前は残る
+  await page.locator(".m-promise summary", { hasText: "整理" }).click();
+  await page.getByRole("button", { name: "すべて消す", exact: true }).click();
+  await waitCheck(
+    "c15-2: 二段確認が件数を言う",
+    page.getByText(/\d+件の記憶をすべて消します。元に戻せません。/),
+  );
+  await page.getByRole("button", { name: "やめる", exact: true }).click();
+  check("c15-2: やめる → 何も消えない", (await page.locator(".m-itemlist .m-item").count()) === cardsBefore - 1);
+  await page.getByRole("button", { name: "すべて消す", exact: true }).click();
+  await page.getByRole("button", { name: "消す", exact: true }).last().click();
+  await waitCheck("c15-2: 全消去 → まだ記憶がありません", page.getByText("まだ記憶がありません", { exact: false }));
+  await page.reload({ waitUntil: "networkidle" });
+  check("c15-2: reload 後も空", (await page.locator(".m-itemlist .m-item").count()) === 0);
+  check(
+    "c15-2: 名前は残る（消すのは記憶カードのみ）",
+    (await page.locator("input.m-field").first().inputValue()) === "みどり",
+  );
+  await shot("10-memory-cleared");
 } finally {
   await browser.close();
 }

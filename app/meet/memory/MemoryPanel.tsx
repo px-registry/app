@@ -39,6 +39,7 @@ import {
   setPublishedSnapshot,
   projectionSnapshotJson,
   snapshotPendingCount,
+  snapshotHas,
 } from "@/lib/meet-net";
 import { RIG_MEMORY_KINDS, type RigMemoryKindV1 } from "@/lib/rig";
 import { BoundaryNote } from "../BoundaryNote.tsx";
@@ -492,8 +493,16 @@ export function MemoryPanel() {
     await reload();
   };
 
-  const removeItem = async (entryId: string) => {
-    await store.remove(entryId);
+  // c15-3 案B: deleting a PUBLISHED item leaves its pool copy until the owner
+  // presses 候補に出す again (publish stays an explicit act — same manual flow
+  // as the 出さない toggle). The notice + the 未反映 banner break the silence.
+  const [poolNotice, setPoolNotice] = useState(false);
+
+  const removeItem = async (e: RigEntry) => {
+    if (e.item.private === false && snapshotHas(getPublishedSnapshot(), toPublicView(e.item))) {
+      setPoolNotice(true);
+    }
+    await store.remove(e.entryId);
     await reload();
   };
 
@@ -524,10 +533,19 @@ export function MemoryPanel() {
     await reload();
   };
 
-  const clearAll = async () => {
-    if (!window.confirm(MEET.memory.confirmClear)) return;
-    await store.clear();
-    setDisplayName("");
+  // c15-2: すべて消す — two-step confirm in the UI (the browser-native dialog
+  // era is over), and it clears the MEMORY CARDS only (the copy promises
+  // {n}件の記憶 — the name, the question and the 伏せたい言葉 survive;
+  // 忘却は owner の行為).
+  const [confirmingClear, setConfirmingClear] = useState(false);
+
+  const clearAllCards = async () => {
+    const snap = getPublishedSnapshot();
+    if (entries.some((e) => e.item.private === false && snapshotHas(snap, toPublicView(e.item)))) {
+      setPoolNotice(true);
+    }
+    for (const e of entries) await store.remove(e.entryId);
+    setConfirmingClear(false);
     await reload();
   };
 
@@ -565,6 +583,7 @@ export function MemoryPanel() {
       const json = projectionSnapshotJson(items);
       setPublishedSnapshot(json);
       setSnapshot(json);
+      setPoolNotice(false); // the pool now matches — the c15-3 notice is settled
     } else {
       setPubState("failed");
     }
@@ -655,6 +674,13 @@ export function MemoryPanel() {
         <p className="m-note" style={{ margin: "0 0 0.75rem" }}>
           {MEET.memory.boundary}
         </p>
+        {/* c15-3 案B: 消した中に「出す」項目があった — 沈黙の禁止（プールには
+            押し直すまで残る、を正直に言う）。押し直しで消える。 */}
+        {poolNotice && (
+          <p className="m-note" aria-live="polite" style={{ margin: "0 0 0.5rem", color: "var(--shu-deep)" }}>
+            {MEET.memory.poolNotice}
+          </p>
+        )}
         {pendingCount > 0 && pubState !== "busy" && (
           <div className="m-pending">
             <span>{MEET.publish.pending(pendingCount)}</span>
@@ -723,7 +749,7 @@ export function MemoryPanel() {
                     <button type="button" className="m-link" onClick={() => setEditing(e.entryId)}>
                       {MEET.memory.edit}
                     </button>
-                    <button type="button" className="m-link" onClick={() => void removeItem(e.entryId)}>
+                    <button type="button" className="m-link" onClick={() => void removeItem(e)}>
                       {MEET.memory.remove}
                     </button>
                   </div>
@@ -812,10 +838,39 @@ export function MemoryPanel() {
                 onChange={(e) => void importBackup(e.target.files?.[0])}
               />
             </label>
-            <button type="button" className="m-btn m-btn-quiet m-btn-danger" onClick={() => void clearAll()}>
+            <button
+              type="button"
+              className="m-btn m-btn-quiet m-btn-danger"
+              onClick={() => setConfirmingClear(true)}
+              disabled={confirmingClear || entries.length === 0}
+            >
               {MEET.memory.clearAll}
             </button>
           </div>
+          {/* c15-2: 二段確認 — 破壊操作は道具箱の中で、数を言ってから */}
+          {confirmingClear && (
+            <div className="m-card" style={{ marginTop: "0.75rem" }}>
+              <p style={{ margin: "0 0 0.75rem", color: "var(--text)" }}>
+                {MEET.memory.confirmClearN(entries.length)}
+              </p>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="m-btn m-btn-quiet m-btn-danger"
+                  onClick={() => void clearAllCards()}
+                >
+                  {MEET.memory.confirmClearGo}
+                </button>
+                <button
+                  type="button"
+                  className="m-btn m-btn-quiet"
+                  onClick={() => setConfirmingClear(false)}
+                >
+                  {MEET.memory.cancel}
+                </button>
+              </div>
+            </div>
+          )}
           {report && <p className="m-note">{report}</p>}
           <p className="m-note">{MEET.memory.durability}</p>
         </details>
