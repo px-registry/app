@@ -158,14 +158,48 @@ try {
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
   await waitCheck("re-named: 探しに行く returns (c12-3)", page.getByRole("button", { name: "探しに行く", exact: true }));
 
-  // 6. signal from あや → talk back → mutual → contact note
+  // 6. signal from あや → talk back → mutual → c17 この接点で話す → contact note
   const sig = await api("/api/meet/signal", { ownerToken: TOK_A, toRef: myRef, fromName: "あや", anchor: "納屋 × 活版印刷" });
   check("seeded 話してみる from あや", sig.status === 201);
   await page.goto(`${BASE}/meet/`, { waitUntil: "networkidle" });
   await waitCheck("section heading あなたへの「話してみる」", page.getByRole("heading", { name: "あなたへの「話してみる」" }));
   await waitCheck("incoming copy (押しました)", page.getByText("あやさんが「話してみる」を押しました。"));
+  check("c17: no face before mutual", (await page.locator(".m-talkface").count()) === 0);
   await shot("06-home-incoming");
+  // c17 tripwire: from here on, NOTHING typed into the first-note textarea may
+  // ride a PX request body (the draft is device-only; sending is copy→outside).
+  const MARKER = "tripwire-第一信-c17";
+  const apiBodies = [];
+  page.on("request", (req) => {
+    if (req.url().includes("/api/")) apiBodies.push(req.postData() ?? "");
+  });
   await page.getByRole("button", { name: "こちらも話してみる" }).click();
+  await waitCheck("c17: pair opens the この接点で話す face", page.getByText("この接点で話す"));
+  check("c17: 接点の再掲 (anchor) inside the face", await page.locator(".m-talkface .m-pairline", { hasText: "納屋 × 活版印刷" }).isVisible());
+  check("c17: assist line", await page.getByText("AIが下書きします。送るのはあなたです。").isVisible());
+  // fail-close: the saved key is fake → honest one-liner + the button stays (再試行可)
+  await page.getByRole("button", { name: "最初の一言を作る" }).click();
+  await waitCheck("c17: generation failure says so honestly", page.getByText("下書きを作れませんでした。もう一度試すか、自分の言葉でどうぞ。"));
+  check("c17: retry stays available", await page.getByRole("button", { name: "最初の一言を作る" }).isEnabled());
+  // L0: the textarea is hand-writable without AI; blur saves; reload keeps it
+  await page.locator(".m-talkface textarea").fill(MARKER + " 自分の言葉で書く");
+  await page.locator(".m-talkface textarea").blur();
+  await page.waitForTimeout(400);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator(".m-talkface textarea").waitFor();
+  await page.waitForFunction(
+    (m) => document.querySelector(".m-talkface textarea")?.value.includes(m),
+    MARKER,
+    { timeout: 10000 },
+  );
+  check("c17: draft survives reload (owner-local lane)", true);
+  // コピー → コピーしました (clipboard granted in this context)
+  await page.getByRole("button", { name: "コピー", exact: true }).click();
+  await waitCheck("c17: copy flips to コピーしました", page.locator(".m-talkface").getByText("コピーしました"));
+  check("c17: clipboard carries the draft", (await page.evaluate(() => navigator.clipboard.readText())).includes(MARKER));
+  await shot("07a-home-first-note");
+  // 従属位置の連絡メモ — fold to open, contents unchanged
+  await page.locator(".m-contactfold summary", { hasText: "連絡メモを開く" }).click();
   await page.getByText("おたがいが「話してみる」を押しました。").waitFor();
   await page.getByPlaceholder("例：LINEのID、メール、電話など、つながれる窓口").fill("メール: midori@example.jp");
   await page.getByRole("button", { name: "渡す", exact: true }).click();
@@ -174,6 +208,9 @@ try {
   await shot("07-home-mutual-contact");
   const inboxA = await api("/api/meet/inbox", { ownerToken: TOK_A });
   check("あや receives みどり's note", inboxA.body?.notes?.some((n) => n.note === "メール: midori@example.jp"));
+  // the tripwire verdict: the contact note went to /api (intended); the draft never did
+  check("c17 tripwire: draft text never reaches a PX endpoint", apiBodies.every((b) => !b.includes(MARKER)));
+  check("…while the contact lane did fire (monitor is live)", apiBodies.some((b) => b.includes("midori@example.jp")));
 
   // 7. receive attempt (fake key) — honest typed error, 第9便: as a DATED
   // ENTRY at the top of AIが見つけた提案
