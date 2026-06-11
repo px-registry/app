@@ -80,6 +80,37 @@ test("VR-6: --faint never colours text (rules & ornament only)", () => {
   }
 });
 
+test("VR-8 (c12): JA-fixed for this test — EN toggle hidden, machinery kept", () => {
+  const toggles = read("app/meet/MeetToggles.tsx");
+  assert.ok(!toggles.includes("setLang"), "the language toggle is hidden (returns in R2)");
+  assert.ok(toggles.includes("setThemePref"), "the theme toggle stays");
+  const layout = read("app/meet/layout.tsx");
+  assert.ok(layout.includes("e.lang='ja'"), "the meet surface pins html lang=ja");
+  assert.ok(layout.includes("data-px-lang"), "…and the i18n resolver attribute");
+  // the EN draft dictionary survives in code (deleted = a different decision)
+  assert.ok(
+    Object.keys(en).some((k) => k.startsWith("meet.")),
+    "EN draft keys still exist in lib/i18n/en.ts",
+  );
+});
+
+test("VR-9 (c12): gated copy — placeholder, name-row link, coldstart guard", async () => {
+  const { MEET } = await import("./copy.ts");
+  assert.equal(MEET.home.question.placeholder, "例：近くで一緒に手を動かせる人を探したい");
+  assert.equal(MEET.receive.nameWhere, "記憶で書けます");
+  const { COLDSTART_PROMPT } = await import("../meet-memory/coldstart.ts");
+  assert.ok(
+    COLDSTART_PROMPT.includes(
+      "会社名・店名・人名・取引先名などの固有名詞は、そのまま書かず、内容が伝わる言い換えにしてください",
+    ),
+    "固有名詞ガード rides the coldstart prompt verbatim",
+  );
+  assert.ok(
+    COLDSTART_PROMPT.includes("あなたの呼び名や連絡先は項目に含めないでください。"),
+    "…including the name/contact line",
+  );
+});
+
 test("VR-7: visual-refresh i18n keys — both dictionaries, no forbidden term", () => {
   const enKeys = Object.keys(en).filter((k) => k.startsWith("meet."));
   const jaKeys = Object.keys(ja).filter((k) => k.startsWith("meet."));
