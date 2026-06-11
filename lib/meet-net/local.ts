@@ -47,8 +47,11 @@ export function markBoundarySeen(): void {
 // G-2 (指示書 §7): the existing device-side persistence method IS this audited
 // file (pxmeet:* keys in localStorage; same shape as the i18n px:lang pref), so
 // the theme pref follows it rather than minting a new mechanism. The init
-// script mirrors lib/i18n's LANG_INIT_SCRIPT: resolve before paint
-// (stored pref → prefers-color-scheme), write <html data-theme> — no flash.
+// script mirrors lib/i18n's LANG_INIT_SCRIPT: resolve before paint, write
+// <html data-theme> — no flash.
+//
+// c12-1 (Hiroto 裁定): the DEFAULT is paper — prefers-color-scheme tracking is
+// gone; only a manually saved pref overrides (保存値 → paper).
 
 const THEME_KEY = "pxmeet:theme";
 
@@ -63,7 +66,7 @@ export function setThemePref(phase: ThemePhase): void {
 }
 
 // Inline, dependency-free; injected verbatim into the meet layout.
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'sumi':'paper';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t='paper';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
 
 // ── 第9便 B — 見回りの last-run (device-local; the 6h throttle's memory) ──────
 

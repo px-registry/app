@@ -66,3 +66,9 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 
 - **同期課題: rule9はpx-appで3行版（2026-06-11裁定）。px-table原本（d0b8c29・2行）は未同期。
   次のpx-table便で同期すること。**
+
+## R2 課題（c12-2 記録）
+
+- EN文言の全面ゲート（現状ドラフト・既存文言は未訳）。
+- EN表示書体 Cormorant Garamond の woff2 同梱（現状OSフォールバックで端末差が出る —
+  Hiroto報告の2端末差の根因）。

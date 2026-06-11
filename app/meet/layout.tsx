@@ -33,9 +33,18 @@ export const metadata: Metadata = {
 export default function MeetLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`meet-scope ${shippori.variable} ${inter.variable}`}>
-      {/* Resolve the theme phase (stored pref → prefers-color-scheme) and set
-          <html data-theme> before this surface paints — no flash. */}
-      <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      {/* Resolve the theme phase (stored pref → paper; c12-1 裁定) and set
+          <html data-theme> before this surface paints — no flash. c12-2: this
+          surface is JA-fixed for the five-test (the language toggle is hidden;
+          the i18n machinery and the EN draft dictionary stay for R2), so the
+          document language is pinned here, overriding the root resolver. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            THEME_INIT_SCRIPT +
+            `(function(){var e=document.documentElement;e.lang='ja';e.setAttribute('data-px-lang','ja');})();`,
+        }}
+      />
       <header className="m-top">
         <div className="m-top-inner">
           <a href="/meet/" className="m-wordmark">

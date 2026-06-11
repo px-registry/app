@@ -1,8 +1,9 @@
 // R1.5 visual refresh — theme pref pins (device-local lane). Run with `node --test`.
 //
 //   LT-1  the pref round-trips through the audited store and rejects junk
-//   LT-2  the init script resolves stored pref → prefers-color-scheme and
-//         writes <html data-theme> (no-flash, same shape as LANG_INIT_SCRIPT)
+//   LT-2  the init script resolves stored pref → paper (c12-1 裁定: the default
+//         is paper; prefers-color-scheme tracking is gone) and writes
+//         <html data-theme> (no-flash, same shape as LANG_INIT_SCRIPT)
 //   LT-3  G-2 — no NEW persistence lane: the theme key follows the existing
 //         pxmeet: prefix in the one gate-pinned localStorage file
 
@@ -30,9 +31,13 @@ test("LT-1: theme pref round-trips; junk reads as unset", () => {
   assert.equal(getThemePref(), "");
 });
 
-test("LT-2: the init script resolves pref → prefers-color-scheme → data-theme", () => {
+test("LT-2: the init script resolves pref → paper (c12-1: default is paper)", () => {
   assert.ok(THEME_INIT_SCRIPT.includes("pxmeet:theme"), "reads the stored pref");
-  assert.ok(THEME_INIT_SCRIPT.includes("prefers-color-scheme"), "falls back to the OS phase");
+  assert.ok(
+    !THEME_INIT_SCRIPT.includes("prefers-color-scheme"),
+    "OS-phase tracking is gone — the default phase is always paper",
+  );
+  assert.ok(THEME_INIT_SCRIPT.includes("'paper'"), "unset/junk resolves to paper");
   assert.ok(THEME_INIT_SCRIPT.includes("data-theme"), "writes the html attribute");
   assert.ok(THEME_INIT_SCRIPT.includes("try{"), "failure stays silent (paper default via CSS)");
 });
