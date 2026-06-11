@@ -23,6 +23,20 @@ export const MEET = {
     start: "はじめかた",
   },
 
+  /** 視覚一新 — header toggles. The phase names are the 指示書 §3-2 values
+   *  (data-theme="paper|sumi"); the language labels are the existing D12 pair. */
+  theme: {
+    paper: "paper",
+    sumi: "sumi",
+    group: "paper / sumi",
+    ja: "日本語",
+    en: "EN",
+    langGroup: "EN / 日本語",
+  },
+
+  /** 視覚一新 — footer mark (the registry's existing name, quiet). */
+  footerKk: "PX Registry KK",
+
   /** 境界の脚注 — 初回は開いて見せ、以降は畳む。 */
   boundaryTitle: "PXのやくそく",
 
@@ -36,6 +50,9 @@ export const MEET = {
     // つながるとは言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
     receive: "探しに行く",
     place: {
+      /** 視覚一新 — v3正本の eyebrows（意匠）。 */
+      eyebrowAsk: "Ask",
+      eyebrowResting: "Resting",
       action: "置いておく",
       confirmHeading: "問いを置く",
       // 第9便 B: 「探し続け」は実態（開くたびの見回り）に合わせて言い直した。
@@ -56,6 +73,8 @@ export const MEET = {
       needName: "候補に出すには、先に記憶ページで「候補に出すときの名前」を決めてください。",
     },
     proposals: {
+      /** 視覚一新 — v3正本の eyebrow（言語によらず英字の意匠）。 */
+      eyebrow: "Found by your AI",
       /** 第9便 命名ゲート: 探しに行く＋見回りの結末がすべてここに並ぶ。 */
       heading: "AIが見つけた提案",
       subnote: "あなたのAIが「探しに行く」と「見回り」で見つけたものが、ここに並びます。",
@@ -86,6 +105,8 @@ export const MEET = {
       noReads: "今日はまだ読まれていません。",
     },
     signals: {
+      /** 視覚一新 — v3正本の eyebrow（意匠）。 */
+      eyebrow: "For you",
       heading: "あなたへの「話してみる」",
       /** 第9便 D — 役割の一行（相手からの合図が届く場所）。 */
       subnote: "あなたの問いや候補を相手のAIが見つけたとき、ここに合図が届きます。",

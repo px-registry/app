@@ -192,4 +192,24 @@ export const ja: Dict = {
   "preview.receiverLabel": "受け取り手の画面",
   "preview.buyerLabel": "買い手の画面",
   "preview.building": "プレビューを生成中…",
+
+  // ── meet 視覚一新（指示書 §6 命名ゲート済 + v3正本の文言）───
+  "meet.hero.lead": "あなたのAIが、あなたの人を見つける。",
+  "meet.hero.accentPre": "間に、",
+  "meet.hero.accentEm": "誰もいない",
+  "meet.hero.accentPost": "。",
+  "meet.hero.sub":
+    "お互いの記憶から、ひとりでは届かなかった接点を。探しに行くのはあなたのAI。決めるのは、あなた。",
+  "meet.hero.tate": "お互いの記憶から、思いがけない接点を。",
+  "meet.meter.lastPre": "最後の見回り ",
+  "meet.meter.auto": "開いた時に自動で見回ります",
+  "meet.meter.keys": "鍵はこの端末の中にあります",
+  "meet.empty.title": "今日は、ありませんでした。",
+  "meet.empty.evPre": "見回りは ",
+  "meet.empty.evMid": " に済んでいます。読めるものは読みました。",
+  "meet.empty.evRest": "提案できる接点は、今日は見つかりませんでした。",
+  "meet.empty.herePre": "いま、この場には ",
+  "meet.empty.herePost": "人",
+  "meet.empty.next": "明日も、開いた時に見回ります。",
+  "meet.signal.notYet": "あなたはまだ押していません。",
 };
