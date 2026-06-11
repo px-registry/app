@@ -58,6 +58,10 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
   品質評価は Hiroto のブラウザ（Claude 実鍵）で。want の無い記憶では law どおり「今日は無い」を返す
   （smoke の記憶 fixture には want を必ず入れる）。
 - wrangler dev は `_headers` を**起動時に読む**——変更したら再起動。
+- **提案エントリのセレクタは `.m-entry`**（`.m-item` は記憶リスト側）。batch3 smoke の
+  `.m-item`/`.m-proposal` 待ちは旧マークアップ — 新 smoke を書くとき写さない（c16 で180s×2浪費）。
+- **wrangler dev 起動中は `npx wrangler pages deploy` が EBUSY で落ちる**（npx キャッシュ共有）
+  — dev を止めてから deploy。
 
 ## RIG_LAW
 
