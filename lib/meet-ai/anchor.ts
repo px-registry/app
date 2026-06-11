@@ -18,26 +18,48 @@
 
 export const MAX_ANCHOR = 80;
 
-export function anchorForRecipient(line1: string, to: string, senderName: string): string {
+/** One line in the 式 shape (あなたの X × ［to］の Y) → recipient-addressed
+ *  swap, or null when the line doesn't parse as the 式. */
+function swapLine(line: string, to: string, senderName: string): string | null {
   const lead = "あなたの";
-  if (!line1.startsWith(lead) || senderName.trim() === "") return line1.slice(0, MAX_ANCHOR);
+  if (!line.startsWith(lead)) return null;
   // the format block writes 全角 ［相手名］, but real models also emit 半角
   // [相手名] (qwen, observed in smoke) — accept both; the OUTPUT is always
   // the canonical 全角 form.
   for (const marker of [`［${to}］の`, `[${to}]の`]) {
-    const m = line1.indexOf(marker);
+    const m = line.indexOf(marker);
     if (m <= lead.length) continue;
     // between = "X × " (spacing around × may vary; anything else → fallback)
-    const xm = line1.slice(lead.length, m).match(/^([\s\S]*?)\s*×\s*$/);
+    const xm = line.slice(lead.length, m).match(/^([\s\S]*?)\s*×\s*$/);
     if (xm === null) continue;
     const x = xm[1].trim();
     // a sentence-final 。 would otherwise land mid-anchor after the swap
-    const y = line1
+    const y = line
       .slice(m + marker.length)
       .trim()
       .replace(/。$/, "");
     if (x === "" || y === "") continue;
     return `あなたの${y} × ［${senderName.trim()}］の${x}`.slice(0, MAX_ANCHOR);
+  }
+  return null;
+}
+
+/**
+ * c13 — staged search: rule 9 v3 puts the 式 on LINE 2 (line1 is the 言い切り),
+ * v2 stock put it on line1. Try line1 → line2 → fall back to the verbatim head
+ * of line1 (従来どおり; fail-close never blocks the send).
+ */
+export function anchorForRecipient(
+  line1: string,
+  line2: string,
+  to: string,
+  senderName: string,
+): string {
+  if (senderName.trim() !== "") {
+    for (const line of [line1, line2]) {
+      const swapped = swapLine(line, to, senderName);
+      if (swapped !== null) return swapped;
+    }
   }
   return line1.slice(0, MAX_ANCHOR);
 }

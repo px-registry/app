@@ -418,12 +418,13 @@ export function HomeView() {
     })();
   }, [memory, reload]);
 
-  // c11: the anchor leaves this device RECIPIENT-addressed — the sender
-  // recomposes their own line1 (あなた=送り手 → あなた=受け手) before sending;
-  // a parse miss falls back to the verbatim head (fail-close, never blocks).
-  // The receiver still renders whatever arrived verbatim (M-10).
-  const talk = async (toRef: string, line1: string, to: string) => {
-    const anchor = anchorForRecipient(line1, to, displayName);
+  // c11/c13: the anchor leaves this device RECIPIENT-addressed — the sender
+  // recomposes their own 式 (あなた=送り手 → あなた=受け手) before sending.
+  // v3 puts the 式 on line2 (line1 is the 言い切り); v2 stock had it on line1 —
+  // staged search, and a parse miss falls back to the verbatim head
+  // (fail-close, never blocks). The receiver renders verbatim (M-10).
+  const talk = async (toRef: string, line1: string, line2: string, to: string) => {
+    const anchor = anchorForRecipient(line1, line2, to, displayName);
     await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor });
     await reload();
   };

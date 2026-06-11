@@ -406,70 +406,98 @@ test("MA-9f: law + format block carry the 3rd line; parse is lenient about it", 
   );
 });
 
-// ── MA-12 (c11): anchor の宛先反転 — 送信側で組み替え、fail-close で verbatim ──
+// ── MA-12 (c11, c13): anchor の宛先反転 — 段階パース＋fail-close verbatim ─────
 //
-// rule 9 の line1 は「あなた=送り手」。受け手に渡す前に送り手クライアントが
-// 受け手宛て（あなた=受け手）へ組み替える。パース不能は line1 先頭80字を
-// verbatim — 送信は止めない。受け手側 verbatim 表示の規定は M-10（meet-gates）。
+// 式（あなたの X × ［to］の Y）は v3 で LINE 2 に座る（line1=言い切り）。
+// v2 在庫は line1 に式。探索は 1行目→2行目→不成立なら line1 先頭80字 verbatim
+// — 送信は止めない。受け手側 verbatim 表示の規定は M-10（meet-gates）。
 
-test("MA-12: the anchor swaps owners for the recipient (正常系)", () => {
+const NO_SHIKI = "納屋で小さな実証の場を開く。"; // 言い切り（式ではない）
+
+test("MA-12: the anchor swaps owners for the recipient (v2在庫形: 式=line1)", () => {
   assert.equal(
-    anchorForRecipient("あなたの納屋 × ［みどり］の改装途中の場所", "みどり", "あや"),
+    anchorForRecipient("あなたの納屋 × ［みどり］の改装途中の場所", NO_SHIKI, "みどり", "あや"),
     "あなたの改装途中の場所 × ［あや］の納屋",
   );
   // sentence-final 。 must not land mid-anchor after the swap
   assert.equal(
-    anchorForRecipient("あなたの納屋 × ［みどり］の改装途中の場所。", "みどり", "あや"),
+    anchorForRecipient("あなたの納屋 × ［みどり］の改装途中の場所。", "", "みどり", "あや"),
     "あなたの改装途中の場所 × ［あや］の納屋",
   );
   // spacing around × may vary
   assert.equal(
-    anchorForRecipient("あなたの納屋×［みどり］の場所", "みどり", "あや"),
+    anchorForRecipient("あなたの納屋×［みどり］の場所", "", "みどり", "あや"),
     "あなたの場所 × ［あや］の納屋",
   );
   // 半角ブラケット（実機 qwen の観測形）も同じ書式として読む — 出力は常に全角
   assert.equal(
-    anchorForRecipient("あなたの古い町家の納屋 × [あや]の改装途中の納屋。", "あや", "つち"),
+    anchorForRecipient("あなたの古い町家の納屋 × [あや]の改装途中の納屋。", "", "あや", "つち"),
     "あなたの改装途中の納屋 × ［つち］の古い町家の納屋",
   );
 });
 
-test("MA-12b: parse misses fall back to the verbatim head (fail-close, never block)", () => {
-  // truncation — the marker never closes
+test("MA-12d (c13): v3形 — 式は2行目から取り、1行目（言い切り）は素通りする", () => {
   assert.equal(
-    anchorForRecipient("あなたの納屋 × ［みど", "みどり", "あや"),
+    anchorForRecipient(NO_SHIKI, "あなたの納屋 × ［みどり］の改装途中の場所", "みどり", "あや"),
+    "あなたの改装途中の場所 × ［あや］の納屋",
+  );
+  // line1 が式なら（v2在庫）line1 が勝つ — 探索順 1→2
+  assert.equal(
+    anchorForRecipient(
+      "あなたのA × ［みどり］のB",
+      "あなたのC × ［みどり］のD",
+      "みどり",
+      "あや",
+    ),
+    "あなたのB × ［あや］のA",
+  );
+  // 散文×散文 → line1 先頭80字 verbatim（三形の最後）
+  assert.equal(anchorForRecipient(NO_SHIKI, "別の散文。", "みどり", "あや"), NO_SHIKI);
+});
+
+test("MA-12b: parse misses fall back to the verbatim head (fail-close, never block)", () => {
+  // truncation — the marker never closes (both lines)
+  assert.equal(
+    anchorForRecipient("あなたの納屋 × ［みど", "", "みどり", "あや"),
     "あなたの納屋 × ［みど",
   );
   // free-form prose (書式逸脱)
   const prose = "あやさんと納屋で会うのが良いと思います。";
-  assert.equal(anchorForRecipient(prose, "みどり", "あや"), prose);
+  assert.equal(anchorForRecipient(prose, "", "みどり", "あや"), prose);
   // a different addressee's marker (to mismatch) → verbatim
   assert.equal(
-    anchorForRecipient("あなたの納屋 × ［カフェの人］の場所", "みどり", "あや"),
+    anchorForRecipient("あなたの納屋 × ［カフェの人］の場所", "", "みどり", "あや"),
     "あなたの納屋 × ［カフェの人］の場所",
   );
   // empty sides / empty sender → verbatim
-  assert.equal(anchorForRecipient("あなたの × ［みどり］の場所", "みどり", "あや"), "あなたの × ［みどり］の場所");
-  assert.equal(anchorForRecipient("あなたの納屋 × ［みどり］の場所", "みどり", " "), "あなたの納屋 × ［みどり］の場所");
+  assert.equal(
+    anchorForRecipient("あなたの × ［みどり］の場所", "", "みどり", "あや"),
+    "あなたの × ［みどり］の場所",
+  );
+  assert.equal(
+    anchorForRecipient("あなたの納屋 × ［みどり］の場所", "", "みどり", " "),
+    "あなたの納屋 × ［みどり］の場所",
+  );
   // verbatim fallback still caps at 80
   const long = "散文。" + "あ".repeat(200);
-  assert.equal(anchorForRecipient(long, "みどり", "あや").length, MAX_ANCHOR);
+  assert.equal(anchorForRecipient(long, "", "みどり", "あや").length, MAX_ANCHOR);
 });
 
 test("MA-12c: edge names (× や括弧を含む) と組み替え後の80字上限", () => {
   // recipient name containing × — the marker is matched literally
   assert.equal(
-    anchorForRecipient("あなたのX × ［A×B］のY", "A×B", "あや"),
+    anchorForRecipient("あなたのX × ［A×B］のY", "", "A×B", "あや"),
     "あなたのY × ［あや］のX",
   );
   // sender name carrying brackets rides verbatim (owner-chosen pseudonym)
   assert.equal(
-    anchorForRecipient("あなたのX × ［みどり］のY", "みどり", "［怪］"),
+    anchorForRecipient("あなたのX × ［みどり］のY", "", "みどり", "［怪］"),
     "あなたのY × ［［怪］］のX",
   );
   // the 80-char cap applies AFTER recomposition
   const out = anchorForRecipient(
     `あなたの${"納".repeat(60)} × ［みどり］の${"場".repeat(60)}`,
+    "",
     "みどり",
     "あや",
   );

@@ -117,8 +117,9 @@ export function ProposalEntry({
   entry: ReceivedProposalV1;
   /** refs this owner has already signalled (from the inbox outgoing list). */
   sentRefs: ReadonlySet<string>;
-  /** c11: the caller composes the recipient-addressed anchor from line1/to. */
-  onTalk: (toRef: string, line1: string, to: string) => Promise<void>;
+  /** c11/c13: the caller composes the recipient-addressed anchor from the
+   *  card's lines (v3: 式 is line2; v2 stock: line1) and the addressee. */
+  onTalk: (toRef: string, line1: string, line2: string, to: string) => Promise<void>;
   onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<boolean>;
   onRemove: (entryId: string) => Promise<void>;
 }) {
@@ -223,7 +224,7 @@ export function ProposalEntry({
                       type="button"
                       className="m-btn m-btn-primary m-proposal-talk"
                       style={{ marginTop: "0.7rem" }}
-                      onClick={() => void onTalk(toRef, card.line1, card.to)}
+                      onClick={() => void onTalk(toRef, card.line1, card.line2, card.to)}
                     >
                       {MEET.proposal.talk}
                     </button>
