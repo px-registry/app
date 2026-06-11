@@ -12,6 +12,10 @@ export {
   getPatrolLastRun,
   getPatrolByQuestion,
   markPatrolRun,
+  getThemePref,
+  setThemePref,
+  THEME_INIT_SCRIPT,
+  type ThemePhase,
 } from "./local.ts";
 export { buildOutboundProjection, type OutboundPoolItem } from "./projection.ts";
 export {

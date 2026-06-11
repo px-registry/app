@@ -42,6 +42,29 @@ export function markBoundarySeen(): void {
   localStorage.setItem(BOUNDARY_KEY, "1");
 }
 
+// ── visual refresh — theme phase (paper | sumi), device-local UI pref ─────────
+//
+// G-2 (指示書 §7): the existing device-side persistence method IS this audited
+// file (pxmeet:* keys in localStorage; same shape as the i18n px:lang pref), so
+// the theme pref follows it rather than minting a new mechanism. The init
+// script mirrors lib/i18n's LANG_INIT_SCRIPT: resolve before paint
+// (stored pref → prefers-color-scheme), write <html data-theme> — no flash.
+
+const THEME_KEY = "pxmeet:theme";
+
+export type ThemePhase = "paper" | "sumi";
+
+export function getThemePref(): ThemePhase | "" {
+  const v = localStorage.getItem(THEME_KEY);
+  return v === "paper" || v === "sumi" ? v : "";
+}
+export function setThemePref(phase: ThemePhase): void {
+  localStorage.setItem(THEME_KEY, phase);
+}
+
+// Inline, dependency-free; injected verbatim into the meet layout.
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'sumi':'paper';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
+
 // ── 第9便 B — 見回りの last-run (device-local; the 6h throttle's memory) ──────
 
 const PATROL_GLOBAL_KEY = "pxmeet:patrol-last";
