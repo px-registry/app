@@ -5,6 +5,11 @@
 // Idempotent upsert on (from_ref, to_ref) — pressing twice is pressing once.
 // A signal to yourself, or to a ref shape that isn't one, is refused. No
 // notification machinery: the receiver sees it on their next visit (R1.5).
+//
+// c18: a signal to a peer with NO pool presence is refused with a machine-
+// readable code (peer_not_in_pool) — 取り下げ済みの相手への合図がサーバで
+// 受理されて偽の成功になっていた（Hiroto 実測 2026-06-12）。行為時検証のみ:
+// existing signal rows stay (歴史は事実), only the new act is stopped.
 
 import {
   json,
@@ -35,6 +40,15 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
   if (fromRef === raw.toRef) return json({ ok: false, error: "self_signal" }, 400);
 
   try {
+    // c18: the addressee must be in the pool NOW (any row). A withdrawn or
+    // never-published ref is an honest refusal, not a stored signal.
+    const present = await env.BOARD
+      .prepare("SELECT 1 AS x FROM r15_pool_item WHERE participant_ref = ?1 LIMIT 1")
+      .bind(raw.toRef)
+      .all();
+    if ((present.results ?? []).length === 0) {
+      return json({ ok: false, error: "peer_not_in_pool" }, 404);
+    }
     await env.BOARD
       .prepare(
         "INSERT INTO r15_signal (from_ref, to_ref, from_name, anchor, created_at) " +

@@ -66,6 +66,7 @@ function post(handler: unknown, path: string, body: unknown, db = fakeD1(), env:
 // ── signal ──────────────────────────────────────────────────────────────────────
 
 test("signal: upserts one-sided, reports mutuality, never stores the token", async () => {
+  // pool row present (c18 gate passes) + reverse signal row present (mutual)
   const db = fakeD1((sql) => (sql.includes("SELECT 1") ? [{ x: 1 }] : []));
   const { res } = post(signalPost, "signal", {
     ownerToken: TOKEN,
@@ -84,6 +85,24 @@ test("signal: upserts one-sided, reports mutuality, never stores the token", asy
   const fromRef = await deriveParticipantRef(TOKEN);
   assert.ok(insert!.args.includes(fromRef), "derived ref bound");
   assert.ok(!insert!.args.includes(TOKEN), "token never bound");
+});
+
+test("signal (c18): a peer with no pool presence is refused — no row, machine-readable code", async () => {
+  // the pool probe returns nothing; anything else would return rows
+  const db = fakeD1((sql) => (sql.includes("r15_pool_item") ? [] : [{ x: 1 }]));
+  const { res } = post(signalPost, "signal", {
+    ownerToken: TOKEN,
+    toRef: PEER,
+    fromName: "あや",
+    anchor: "x",
+  }, db);
+  const r = await res;
+  assert.equal(r.status, 404);
+  assert.equal((await r.json()).error, "peer_not_in_pool", "code is machine-readable");
+  assert.ok(!db.calls.some((c) => c.sql.includes("INSERT INTO r15_signal")), "no signal row stored");
+  // and the gate actually consults the pool, before any write
+  const probe = db.calls.findIndex((c) => c.sql.includes("r15_pool_item"));
+  assert.ok(probe >= 0, "pool presence is checked");
 });
 
 test("signal: self-signal and bad shapes are refused", async () => {
