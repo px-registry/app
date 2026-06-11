@@ -45,7 +45,8 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 
 - 便別 smoke: batch2（問いを置く/書き方射影）・batch3（provenance/読み自動保存）・
   batch4（伏せ字の反転）・batch7（紹介/basis）・batch8（沈黙の禁止・モック6経路）・
-  batch9（見回り/気配）・ollama-smoke（接続表示）・responsive-sweep（4幅×4面）。
+  batch9（見回り/気配）・c17（第一信下書き・実 Ollama・PX無送信 tripwire）・
+  ollama-smoke（接続表示）・responsive-sweep（4幅×4面）。
 - スクショは `C:\Users\User\Desktop\スクショ\r15<x>-NN.png`（コミットしない）。
 
 ## 既知の罠（実地で踏んだもの）
@@ -62,6 +63,11 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
   `.m-item`/`.m-proposal` 待ちは旧マークアップ — 新 smoke を書くとき写さない（c16 で180s×2浪費）。
 - **wrangler dev 起動中は `npx wrangler pages deploy` が EBUSY で落ちる**（npx キャッシュ共有）
   — dev を止めてから deploy。
+- **owner token は home 初訪問で mint される** — smoke で `pxmeet:owner-token` を読むのは
+  `/meet/` を一度踏んだ後（c17 で 30s タイムアウト1回浪費）。
+- **呼び名が空のまま「こちらも話してみる」を押すと signal がサーバに弾かれて無反応**
+  （fromName 必須・talkBack は結果を見ていない）。テスターは名前必須導線を通るので
+  実害は smoke のみだが、R2 で沈黙の禁止に照らして要再訪。
 
 ## RIG_LAW
 
