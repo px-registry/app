@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MEET } from "@/lib/meet/copy.ts";
+import { MEET, questionPlaceholderByHour } from "@/lib/meet/copy.ts";
 import {
   openMeetMemory,
   openReceived,
@@ -160,6 +160,14 @@ export function HomeView() {
   const peerKeyLane = useMemo(() => openPeerKeys(), []);
 
   const [question, setQuestion] = useState("");
+  // Antenna 化の小便: placeholder が機能を語る（時間帯 v1・静的）。SSR/prerender と
+  // の不一致を避けるため mount 後に時刻で確定する（空の一瞬は無害 — 値ではない）。
+  const [qPlaceholder, setQPlaceholder] = useState("");
+  useEffect(() => {
+    setQPlaceholder(questionPlaceholderByHour(new Date().getHours()));
+  }, []);
+  // 探しにいく の結末行（AI 未接続のときに正直に倒す — 既存 offline 定数を再利用）
+  const [seekNote, setSeekNote] = useState("");
   const [rigEntries, setRigEntries] = useState<RigEntry[]>([]);
   const [aliases, setAliases] = useState<Map<string, string>>(new Map());
   const [displayName, setDisplayName] = useState("");
@@ -1000,34 +1008,42 @@ export function HomeView() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onBlur={() => void memory.setQuestion(question)}
-          placeholder={MEET.home.question.placeholder}
+          placeholder={qPlaceholder}
         />
-        <p className="m-note">
-          {MEET.home.question.twoTenses} {MEET.home.question.note}
-        </p>
 
+        {/* 対ボタン［探しにいく］［アンテナを立てる］— 常設。未接続の探しにいくは
+            offline 一行へ正直に倒す（沈黙の禁止・同一定数の再利用）。 */}
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
-          {ready && (
-            <button
-              type="button"
-              className="m-btn m-btn-primary"
-              style={{ flex: 1 }}
-              onClick={() => void receive()}
-              disabled={gen.phase === "busy"}
-            >
-              {gen.phase === "busy" ? MEET.receive.busy : MEET.home.receive}
-            </button>
-          )}
+          <button
+            type="button"
+            className="m-btn m-btn-primary"
+            style={{ flex: 1 }}
+            onClick={() => {
+              if (!connected) {
+                setSeekNote(MEET.home.dockSearch.offline);
+                return;
+              }
+              setSeekNote("");
+              void receive();
+            }}
+            disabled={gen.phase === "busy"}
+          >
+            {gen.phase === "busy" ? MEET.receive.busy : MEET.home.receive}
+          </button>
           <button
             type="button"
             className="m-btn m-btn-quiet"
-            style={ready ? undefined : { flex: 1 }}
             onClick={openPlace}
             disabled={question.trim() === "" || placeDraft !== null}
           >
             {MEET.home.place.action}
           </button>
         </div>
+        {seekNote !== "" && (
+          <p className="m-note" aria-live="polite">
+            {seekNote}
+          </p>
+        )}
         {!ready && (
           <div className="m-empty" style={{ marginTop: "0.75rem", textAlign: "left" }}>
             {/* c12-4: each row carries its own 導線 — the key/memory rows land

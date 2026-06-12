@@ -96,8 +96,17 @@ test("VR-8 (c12): JA-fixed for this test — EN toggle hidden, machinery kept", 
 
 test("VR-9 (c12/便3): gated copy — placeholder, name-row link", async () => {
   const { MEET } = await import("./copy.ts");
-  // 便3 改名（Hiroto ゲート済・期待の追従）: アンテナのプレースホルダ上の問いへ。
-  assert.equal(MEET.home.question.placeholder, "あなたのAIに、どんな人や話を見つけてほしいですか。");
+  // 期待の追従（2026-06-13 小便）: 単一 placeholder は時間帯 v1（ゲート済4本）へ。
+  // 旧文「あなたのAIに、どんな人や話を見つけてほしいですか。」は朝の文に生きている。
+  // verbatim の pin 本体は M-7（meet-gates）— ここは存在と帯の non-empty だけ見る。
+  for (const key of [
+    "placeholderMorning",
+    "placeholderDaytime",
+    "placeholderEvening",
+    "placeholderNight",
+  ] as const) {
+    assert.ok(MEET.home.question[key].trim() !== "", `${key} is set`);
+  }
   assert.equal(MEET.receive.nameWhere, "記憶で書けます");
 });
 

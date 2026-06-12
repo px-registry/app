@@ -42,22 +42,28 @@ export const MEET = {
 
   home: {
     question: {
-      /** 便3 改名（Hiroto ゲート済）: アンテナのプレースホルダ上の問い。 */
-      placeholder: "あなたのAIに、どんな人や話を見つけてほしいですか。",
-      note: "いつでも書き換えられます。空でもかまいません。",
-      twoTenses: "いま探しに行くか、アンテナを立てて待つか。立てたアンテナは、ほかの参加者のAIにも見つけられます。",
+      /**
+       * Antenna 化の小便（設計役 黄宣言・2026-06-13）: 周辺ヘルパー文は入力欄へ
+       * 畳む — placeholder が機能を語る。時間帯で変わる文言 v1（静的・ゲート済4本）。
+       * 旧 twoTenses/note は退場（説明の役は placeholder と看板調の対句が担う）。
+       */
+      placeholderMorning: "おはようございます。今日は、どんな人や話を見つけてほしいですか。",
+      placeholderDaytime: "今日は何を始めますか。探したい人や話を書いてみてください。",
+      placeholderEvening: "今夜は、どんな話ができる人がいたらいいですか。",
+      placeholderNight: "夜ふかしですね。気になっていること、書いておきませんか。",
     },
     // 主動詞（Hiroto 確定）: 結果を約束せず行為だけを名指す。探すのであって、
     // つながるとは言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
-    receive: "探しに行く",
+    // 2026-06-13 Hiroto 指定（期待の追従）: ひらがな「探しにいく」へ。
+    receive: "探しにいく",
     // 便3 改名（Hiroto ゲート済・最重要）: 問いを置く → アンテナ。
-    // 機能名=アンテナ／主ボタン=アンテナを立てる／見出し=今日のアンテナ。
-    // 「探しに行く」（即時探索）は存置。関連文言はアンテナ語に追従。
+    // 機能名=アンテナ／主ボタン=アンテナを立てる。
+    // 見出しは 2026-06-13 ブランド語へ昇格: 今日のアンテナ → Antenna（英語 eyebrow 群と同テクスチャ）。
     place: {
       /** 視覚一新 — v3正本の eyebrows（意匠）。 */
       eyebrowAsk: "Ask",
       eyebrowResting: "Resting",
-      heading: "今日のアンテナ",
+      heading: "Antenna",
       action: "アンテナを立てる",
       confirmHeading: "アンテナを立てる",
       // 第9便 B: 「探し続け」は実態（開くたびの見回り）に合わせて言い直した。
@@ -187,7 +193,8 @@ export const MEET = {
     dockSearch: {
       eyebrow: "あなたのAI",
       heading: "探してもらう",
-      note: "あなたの記憶・公開候補・届いている提案を読んで、いま探したい接点を見つけます。",
+      /** です調（Hiroto 起草・ゲート済 2026-06-13）— 「接点」は UI から退場（二層命名）。 */
+      note: "あなたのAIが探しに行きます。候補やアンテナを読んで、いま話したい相手を見つけます。",
       placeholder: "どんな人・どんな話を探しますか",
       run: "探してもらう",
       busy: "探しています…",
@@ -240,8 +247,8 @@ export const MEET = {
     nameWhere: "記憶で書けます",
     toStart: "はじめかたへ",
     busy: "あなたのAIが読んでいます…",
-    noKeyLoop:
-      "AIをつながなくても、記憶を候補に出しておけば、ほかの参加者のAIがあなたを見つけます。「話してみる」が届いたらここに出ます。",
+    /** 二態の対句のです調（Hiroto 起草・ゲート済 2026-06-13）— 行ごと差し替え。 */
+    noKeyLoop: "AIをつながなくても、アンテナを立てておけば、見つけてもらえます。",
     /** プール0件の短絡（第3便 A）: 生成せず、正直にこの2行。 */
     poolEmptyNote: "いまは候補に出ている参加者がいません。",
     errors: {
@@ -259,19 +266,28 @@ export const MEET = {
     title: "はじめかた",
     lede: "三つ済ませば、あとは受け取るだけ。",
     /**
-     * R2 GOAL — 二扉化（黄・仮置き文言: 設計役の起草と早い方を採る）。
-     * 「このページで使う」「あなたのAIから使う」は同格 — どちらも同じ部屋に入る。
+     * R2 二扉化。「このページで使う」「あなたのAIから使う」は同格 — どちらも同じ部屋に入る。
+     * 二態の対句（sign/body・Hiroto 起草・ゲート済 2026-06-13）。register 規則:
+     * 看板調（sign）は見出し・二扉ページ級のみ、本文はです調。対句で足りない新文は STOP④。
+     * lede・copyUrl 等の残りは仮置き（黄・精算中）。
      */
     doors: {
       lede: "入り口は二つ。どちらからでも、同じ部屋に入れます。",
       page: {
         heading: "このページで使う",
+        /** 看板調（ゲート済） */
+        sign: "アンテナを立てる。ほかの人のAIが見つけたとき、あなたに届く。",
         body: "下の三つを済ませれば、あとは受け取るだけ。",
       },
       ai: {
         heading: "あなたのAIから使う",
-        body: "ふだんのチャット（Claude・ChatGPT など）に、この部屋への接続を渡せます。あなたのAIがここを見回り、提案を持ち帰ります。",
-        setupNote: "チャット側の「コネクタ」「MCPサーバー」設定に、このURLを貼ります。",
+        /** 看板調（ゲート済） */
+        sign: "あなたのAIをつなぐと、探しに行ける。",
+        /** です調（ゲート済） */
+        body: "候補やアンテナを読んで、いま話したい相手を見つけます。",
+        /** コネクタ説明の平易化（ゲート済）— 技術語は降格して最後に小さく。 */
+        lead: "あなたが使っているいつものAIからこの部屋を使えます。下のURLを、AI側の接続設定に貼ってください。",
+        tech: "MCP／コネクタ設定で使います。",
         copyUrl: "接続URLをコピー",
         copied: "コピーしました",
         copyFailed: "コピーできませんでした。",
@@ -483,4 +499,15 @@ export function allMeetCopyStrings(): string[] {
   };
   walk(MEET);
   return out;
+}
+
+/**
+ * 時間帯 → アンテナ欄の placeholder（v1・静的・ゲート済4本）。
+ * 帯の切れ目は実装裁量（緑）: 朝=5-10時台／昼=11-16時台／夜=17-22時台／深夜=23-4時台。
+ */
+export function questionPlaceholderByHour(hour: number): string {
+  if (hour >= 5 && hour < 11) return MEET.home.question.placeholderMorning;
+  if (hour >= 11 && hour < 17) return MEET.home.question.placeholderDaytime;
+  if (hour >= 17 && hour < 23) return MEET.home.question.placeholderEvening;
+  return MEET.home.question.placeholderNight;
 }

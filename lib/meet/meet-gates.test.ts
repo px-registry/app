@@ -19,7 +19,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { MEET, allMeetCopyStrings } from "./copy.ts";
+import { MEET, allMeetCopyStrings, questionPlaceholderByHour } from "./copy.ts";
 import { findForbiddenTerm } from "./forbidden.ts";
 
 const root = (rel: string) => new URL(`../../${rel}`, import.meta.url);
@@ -135,20 +135,41 @@ test("M-6c: the candidate wording replaced 公開 in the meet copy", () => {
   assert.ok(copy.includes("人間の一覧には出ません"), "the AI-only fact is stated");
 });
 
-// ── M-7 (naming final): 主動詞の対は「探しに行く」／「アンテナを立てる」 ──────────
+// ── M-7 (naming final): 主動詞の対は「探しにいく」／「アンテナを立てる」 ──────────
 //
 // Hiroto 確定: 結果を約束せず行為だけを名指す。探すのであって、つながるとは
 // 言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
 // 便3 改名（Hiroto ゲート済・期待の追従）: 置いておく → アンテナを立てる。
+// 2026-06-13 小便（期待の追従）: ひらがな「探しにいく」（Hiroto 指定）／見出しは
+// ブランド語 Antenna へ昇格／twoTenses ヘルパー文は退場 — 説明は placeholder
+// （時間帯 v1・ゲート済4本）へ畳まれた。
 
-test("M-7: the generate verb is 探しに行く; the 聞く-era wording is extinct", () => {
-  assert.equal(MEET.home.receive, "探しに行く", "the generate button names the act");
+test("M-7: the generate verb is 探しにいく; the 聞く-era wording is extinct", () => {
+  assert.equal(MEET.home.receive, "探しにいく", "the generate button names the act (ひらがな指定)");
   assert.equal(MEET.home.place.action, "アンテナを立てる", "the waiting verb (便3 改名)");
-  assert.equal(MEET.home.place.heading, "今日のアンテナ", "the box heading (便3 改名)");
-  assert.ok(
-    MEET.home.question.twoTenses.startsWith("いま探しに行くか、アンテナを立てて待つか。"),
-    "the two-tense line uses the same verb pair",
+  assert.equal(MEET.home.place.heading, "Antenna", "ブランド語昇格 (2026-06-13)");
+  // 時間帯 placeholder v1 — ゲート済 verbatim ＋帯写像（朝/昼/夜/深夜）
+  assert.equal(
+    MEET.home.question.placeholderMorning,
+    "おはようございます。今日は、どんな人や話を見つけてほしいですか。",
   );
+  assert.equal(
+    MEET.home.question.placeholderDaytime,
+    "今日は何を始めますか。探したい人や話を書いてみてください。",
+  );
+  assert.equal(
+    MEET.home.question.placeholderEvening,
+    "今夜は、どんな話ができる人がいたらいいですか。",
+  );
+  assert.equal(
+    MEET.home.question.placeholderNight,
+    "夜ふかしですね。気になっていること、書いておきませんか。",
+  );
+  assert.equal(questionPlaceholderByHour(7), MEET.home.question.placeholderMorning);
+  assert.equal(questionPlaceholderByHour(13), MEET.home.question.placeholderDaytime);
+  assert.equal(questionPlaceholderByHour(20), MEET.home.question.placeholderEvening);
+  assert.equal(questionPlaceholderByHour(2), MEET.home.question.placeholderNight);
+  assert.equal(questionPlaceholderByHour(23), MEET.home.question.placeholderNight);
   for (const s of allMeetCopyStrings()) {
     assert.ok(!s.includes("いま聞く"), `聞く-era copy survives: ${s}`);
     assert.ok(!s.includes("提案を受け取る"), `pre-fix1 verb survives: ${s}`);
