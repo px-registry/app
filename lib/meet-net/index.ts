@@ -41,7 +41,6 @@ export {
   sendTalkBack,
   sendClose,
   fetchInbox,
-  saveContactNote,
   submitLog,
   fetchHostView,
   type PoolItemPublic,

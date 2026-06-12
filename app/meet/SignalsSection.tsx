@@ -562,16 +562,12 @@ export function SignalsSection({
       ) : (
         <ul className="m-itemlist">
           {incoming.map((sig) => {
-            // 便6-3: 渡すは E2EE が主・平文行は二重読み窓の legacy（カットオーバーで終い）
+            // R2 GOAL 小掃除: 渡すは E2EE 封筒だけ — 平文の二重読み窓は終い
             const th = threads[sig.edgeId] ?? [];
             const theirNote =
-              [...th].reverse().find((e) => e.kind === "contact-in")?.text ??
-              inbox?.notes.find((n) => n.fromRef === sig.fromRef)?.note ??
-              null;
+              [...th].reverse().find((e) => e.kind === "contact-in")?.text ?? null;
             const myNote =
-              [...th].reverse().find((e) => e.kind === "contact-out")?.text ??
-              inbox?.myNotes.find((n) => n.peerRef === sig.fromRef)?.note ??
-              "";
+              [...th].reverse().find((e) => e.kind === "contact-out")?.text ?? "";
             const isMutual = sig.state === "mutual";
             const isClosed = sig.state === "closed";
             return (
@@ -756,13 +752,9 @@ export function SignalsSection({
             const isClosed = pair.state === "closed";
             const th = threads[pair.edgeId] ?? [];
             const theirNote =
-              [...th].reverse().find((e) => e.kind === "contact-in")?.text ??
-              inbox?.notes.find((n) => n.fromRef === pair.toRef)?.note ??
-              null;
+              [...th].reverse().find((e) => e.kind === "contact-in")?.text ?? null;
             const myNote =
-              [...th].reverse().find((e) => e.kind === "contact-out")?.text ??
-              inbox?.myNotes.find((n) => n.peerRef === pair.toRef)?.note ??
-              "";
+              [...th].reverse().find((e) => e.kind === "contact-out")?.text ?? "";
             const absent = poolRefs !== null && !poolRefs.has(pair.toRef);
             return (
               <li key={pair.edgeId} id={`room-${pair.edgeId}`} className="m-signal">

@@ -4,10 +4,11 @@
 // R2 0010: signals are EDGE rows now. Returns, for the CALLER only:
 //   incoming — edges addressed to me (sender pseudonym, anchor, basis, state)
 //   outgoing — edges I opened (so the UI shows sent-state PER CARD, not per peer)
-//   notes    — a peer's contact note ONLY where a MUTUAL EDGE exists between us
-//              (the disclosure rule lives here, in SQL — either orientation;
-//              0010 精密化②: 渡せるか＝∃mutual edge, no person-level state table)
-//   myNotes  — what I have written, so the owner can review/replace it
+//   myItems  — the caller's own public rows (チャットポートの reverse-import 材料)
+//
+// R2 GOAL 小掃除: 平文 contact note の serve（notes/myNotes）は退場 — 渡すは
+// E2EE 封筒だけ（カットオーバー Phase 3 で平文 0 件を確認済・R8 hook が復活を
+// 遮断）。r15_contact_note の表は档案として残る（行は読まれない）。
 //
 // Closed edges are served too — the honest fact, shown before pressing (c18b
 // lineage); the UI words it, the server never hides it.
@@ -49,21 +50,6 @@ interface OutEdgeRow {
   last_act_a_at: string;
   last_act_b_at: string;
 }
-interface NoteRow {
-  writer_ref: string;
-  note: string;
-}
-interface MyNoteRow {
-  peer_ref: string;
-  note: string;
-}
-
-// ∃ mutual edge between the two refs, either orientation — the ONLY contact
-// disclosure predicate (no pair table, no person-level state).
-const MUTUAL_EDGE =
-  "EXISTS(SELECT 1 FROM r15_edge m WHERE m.state = 'mutual' AND " +
-  "((m.a_ref = ?1 AND m.b_ref = n.writer_ref) OR (m.a_ref = n.writer_ref AND m.b_ref = ?1)))";
-
 export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) => {
   if (!isAllowedWriteOrigin(request)) return json({ ok: false, error: "bad_origin" }, 403);
 
@@ -93,18 +79,6 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       )
       .bind(me)
       .all<OutEdgeRow>();
-
-    const notes = await env.BOARD
-      .prepare(
-        `SELECT n.writer_ref, n.note FROM r15_contact_note n WHERE n.peer_ref = ?1 AND ${MUTUAL_EDGE}`,
-      )
-      .bind(me)
-      .all<NoteRow>();
-
-    const myNotes = await env.BOARD
-      .prepare("SELECT peer_ref, note FROM r15_contact_note WHERE writer_ref = ?1")
-      .bind(me)
-      .all<MyNoteRow>();
 
     // R2 GOAL（チャットポート）— 自分の公開面の写し。port が additive に立てた
     // アンテナを端末が次回訪問で取り込む（reverse-import）ための serve。自分の
@@ -158,8 +132,6 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
         dormant: deriveDormant(r.state, r.created_at, r.last_act_a_at, r.last_act_b_at, now),
         createdAt: r.created_at,
       })),
-      notes: (notes.results ?? []).map((r) => ({ fromRef: r.writer_ref, note: r.note })),
-      myNotes: (myNotes.results ?? []).map((r) => ({ peerRef: r.peer_ref, note: r.note })),
       myItems: (myItems.results ?? []).map((r) => ({
         itemRef: r.item_ref,
         kind: r.kind,

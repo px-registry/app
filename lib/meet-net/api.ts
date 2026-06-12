@@ -135,8 +135,6 @@ export type InboxMyItem = {
 export type InboxData = {
   incoming: InboxIncoming[];
   outgoing: InboxOutgoing[];
-  notes: Array<{ fromRef: string; note: string }>;
-  myNotes: Array<{ peerRef: string; note: string }>;
   /** R2 GOAL — port が立てた行を端末が取り込むための自分の公開面（additive key）。 */
   myItems: InboxMyItem[];
   /** 第9便 C — today's read-count per OWN placed question (by projection position). */
@@ -263,16 +261,6 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
             }]
           : [];
       }),
-      notes: arr(body.notes).filter(isRecord).flatMap((r) =>
-        isParticipantRef(r.fromRef) && typeof r.note === "string"
-          ? [{ fromRef: r.fromRef, note: r.note }]
-          : [],
-      ),
-      myNotes: arr(body.myNotes).filter(isRecord).flatMap((r) =>
-        isParticipantRef(r.peerRef) && typeof r.note === "string"
-          ? [{ peerRef: r.peerRef, note: r.note }]
-          : [],
-      ),
       myItems: arr(body.myItems).filter(isRecord).flatMap((r) =>
         typeof r.itemRef === "string" && /^[0-9a-f]{16}$/.test(r.itemRef) &&
         typeof r.kind === "string" && typeof r.title === "string" && typeof r.text === "string"
@@ -294,22 +282,6 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
           : [],
       ),
     };
-  } catch {
-    return { ok: false, error: "network" };
-  }
-}
-
-export async function saveContactNote(input: {
-  ownerToken: string;
-  peerRef: string;
-  note: string;
-}): Promise<NetResult<Record<never, never>>> {
-  try {
-    const { body } = await postJson("/api/meet/contact", input);
-    if (!isRecord(body) || body.ok !== true) {
-      return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "contact_failed" };
-    }
-    return { ok: true };
   } catch {
     return { ok: false, error: "network" };
   }

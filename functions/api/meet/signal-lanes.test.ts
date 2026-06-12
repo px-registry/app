@@ -13,7 +13,6 @@ import assert from "node:assert/strict";
 import { onRequestPost as signalPost } from "./signal.ts";
 import { onRequestPost as talkbackPost } from "./talkback.ts";
 import { onRequestPost as closePost } from "./close.ts";
-import { onRequestPost as contactPost } from "./contact.ts";
 import { onRequestPost as inboxPost } from "./inbox.ts";
 import { onRequestPost as logPost } from "./log.ts";
 import { onRequestPost as hostPost } from "./host.ts";
@@ -259,28 +258,9 @@ test("dormant: derived at read; acts wake it; closed never sleeps", () => {
 });
 
 // ── contact ─────────────────────────────────────────────────────────────────────
-
-test("contact: REFUSED before a mutual EDGE exists (custody rule, edge predicate)", async () => {
-  const db = fakeD1((sql) => (sql.includes("AS m") ? [{ m: 0 }] : []));
-  const { res } = post(contactPost, "contact", { ownerToken: TOKEN, peerRef: PEER, note: "LINE: aya" }, db);
-  const r = await res;
-  assert.equal(r.status, 403);
-  assert.equal((await r.json()).error, "not_mutual");
-  const probe = db.calls.find((c) => c.sql.includes("AS m"));
-  assert.ok(probe, "mutual probe issued");
-  assert.match(probe!.sql, /r15_edge/, "predicate reads edges, not the pair table");
-  assert.match(probe!.sql, /state = 'mutual'/);
-  assert.ok(!db.calls.some((c) => c.sql.includes("INSERT INTO r15_contact_note")), "note never stored");
-});
-
-test("contact: stored (upsert) once a mutual edge exists; token never bound", async () => {
-  const db = fakeD1((sql) => (sql.includes("AS m") ? [{ m: 1 }] : []));
-  const { res } = post(contactPost, "contact", { ownerToken: TOKEN, peerRef: PEER, note: "LINE: aya" }, db);
-  assert.equal((await res).status, 201);
-  const ins = db.calls.find((c) => c.sql.includes("INSERT INTO r15_contact_note"));
-  assert.ok(ins, "note upsert issued");
-  assert.ok(!ins!.args.includes(TOKEN));
-});
+// R2 GOAL 小掃除（期待の追従）: 旧 /api/meet/contact 書込端点は退場 — 渡すは
+// E2EE 封筒（envelope-lanes.test.ts が正本）。平文書込の復活は R8 hook が遮断。
+// 退場の構造 pin は下の「inbox never touches r15_contact_note」。
 
 // ── inbox ───────────────────────────────────────────────────────────────────────
 
@@ -292,15 +272,12 @@ test("inbox: serves edges (incoming/outgoing) and never the pair table", async (
   assert.ok(!db.calls.some((c) => c.sql.includes("r15_signal")), "pair table retired from serve");
 });
 
-test("inbox: notes are served through the mutual-EDGE join (structural pin)", async () => {
+test("inbox: never touches r15_contact_note (平文レーンの退場・期待の追従)", async () => {
   const db = fakeD1(() => []);
   const { res } = post(inboxPost, "inbox", { ownerToken: TOKEN }, db);
-  assert.equal((await res).status, 200);
-  const noteQuery = db.calls.find((c) => c.sql.includes("FROM r15_contact_note n"));
-  assert.ok(noteQuery, "note query issued");
-  assert.match(noteQuery!.sql, /FROM r15_edge m/, "disclosure predicate reads edges");
-  assert.match(noteQuery!.sql, /m\.state = 'mutual'/, "mutual edges only");
-  assert.ok(noteQuery!.sql.includes("OR"), "either orientation qualifies (人単位の行為)");
+  const body = (await (await res).json()) as Record<string, unknown>;
+  assert.ok(!db.calls.some((c) => c.sql.includes("r15_contact_note")), "档案は読まれない");
+  assert.ok(!("notes" in body) && !("myNotes" in body), "平文 keys は serve に存在しない");
 });
 
 test("inbox: myItems = the caller's OWN public rows only (reverse-import serve)", async () => {

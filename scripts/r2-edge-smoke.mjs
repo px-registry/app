@@ -175,9 +175,9 @@ const rev = await post("/api/meet/signal", {
 });
 check("逆向き新 edge は sent（両方向 sent ≠ mutual）", rev.status === 201 && rev.body?.state === "sent");
 
-// 9. contact via mutual edge
+// 9. 旧 contact 書込端点は退場済（R2 GOAL 小掃除）— 渡すは E2EE 封筒（E1 以降）だけ
 const note = await post("/api/meet/contact", { ownerToken: TOKEN_A, peerRef: refB, note: "smoke-contact" });
-check("contact: mutual edge があるので預かる", note.status === 201 && note.body?.ok === true, JSON.stringify(note));
+check("旧 contact 端点は存在しない（平文の渡すは戻らない）", note.status >= 400, `status=${note.status}`);
 
 // 10. inbox shapes
 const ibA = await post("/api/meet/inbox", { ownerToken: TOKEN_A });
@@ -187,7 +187,7 @@ check("A incoming に逆向き sent", (ibA.body?.incoming ?? []).some((s) => s.e
 check("dormant は新鮮な edge では false（読み時導出）", outA.every((o) => o.dormant === false));
 const ibB = await post("/api/meet/inbox", { ownerToken: TOKEN_B });
 check("B incoming に mutual edge＋basisItemRef", (ibB.body?.incoming ?? []).some((s) => s.edgeId === EDGE && s.state === "mutual" && s.basisItemRef === REF_ITEM_B));
-check("B notes に A の連絡メモ（mutual join 開示）", (ibB.body?.notes ?? []).some((n) => n.note === "smoke-contact"), JSON.stringify(ibB.body?.notes));
+check("inbox は平文 notes を運ばない（E2EE 移行完了の確認）", ibB.body?.notes === undefined && ibB.body?.myNotes === undefined, JSON.stringify(Object.keys(ibB.body ?? {})));
 
 // ── 便6: E2EE 封筒 — 実鍵の往復（EDGE は mutual の状態でここに来る） ─────────────
 
