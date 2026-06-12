@@ -56,7 +56,21 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
 - **migration 規律: 0010 以降を本番 `px-app-board` へ `--remote` 適用しない**（カットオーバーゲートまで）。
   dev への適用は `npx wrangler d1 migrations apply px-app-board-r2dev --remote --config wrangler.r2dev.toml`。
 
-**/auto 運転規約 — stage-r2-complete（Hiroto 裁定 2026-06-12・便1 から適用）**
+**信号機運用（Hiroto 裁定 2026-06-12・最終形 — 下の停止線リストを置き換える）**
+
+- **赤（必ず停止・例外なし）**: 本番データ削除／schema 破壊（DROP・破壊的 ALTER・additive 以外）／
+  private・鍵・平文の漏れ形／law 変更（RIG_LAW・rule9 系）／ランキング・課金化の忍び込み／main 直 push。
+  hook と pin が大半を機械で見ているが、**機械が黙っていても該当すると判断したら止まる**。
+- **黄（一行対話 — 傾きを示し、異議がなければ進行。返答を待たずに他の作業は続けてよい）**:
+  サーバデータの追加（additive な migration・新 endpoint）／ゲート済テーブルへの追補列／
+  新規 user-facing 文言（候補と傾きを添えて投げる）／allowlist 追記。
+- **緑（/auto・報告のみ）**: それ以外すべて。設計判断は CC のもの。完成形を証拠つき報告で。
+- 現行 GOAL（2026-06-12 一括）: Dock L2/L3・チャットポート P0→P1・はじめかた二扉化・小掃除完済・
+  Wave4 前倒し可能分。**終了条件 = 1〜4 が本番で動き、テスターとチャット LLM の両方から同じ部屋に
+  入れる状態**（この GOAL 内の本番 deploy は終了条件が裁可 — 赤に触れない形で）。
+  R4（AI 相互読解・injection 硬化・縁の記録戸口）は設計メモのみ・実装は待て。
+
+**/auto 運転規約 — stage-r2-complete（Hiroto 裁定 2026-06-12・便1 から適用・歴史として保存）**
 
 既定＝/auto。下の停止線でのみ止まる。それ以外で確認を求めない。
 
