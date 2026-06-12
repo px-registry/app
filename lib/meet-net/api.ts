@@ -20,6 +20,12 @@ export type PoolItemPublic = {
   title: string;
   text: string;
   tags: string[];
+  /**
+   * R2 0010 — the item's stable public alias (basis of an edge). Lenient at
+   * PARSE time ("" when absent/odd, like basisItemId); strict at ACT time —
+   * T1 refuses an empty/foreign basis.
+   */
+  itemRef: string;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -70,28 +76,46 @@ function parsePoolItem(raw: unknown): PoolItemPublic | null {
     title: raw.title,
     text: raw.text,
     tags,
+    itemRef: typeof raw.itemRef === "string" ? raw.itemRef : "",
   };
 }
 
 // ── signal / contact / inbox / facilitator-log lanes ───────────────────────────
 
+// R2 0010 — the inbox speaks EDGES now (期待の追従: ペア単位 mutual flag 退場).
+export type EdgeState = "sent" | "mutual" | "closed";
+
 export type InboxIncoming = {
+  edgeId: string;
   fromRef: string;
   fromName: string;
-  /** sender's published ひとこと紹介 ("" = unset). */
+  /** sender's published ひとこと紹介 ("" = unset/departed). */
   fromIntro: string;
+  /** the basis item alias this edge stands on ("" only on backfill edges). */
+  basisItemRef: string;
   anchor: string;
   createdAt: string;
-  mutual: boolean;
+  state: EdgeState;
+};
+export type InboxOutgoing = {
+  edgeId: string;
+  toRef: string;
+  basisItemRef: string;
+  state: EdgeState;
+  createdAt: string;
 };
 export type InboxData = {
   incoming: InboxIncoming[];
-  outgoing: Array<{ toRef: string; mutual: boolean }>;
+  outgoing: InboxOutgoing[];
   notes: Array<{ fromRef: string; note: string }>;
   myNotes: Array<{ peerRef: string; note: string }>;
   /** 第9便 C — today's read-count per OWN placed question (by projection position). */
   questionReads: Array<{ position: number; count: number }>;
 };
+
+function parseEdgeState(v: unknown): EdgeState | null {
+  return v === "sent" || v === "mutual" || v === "closed" ? v : null;
+}
 
 async function postJson(path: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const res = await fetch(path, {
@@ -102,18 +126,45 @@ async function postJson(path: string, body: unknown): Promise<{ status: number; 
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
+/** T1 — open (or honestly re-find) the edge for one 話してみる. */
 export async function sendSignal(input: {
   ownerToken: string;
   toRef: string;
   fromName: string;
   anchor: string;
-}): Promise<NetResult<{ mutual: boolean }>> {
+  edgeId: string;
+  basisItemRef: string;
+  /** opaque pointer into the sender's own shelf (recv entry + card index). */
+  proposalPtr: string;
+}): Promise<NetResult<{ edgeId: string; state: EdgeState; existing: boolean }>> {
   try {
     const { body } = await postJson("/api/meet/signal", input);
     if (!isRecord(body) || body.ok !== true) {
       return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "signal_failed" };
     }
-    return { ok: true, mutual: body.mutual === true };
+    const state = parseEdgeState(body.state);
+    if (typeof body.edgeId !== "string" || state === null) {
+      return { ok: false, error: "signal_failed" };
+    }
+    return { ok: true, edgeId: body.edgeId, state, existing: body.existing === true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+/** T2 — the addressee answers the edge they received (sent→mutual; b only). */
+export async function sendTalkBack(input: {
+  ownerToken: string;
+  edgeId: string;
+}): Promise<NetResult<{ state: EdgeState; already: boolean }>> {
+  try {
+    const { body } = await postJson("/api/meet/talkback", input);
+    if (!isRecord(body) || body.ok !== true) {
+      return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "talkback_failed" };
+    }
+    const state = parseEdgeState(body.state);
+    if (state === null) return { ok: false, error: "talkback_failed" };
+    return { ok: true, state, already: body.already === true };
   } catch {
     return { ok: false, error: "network" };
   }
@@ -126,21 +177,34 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
     const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
     return {
       ok: true,
-      incoming: arr(body.incoming).filter(isRecord).flatMap((r) =>
-        isParticipantRef(r.fromRef) && typeof r.fromName === "string"
+      incoming: arr(body.incoming).filter(isRecord).flatMap((r) => {
+        const state = parseEdgeState(r.state);
+        return isParticipantRef(r.fromRef) && typeof r.fromName === "string" &&
+          typeof r.edgeId === "string" && state !== null
           ? [{
+              edgeId: r.edgeId,
               fromRef: r.fromRef,
               fromName: r.fromName,
               fromIntro: typeof r.fromIntro === "string" ? r.fromIntro : "",
+              basisItemRef: typeof r.basisItemRef === "string" ? r.basisItemRef : "",
               anchor: typeof r.anchor === "string" ? r.anchor : "",
               createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
-              mutual: r.mutual === true,
+              state,
             }]
-          : [],
-      ),
-      outgoing: arr(body.outgoing).filter(isRecord).flatMap((r) =>
-        isParticipantRef(r.toRef) ? [{ toRef: r.toRef, mutual: r.mutual === true }] : [],
-      ),
+          : [];
+      }),
+      outgoing: arr(body.outgoing).filter(isRecord).flatMap((r) => {
+        const state = parseEdgeState(r.state);
+        return isParticipantRef(r.toRef) && typeof r.edgeId === "string" && state !== null
+          ? [{
+              edgeId: r.edgeId,
+              toRef: r.toRef,
+              basisItemRef: typeof r.basisItemRef === "string" ? r.basisItemRef : "",
+              state,
+              createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
+            }]
+          : [];
+      }),
       notes: arr(body.notes).filter(isRecord).flatMap((r) =>
         isParticipantRef(r.fromRef) && typeof r.note === "string"
           ? [{ fromRef: r.fromRef, note: r.note }]

@@ -70,6 +70,11 @@ test("MN-3: lane sources carry no forbidden term", () => {
 
 // ── MN-4: outbound projection ───────────────────────────────────────────────────
 
+// R2 0010 期待の追従: the projection takes {itemRef, view} pairs now — the
+// alias rides explicitly, attached AFTER the rig gate.
+const withRefs = (views: RigMemoryItemV1[]) =>
+  views.map((view, i) => ({ itemRef: String(i + 1).repeat(16).slice(0, 16), view }));
+
 const ITEMS: RigMemoryItemV1[] = [
   { kind: "have", title: "工房", text: "PUBLIC_A", tags: ["手仕事"], private: false },
   { kind: "memory", title: "秘", text: "PRIVATE_SENTINEL", tags: ["内緒"], private: true },
@@ -77,21 +82,25 @@ const ITEMS: RigMemoryItemV1[] = [
 ];
 
 test("MN-4: private items never leave the device; key set is closed", () => {
-  const out = buildOutboundProjection(ITEMS);
+  const out = buildOutboundProjection(withRefs(ITEMS));
   assert.deepEqual(out.map((o) => o.text), ["PUBLIC_A", "PUBLIC_B"], "order preserved, private gone");
   const flat = JSON.stringify(out);
   assert.ok(!flat.includes("PRIVATE_SENTINEL"), "private text must not be projected");
   assert.ok(!flat.includes("内緒"), "private tags must not be projected");
   for (const o of out) {
-    assert.deepEqual(Object.keys(o).sort(), ["kind", "position", "tags", "text", "title"]);
+    assert.deepEqual(Object.keys(o).sort(), ["itemRef", "kind", "position", "tags", "text", "title"]);
   }
+  // R2 0010: a PRIVATE item's alias does not leave either — the pairing is
+  // per-item, so the dropped item's ref simply never lands in a row.
+  assert.ok(!flat.includes("2".repeat(16)), "the private item's alias never leaves");
+  assert.deepEqual(out.map((o) => o.itemRef), ["1".repeat(16), "3".repeat(16)], "alias↔row pairing is exact");
 });
 
 test("MN-4b: a missing/odd private flag is excluded (fail-closed end-to-end)", () => {
   const sketchy = [
     { kind: "have", title: "no-flag", text: "LEAK", tags: [] },
   ] as unknown as RigMemoryItemV1[];
-  assert.equal(buildOutboundProjection(sketchy).length, 0);
+  assert.equal(buildOutboundProjection(withRefs(sketchy)).length, 0);
 });
 
 // ── MN-5: ref derivation ────────────────────────────────────────────────────────
@@ -120,11 +129,11 @@ test("MN-5b: shape guards", () => {
 // ── MN-6 (第2便 A): published-snapshot identity — one definition everywhere ────
 
 test("MN-6: snapshot round-trip — what was pushed is what snapshotHas finds", () => {
-  const items = buildOutboundProjection([
+  const items = buildOutboundProjection(withRefs([
     { kind: "want", title: "問いA", text: "本文A", tags: ["問い"], private: false },
     { kind: "have", title: "工房", text: "活版", tags: [], private: false },
     { kind: "memory", title: "秘", text: "PRIVATE", tags: [], private: true },
-  ]);
+  ]));
   const snap = projectionSnapshotJson(items);
   assert.ok(snapshotHas(snap, { kind: "want", title: "問いA", text: "本文A", tags: ["問い"] }));
   assert.ok(!snapshotHas(snap, { kind: "memory", title: "秘", text: "PRIVATE", tags: [] }), "private never entered");
@@ -133,12 +142,12 @@ test("MN-6: snapshot round-trip — what was pushed is what snapshotHas finds", 
 });
 
 test("MN-6b: pending count — symmetric diff; empty snapshot stays quiet; broken JSON is empty", () => {
-  const a = buildOutboundProjection([
+  const a = buildOutboundProjection(withRefs([
     { kind: "want", title: "t", text: "x", tags: [], private: false },
-  ]);
-  const b = buildOutboundProjection([
+  ]));
+  const b = buildOutboundProjection(withRefs([
     { kind: "want", title: "t", text: "x2", tags: [], private: false },
-  ]);
+  ]));
   const snap = projectionSnapshotJson(a);
   assert.equal(snapshotPendingCount(snap, b), 2, "one removed + one added");
   assert.equal(snapshotPendingCount("", b), 0, "never-published device shows no banner");
@@ -165,7 +174,7 @@ test("MN-7: private phrasing of a 書き方-item never survives the outbound pro
     { kind: "want" as const, title: "相棒", text: "床を張る人", tags: [], private: false },
     { kind: "memory" as const, title: "秘", text: "FULLY_PRIVATE", tags: [], private: true },
   ];
-  const out = JSON.stringify(buildOutboundProjection(items.map(toPublicView)));
+  const out = JSON.stringify(buildOutboundProjection(withRefs(items.map(toPublicView))));
   assert.ok(out.includes("PUBLIC_SAFE_TEXT") && out.includes("BtoB SaaS の CS 立ち上げ"));
   assert.ok(!out.includes("○○株式会社"), "private title must not leave");
   assert.ok(!out.includes("SECRET_COMPANY_STORY"), "private text must not leave");

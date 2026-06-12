@@ -230,16 +230,19 @@ export function SignalsSection({
   firstNotes: Record<string, FirstNoteFaceData>;
   /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell. */
   poolRefs: ReadonlySet<string> | null;
-  /** c18: the send result comes back — a refusal renders an honest line. */
-  onTalkBack: (toRef: string) => Promise<{ ok: boolean; code: string }>;
+  /** c18: the send result comes back — a refusal renders an honest line.
+   *  R2 0010 T2: the answer addresses the EDGE that arrived (no reverse edge). */
+  onTalkBack: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
   onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
   onMakeFirstNote: (peerRef: string) => Promise<string | null>;
   onSaveFirstNote: (peerRef: string, text: string) => Promise<void>;
 }) {
   const t = useT();
-  // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by peer).
+  // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by edge).
   const [backNotes, setBackNotes] = useState<Record<string, string>>({});
   // c18b — 片づけた合図 (device-local list; loaded after mount, SSR-safe).
+  // R2 note: このレーンはペア単位キーの過渡形 — T3/T4 がサーバの事実になる
+  // 便4 で退場する（0010 §6）。それまで従来どおり相手単位で伏せる。
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
     setHidden(new Set(getHiddenSignalRefs()));
@@ -251,7 +254,7 @@ export function SignalsSection({
   // 片づけは「不在の残骸」だけを伏せる: 相手が pool に戻れば自動で再び見える
   // (箒が生きた相手を隠さない)。mutual は常に見える。
   const incoming = (inbox?.incoming ?? []).filter(
-    (sig) => sig.mutual || !(hidden.has(sig.fromRef) && absentOf(sig)),
+    (sig) => sig.state === "mutual" || !(hidden.has(sig.fromRef) && absentOf(sig)),
   );
 
   const sweep = (ref: string) => {
@@ -275,24 +278,25 @@ export function SignalsSection({
             const theirNote =
               inbox?.notes.find((n) => n.fromRef === sig.fromRef)?.note ?? null;
             const myNote = inbox?.myNotes.find((n) => n.peerRef === sig.fromRef)?.note ?? "";
+            const isMutual = sig.state === "mutual";
             return (
-              <li key={sig.fromRef} className={`m-signal${sig.mutual ? "" : " is-in"}`}>
+              <li key={sig.edgeId} className={`m-signal${isMutual ? "" : " is-in"}`}>
                 <div className="m-sighead">
                   {/* 輪が語る: open=相手は挙げた・あなたはまだ / pair=相互。
                       こちらも押すと弧が閉じて pair へ（~300ms; Ring.tsx）。
                       c9-5: 印なしの輪は状態記号サイズ=26。印あり=52 は R2 用の規約
                       （G-1=B: 今回の配布に印データは存在しない＝常に小輪）。 */}
-                  <Ring state={sig.mutual ? "pair" : "open"} size={26} />
+                  <Ring state={isMutual ? "pair" : "open"} size={26} />
                   <h4>{MEET.home.signals.incoming(sig.fromName)}</h4>
                 </div>
                 {/* c17: in pair state the anchor moves INTO the face (接点の再掲,
                     same verbatim string) — shown here only pre-mutual. */}
-                {!sig.mutual && sig.anchor !== "" && <p className="m-pairline">{sig.anchor}</p>}
+                {!isMutual && sig.anchor !== "" && <p className="m-pairline">{sig.anchor}</p>}
                 {/* c10: 判断材料 — 相手のひとこと紹介（owner自書き・公開済みの転載）。
                     式の下に引用の体で、ラベルなし・加工ゼロ（表示値=保存値）。
                     空なら行ごと出さない。 */}
                 {sig.fromIntro.trim() !== "" && <p className="m-introline">{sig.fromIntro}</p>}
-                {sig.mutual ? (
+                {isMutual ? (
                   <>
                     {absentOf(sig) && (
                       // c18c: a pair whose peer left the pool says so here too
@@ -335,10 +339,11 @@ export function SignalsSection({
                         type="button"
                         className={`m-btn m-btn-wide ${absentOf(sig) ? "m-btn-quiet m-btn-dim" : "m-btn-primary"}`}
                         onClick={() =>
-                          void onTalkBack(sig.fromRef).then((r) =>
+                          // R2 0010 T2: answer THIS edge — no reverse edge
+                          void onTalkBack(sig.edgeId).then((r) =>
                             setBackNotes((prev) => ({
                               ...prev,
-                              [sig.fromRef]: r.ok ? "" : r.code,
+                              [sig.edgeId]: r.ok ? "" : r.code,
                             })),
                           )
                         }
@@ -357,12 +362,12 @@ export function SignalsSection({
                         </button>
                       )}
                     </div>
-                    {(backNotes[sig.fromRef] ?? "") !== "" && (
+                    {(backNotes[sig.edgeId] ?? "") !== "" && (
                       // c18: refusal lines — dead edge / missing name / honest error
                       <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-                        {backNotes[sig.fromRef] === "peer_not_in_pool" ? (
+                        {backNotes[sig.edgeId] === "peer_not_in_pool" ? (
                           MEET.home.signals.notInPool
-                        ) : backNotes[sig.fromRef] === "from_name" ? (
+                        ) : backNotes[sig.edgeId] === "from_name" ? (
                           <>
                             {MEET.home.signals.nameFirst}{" "}
                             <Link className="m-rowlink" href="/meet/memory/#name">
@@ -371,7 +376,7 @@ export function SignalsSection({
                             。
                           </>
                         ) : (
-                          MEET.receive.errors[backNotes[sig.fromRef]] ?? MEET.receive.errors.unknown
+                          MEET.receive.errors[backNotes[sig.edgeId]] ?? MEET.receive.errors.unknown
                         )}
                       </p>
                     )}

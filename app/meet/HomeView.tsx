@@ -18,6 +18,7 @@ import {
   openMeetMemory,
   openReceived,
   openFirstNotes,
+  openItemAliases,
   PLACED_QUESTION_TAG,
   draftPlacedQuestionTitle,
   isPlacedQuestion,
@@ -29,9 +30,11 @@ import {
 import {
   getOrMintOwnerToken,
   deriveParticipantRef,
+  mintEdgeId,
   fetchPool,
   fetchInbox,
   sendSignal,
+  sendTalkBack,
   saveContactNote,
   submitLog,
   buildOutboundProjection,
@@ -128,9 +131,12 @@ export function HomeView() {
   const shelf = useMemo(() => openReceived(), []);
   // c17: 第一信の下書きレーン — edge 単位・端末のみ（serverへ送らない）
   const notesLane = useMemo(() => openFirstNotes(), []);
+  // R2 0010: 端末側の item_ref alias 対応表（内部 entryId → 公開 alias）
+  const aliasLane = useMemo(() => openItemAliases(), []);
 
   const [question, setQuestion] = useState("");
   const [rigEntries, setRigEntries] = useState<RigEntry[]>([]);
+  const [aliases, setAliases] = useState<Map<string, string>>(new Map());
   const [displayName, setDisplayName] = useState("");
   const [intro, setIntro] = useState("");
   const [connected, setConnected] = useState(false);
@@ -153,7 +159,10 @@ export function HomeView() {
 
   const reload = useCallback(async () => {
     setQuestion(await memory.getQuestion());
-    setRigEntries(await memory.listRigItems());
+    const rig = await memory.listRigItems();
+    setRigEntries(rig);
+    // alias は読み込みついでに mint しておく（publish 時にも再取得して鮮度を担保）
+    setAliases(await aliasLane.getOrMintAll(rig.map((e) => e.entryId)));
     const profile = await memory.getProfile();
     setDisplayName(profile?.displayName.trim() ?? "");
     setIntro(profile?.intro?.trim() ?? "");
@@ -169,7 +178,7 @@ export function HomeView() {
     const fn: Record<string, FirstNoteFaceData> = {};
     if (ib.ok) {
       for (const sig of ib.incoming) {
-        if (!sig.mutual) continue;
+        if (sig.state !== "mutual") continue;
         const m = firstNoteMaterialFor(sig.fromRef, list, sig.anchor);
         fn[sig.fromRef] = { basis: m.basis, draft: await notesLane.get(sig.fromRef) };
       }
@@ -182,7 +191,7 @@ export function HomeView() {
     const refsNow = poolNow.ok ? new Set(poolNow.items.map((it) => it.participantRef)) : null;
     setParticipants(refsNow === null ? null : refsNow.size);
     setPoolRefs(refsNow);
-  }, [memory, shelf, notesLane]);
+  }, [memory, shelf, notesLane, aliasLane]);
 
   useEffect(() => {
     void reload();
@@ -206,8 +215,15 @@ export function HomeView() {
 
   const hasItems = rigEntries.length > 0;
   const ready = connected && hasItems && displayName !== "";
-  const sentRefs = useMemo(
-    () => new Set((inbox?.outgoing ?? []).map((o) => o.toRef)),
+  // R2 0010: sent は edge 単位 — キーは `${toRef}:${basisItemRef}`（カードの接点）。
+  // closed は数えない（取り下げた接点は再び押せる — T6: 再会は新 edge）。
+  const sentEdgeKeys = useMemo(
+    () =>
+      new Set(
+        (inbox?.outgoing ?? [])
+          .filter((o) => o.state !== "closed")
+          .map((o) => `${o.toRef}:${o.basisItemRef}`),
+      ),
     [inbox],
   );
 
@@ -229,7 +245,9 @@ export function HomeView() {
 
   // 第9便 C — 今日この問いを読んだ AI の実数 (server's dedup'd daily count).
   // Position = the item's index in the outbound projection (what publish sent).
-  const projRows = buildOutboundProjection(rigEntries.map((x) => toPublicView(x.item)));
+  const projRows = buildOutboundProjection(
+    rigEntries.map((x) => ({ itemRef: aliases.get(x.entryId) ?? "", view: toPublicView(x.item) })),
+  );
   const readsOf = (item: MeetRigItemV1): number | null => {
     const v = toPublicView(item);
     const pos = projRows.findIndex(
@@ -291,7 +309,12 @@ export function HomeView() {
   const updatePool = async () => {
     setPoolBusy(true);
     // Public views leave the device (候補に出すときの書き方 substituted).
-    const items = buildOutboundProjection(rigEntries.map((e) => toPublicView(e.item)));
+    // R2 0010: alias は publish 時に必ず mint 済みの最新を取り直す（state の
+    // 読み遅れで "" を送らない — server は itemRef 必須・fail-closed）。
+    const aliasMap = await aliasLane.getOrMintAll(rigEntries.map((e) => e.entryId));
+    const items = buildOutboundProjection(
+      rigEntries.map((e) => ({ itemRef: aliasMap.get(e.entryId) ?? "", view: toPublicView(e.item) })),
+    );
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName,
@@ -451,20 +474,36 @@ export function HomeView() {
   // c18: the RESULT is read and returned — a refused signal (withdrawn peer,
   // missing name) must not wear a success face. The sent state stays server-
   // truth: a refusal writes no outgoing row, so no card flips.
+  // R2 0010 T1: 話してみる は接点（edge）を開く。edge_id は端末 mint、根拠は
+  // カードの basis item alias、proposalPtr は自分の棚への不透明ポインタのみ。
+  // live-triple に既存があればサーバが既存 edge を正直に返す（押すことは一度
+  // 押したこと — sent 表示はサーバ真実のまま）。
   const talk = async (
     toRef: string,
+    basisItemRef: string,
+    proposalPtr: string,
     line1: string,
     line2: string,
     to: string,
   ): Promise<{ ok: boolean; code: string }> => {
     const anchor = anchorForRecipient(line1, line2, to, displayName);
-    const r = await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor });
+    const r = await sendSignal({
+      ownerToken: getOrMintOwnerToken(),
+      toRef,
+      fromName: displayName,
+      anchor,
+      edgeId: mintEdgeId(),
+      basisItemRef,
+      proposalPtr,
+    });
     await reload();
     return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
   };
 
-  const talkBack = async (toRef: string): Promise<{ ok: boolean; code: string }> => {
-    const r = await sendSignal({ ownerToken: getOrMintOwnerToken(), toRef, fromName: displayName, anchor: "" });
+  // R2 0010 T2: こちらも話してみる は届いた edge への返答 — 逆向きの新 edge を
+  // 立てない（mutual は同じ接点で揃う）。
+  const talkBack = async (edgeId: string): Promise<{ ok: boolean; code: string }> => {
+    const r = await sendTalkBack({ ownerToken: getOrMintOwnerToken(), edgeId });
     await reload();
     return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
   };
@@ -898,7 +937,7 @@ export function HomeView() {
                 <ProposalEntry
                   key={entry.entryId}
                   entry={entry}
-                  sentRefs={sentRefs}
+                  sentEdgeKeys={sentEdgeKeys}
                   poolRefs={poolRefs}
                   onTalk={talk}
                   onReading={reading}

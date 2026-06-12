@@ -24,3 +24,15 @@ export function isParticipantRef(s: unknown): s is string {
 export function isOwnerToken(s: unknown): s is string {
   return typeof s === "string" && /^[0-9a-f]{32,64}$/.test(s);
 }
+
+/**
+ * R2 0010 — mint an edge id (T1, device-minted). edge_ is the client
+ * namespace; r15pair_ is reserved for backfill provenance and refused by the
+ * server BY SHAPE, so a client cannot dress an edge up as backfill.
+ */
+export function mintEdgeId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  let hex = "";
+  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+  return `edge_${hex}`;
+}

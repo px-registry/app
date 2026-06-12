@@ -53,7 +53,17 @@ export function toRigPool(items: PoolItemPublic[]): RigPublicPoolItemV1[] {
 // ── basis provenance (第7便 C) ─────────────────────────────────────────────────
 
 /** One serveable basis item, captured at generation time for the gate + fold. */
-export type BasisItem = { ownerRef: string; title: string; text: string };
+export type BasisItem = {
+  ownerRef: string;
+  title: string;
+  text: string;
+  /**
+   * R2 0010 — the served item's stable public alias: what T1 sends as the
+   * edge's basis_item_ref. "" on pre-R2 entries (their cards cannot open an
+   * edge; the act-time server check stays the floor).
+   */
+  itemRef?: string;
+};
 export type BasisMap = Record<string, BasisItem>;
 
 /**
@@ -73,7 +83,14 @@ export function toRigPoolWithRefs(items: PoolItemPublic[]): {
     if (!KIND_SET.has(it.kind)) continue;
     n += 1;
     const id = `p${n}`;
-    basis[id] = { ownerRef: it.ownerRef, title: it.title, text: it.text };
+    // itemRef rides only when the serve carried one — pre-R2 entries keep their
+    // exact stored shape (deep-equal stable; act-time checks stay the floor).
+    basis[id] = {
+      ownerRef: it.ownerRef,
+      title: it.title,
+      text: it.text,
+      ...(typeof it.itemRef === "string" && it.itemRef !== "" ? { itemRef: it.itemRef } : {}),
+    };
     pool.push({
       ownerRef: it.ownerRef,
       kind: it.kind as RigMemoryKindV1,

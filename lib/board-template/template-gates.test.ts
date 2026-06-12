@@ -169,8 +169,10 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
   // public projection / signal / mutual contact note / facilitator log; still
   // no board-template, draft, or owner-memory table) — and 0008, the R1.5
   // 第7便 ひとこと紹介 column on r15_pool_item (owner-published projection,
-  // same standing as display_name). The set stays locked so any surprise
-  // migration still trips.
+  // same standing as display_name) — and 0010, the R2 edge stage (STOP②
+  // gate-passed: docs/r2/0010-edge-and-item-ref.md; item_ref alias column +
+  // r15_edge metadata — still no board-template, draft, or owner-memory
+  // table). The set stays locked so any surprise migration still trips.
   const files = readdirSync(here("../../migrations")).filter((f) => f.endsWith(".sql")).sort();
   assert.deepEqual(files, [
     "0001_board_records.sql",
@@ -182,6 +184,7 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
     "0007_r15_meet.sql",
     "0008_r15_intro.sql",
     "0009_r15_question_serve.sql",
+    "0010_r15_edge.sql",
   ]);
 });
 

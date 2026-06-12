@@ -12,6 +12,7 @@
 //               (separate shelf: never validated into the memory substrate)
 //   firstnote — c17: 第一信の下書き, one per edge (peerRef-derived key);
 //               like received, AI output that never re-enters a prompt
+//   aliasmap  — R2 0010: entryId → item_ref（公開項目の安定 alias の対応表）
 //
 // Imported only from client components via the lib barrel. node:test uses
 // InMemoryMeetBackend instead, so this DOM-only code never loads there.
@@ -22,9 +23,11 @@ const DB_NAME = "px-meet";
 export const MEMORY_STORE = "memory";
 export const RECEIVED_STORE = "received";
 export const FIRSTNOTE_STORE = "firstnote";
-// v2 (c17): + firstnote store. onupgradeneeded creates only what is missing,
-// so a v1 database upgrades in place without touching existing lanes.
-const VERSION = 2;
+export const ALIAS_STORE = "aliasmap";
+// v3 (R2 0010): + aliasmap store. v2 (c17): + firstnote. onupgradeneeded creates
+// only what is missing, so older databases upgrade in place without touching
+// existing lanes.
+const VERSION = 3;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -39,6 +42,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(FIRSTNOTE_STORE)) {
         db.createObjectStore(FIRSTNOTE_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(ALIAS_STORE)) {
+        db.createObjectStore(ALIAS_STORE, { keyPath: "entryId" });
       }
     };
     req.onsuccess = () => resolve(req.result);

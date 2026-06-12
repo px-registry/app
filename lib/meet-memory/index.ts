@@ -20,6 +20,7 @@ export {
 } from "./backend.ts";
 export { ReceivedStore, type ReceivedProposalV1, type ReadingV1 } from "./received.ts";
 export { FirstNoteStore, firstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
+export { ItemAliasStore, mintItemRef, type ItemAliasV1 } from "./alias.ts";
 export { validateNewEntry, validateStoredEntry, type ValidationResult } from "./validate.ts";
 export {
   MeetMemoryStore,
@@ -48,10 +49,11 @@ export {
   type MaskPair,
 } from "./mask-check.ts";
 
-import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE } from "./indexeddb.ts";
+import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";
 import { ReceivedStore, type ReceivedProposalV1 } from "./received.ts";
 import { FirstNoteStore, type FirstNoteDraftV1 } from "./firstnote.ts";
+import { ItemAliasStore, type ItemAliasV1 } from "./alias.ts";
 import type { MeetMemoryEntryV1 } from "./types.ts";
 
 /** Browser-side memory store over IndexedDB. Call only from client components. */
@@ -67,4 +69,9 @@ export function openReceived(): ReceivedStore {
 /** Browser-side 第一信下書き lane (c17). Call only from client components. */
 export function openFirstNotes(): FirstNoteStore {
   return new FirstNoteStore(new IndexedDbMeetBackend<FirstNoteDraftV1>(FIRSTNOTE_STORE));
+}
+
+/** Browser-side item_ref alias map (R2 0010). Call only from client components. */
+export function openItemAliases(): ItemAliasStore {
+  return new ItemAliasStore(new IndexedDbMeetBackend<ItemAliasV1>(ALIAS_STORE));
 }

@@ -1,7 +1,7 @@
 // R1.5 meet network lane — barrel. app/meet imports ONLY from here; the gates
 // pin fetch to api.ts and localStorage to local.ts.
 
-export { deriveParticipantRef, isParticipantRef, isOwnerToken } from "./ref.ts";
+export { deriveParticipantRef, isParticipantRef, isOwnerToken, mintEdgeId } from "./ref.ts";
 export {
   getOrMintOwnerToken,
   clearOwnerToken,
@@ -19,7 +19,7 @@ export {
   THEME_INIT_SCRIPT,
   type ThemePhase,
 } from "./local.ts";
-export { buildOutboundProjection, type OutboundPoolItem } from "./projection.ts";
+export { buildOutboundProjection, type OutboundPoolItem, type ProjectableEntry } from "./projection.ts";
 export {
   projectionSnapshotJson,
   snapshotRowSet,
@@ -30,6 +30,7 @@ export {
   publishProjection,
   fetchPool,
   sendSignal,
+  sendTalkBack,
   fetchInbox,
   saveContactNote,
   submitLog,
@@ -38,4 +39,6 @@ export {
   type NetResult,
   type InboxData,
   type InboxIncoming,
+  type InboxOutgoing,
+  type EdgeState,
 } from "./api.ts";

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
 import {
   openMeetMemory,
+  openItemAliases,
   toPublicView,
   hasPublicVariant,
   parseMaskWords,
@@ -397,7 +398,13 @@ function ItemForm({
 
 export function MemoryPanel() {
   const store = useMemo(() => openMeetMemory(), []);
+  // R2 0010: 端末側の item_ref alias 対応表（公開項目の安定 identity）
+  const aliasLane = useMemo(() => openItemAliases(), []);
   const [entries, setEntries] = useState<RigEntry[]>([]);
+  const [aliases, setAliases] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    void aliasLane.getOrMintAll(entries.map((e) => e.entryId)).then(setAliases);
+  }, [entries, aliasLane]);
   const [displayName, setDisplayName] = useState("");
   const [intro, setIntroState] = useState("");
   const [introAi, setIntroAi] = useState<"idle" | "busy" | "failed">("idle");
@@ -562,7 +569,9 @@ export function MemoryPanel() {
   // 未反映 diff — what differs between the current projection and what was last
   // actually pushed from this device (symmetric difference, by item identity).
   // toPublicView first: what leaves is the 公開用の書き方 when one is set.
-  const projection = buildOutboundProjection(entries.map((e) => toPublicView(e.item)));
+  const projection = buildOutboundProjection(
+    entries.map((e) => ({ itemRef: aliases.get(e.entryId) ?? "", view: toPublicView(e.item) })),
+  );
   const pendingCount = snapshotPendingCount(snapshot, projection);
 
   const publish = async () => {
@@ -570,7 +579,11 @@ export function MemoryPanel() {
     // The outbound path runs through the frozen rig-core gate (fail-closed):
     // only private === false items can appear in the projection — and they
     // leave as their public view (候補に出すときの書き方 substituted).
-    const items = buildOutboundProjection(entries.map((e) => toPublicView(e.item)));
+    // R2 0010: alias は publish 時に取り直す（"" を送らない — server は必須）。
+    const aliasMap = await aliasLane.getOrMintAll(entries.map((e) => e.entryId));
+    const items = buildOutboundProjection(
+      entries.map((e) => ({ itemRef: aliasMap.get(e.entryId) ?? "", view: toPublicView(e.item) })),
+    );
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName: displayName.trim(),

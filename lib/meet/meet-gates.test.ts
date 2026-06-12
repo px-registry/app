@@ -298,9 +298,10 @@ test("M-13: 片づける is gated verbatim; the absent line is ONE constant ever
     pe.indexOf("MEET.home.signals.notInPool") < pe.indexOf("{!sent && ("),
     "ProposalEntry: the absent line renders before (outside) the !sent gate — sent cards keep it",
   );
+  // R2 0010 期待の追従: ペアの mutual flag は edge state へ（isMutual = state === "mutual"）
   const sec = read("app/meet/SignalsSection.tsx");
   const mutualBranch = sec.slice(
-    sec.indexOf("sig.mutual ? ("),
+    sec.indexOf("{isMutual ? ("),
     sec.indexOf('className="m-contactfold"'),
   );
   assert.ok(
@@ -318,8 +319,9 @@ test("M-13b: the broom shows ONLY on debris; hiding never silences a living peer
     "片づける is wrapped in the absent mark",
   );
   // the hide filter: mutual always shows; hidden suppresses only while absent
+  // (R2 0010 期待の追従: mutual はペア flag から edge state の比較へ)
   assert.ok(
-    /sig\.mutual \|\| !\(hidden\.has\(sig\.fromRef\) && absentOf\(sig\)\)/.test(src),
+    /sig\.state === "mutual" \|\| !\(hidden\.has\(sig\.fromRef\) && absentOf\(sig\)\)/.test(src),
     "a hidden peer back in the pool (or mutual) is visible again",
   );
   // no server delete — the hide is the device-local lane only

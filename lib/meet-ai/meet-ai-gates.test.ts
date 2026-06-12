@@ -177,9 +177,9 @@ test("MA-4e: 公開用の書き方 — the OTHER side's prompt gets the public p
 
 test("MA-4d: toRigPool is fail-closed on kind and keeps arrival order", () => {
   const served: PoolItemPublic[] = [
-    { participantRef: "a".repeat(16), ownerRef: "甲", ownerIntro: "", kind: "have", title: "t", text: "x", tags: [] },
-    { participantRef: "b".repeat(16), ownerRef: "乙", ownerIntro: "", kind: "weird", title: "t", text: "y", tags: [] },
-    { participantRef: "c".repeat(16), ownerRef: "丙", ownerIntro: "", kind: "want", title: "t", text: "z", tags: [] },
+    { participantRef: "a".repeat(16), ownerRef: "甲", ownerIntro: "", kind: "have", title: "t", text: "x", tags: [], itemRef: "" },
+    { participantRef: "b".repeat(16), ownerRef: "乙", ownerIntro: "", kind: "weird", title: "t", text: "y", tags: [], itemRef: "" },
+    { participantRef: "c".repeat(16), ownerRef: "丙", ownerIntro: "", kind: "want", title: "t", text: "z", tags: [], itemRef: "" },
   ];
   const rig = toRigPool(served);
   assert.deepEqual(rig.map((r) => r.text), ["x", "z"]);
@@ -192,6 +192,15 @@ test("MA-4d: toRigPool is fail-closed on kind and keeps arrival order", () => {
     p1: { ownerRef: "甲", title: "t", text: "x" },
     p2: { ownerRef: "丙", title: "t", text: "z" },
   });
+
+  // R2 0010: when the serve carries the stable alias, it rides the basis map —
+  // T1 sends it as the edge's basis_item_ref. An empty alias keeps the pre-R2
+  // shape exactly (no itemRef key at all).
+  const withAlias = toRigPoolWithRefs(
+    served.map((s, i) => ({ ...s, itemRef: i === 0 ? "9".repeat(16) : "" })),
+  );
+  assert.equal(withAlias.basis.p1.itemRef, "9".repeat(16), "alias rides when served");
+  assert.ok(!("itemRef" in withAlias.basis.p2), "empty alias → key absent (stable shape)");
 });
 
 // ── MA-5: reply parsing ─────────────────────────────────────────────────────────

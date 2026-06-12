@@ -118,23 +118,28 @@ function ReadingEditor({
 
 export function ProposalEntry({
   entry,
-  sentRefs,
+  sentEdgeKeys,
   poolRefs,
   onTalk,
   onReading,
   onRemove,
 }: {
   entry: ReceivedProposalV1;
-  /** refs this owner has already signalled (from the inbox outgoing list). */
-  sentRefs: ReadonlySet<string>;
+  /** R2 0010: live edges this owner opened — keys are `${toRef}:${basisItemRef}`
+   *  (sent は接点単位; 同じ相手でも別の接点はまだ押せる). */
+  sentEdgeKeys: ReadonlySet<string>;
   /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell.
    *  Marking is advisory — c18's act-time check stays the second guard. */
   poolRefs: ReadonlySet<string> | null;
   /** c11/c13: the caller composes the recipient-addressed anchor from the
    *  card's lines (v3: 式 is line2; v2 stock: line1) and the addressee.
-   *  c18: the send RESULT comes back — a refusal renders an honest line. */
+   *  c18: the send RESULT comes back — a refusal renders an honest line.
+   *  R2 0010: the card's basis alias + an opaque pointer to THIS card ride
+   *  along — they become the edge's basis_item_ref / proposal_ptr. */
   onTalk: (
     toRef: string,
+    basisItemRef: string,
+    proposalPtr: string,
     line1: string,
     line2: string,
     to: string,
@@ -206,12 +211,16 @@ export function ProposalEntry({
             )}
             {kept.map(({ card, index }) => {
               const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
-              const sent = sentRefs.has(toRef);
+              const partnerIntro = (entry.intros?.[card.to] ?? "").trim();
+              const basisItem = entry.basisItems?.[card.basisItemId];
+              // R2 0010: the edge this card would open — sent は接点単位。
+              // pre-R2 entries ("" alias) never match a key; their act fails
+              // honestly at the server (basis_not_in_pool).
+              const basisRef = basisItem?.itemRef ?? "";
+              const sent = sentEdgeKeys.has(`${toRef}:${basisRef}`);
               // c18b 受動マーキング: 押す前から無いと分かる。確信があるとき
               // だけ（pool照合不能=null では偽の不在も嘘なのでマークしない）。
               const absent = poolRefs !== null && !poolRefs.has(toRef);
-              const partnerIntro = (entry.intros?.[card.to] ?? "").trim();
-              const basisItem = entry.basisItems?.[card.basisItemId];
               return (
                 <div key={index}>
                   <div className="m-cardhead">
@@ -259,7 +268,14 @@ export function ProposalEntry({
                       className={`m-btn m-proposal-talk ${absent ? "m-btn-quiet m-btn-dim" : "m-btn-primary"}`}
                       style={{ marginTop: "0.7rem" }}
                       onClick={() =>
-                        void onTalk(toRef, card.line1, card.line2, card.to).then((r) =>
+                        void onTalk(
+                          toRef,
+                          basisRef,
+                          `${entry.entryId}#${index}`,
+                          card.line1,
+                          card.line2,
+                          card.to,
+                        ).then((r) =>
                           setTalkNotes((prev) => ({ ...prev, [index]: r.ok ? "" : r.code })),
                         )
                       }
@@ -271,7 +287,10 @@ export function ProposalEntry({
                     // c18: refusal lines — dead edge / missing name / honest error.
                     // The button stays above (再試行可); sent never flips here.
                     <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-                      {talkNotes[index] === "peer_not_in_pool" ? (
+                      {talkNotes[index] === "peer_not_in_pool" ||
+                      talkNotes[index] === "basis_not_in_pool" ? (
+                        // R2 0010: 根拠項目の取り下げも「もう卓にない」と同じ
+                        // 事実 — 同一定数（新文言なし）
                         MEET.home.signals.notInPool
                       ) : talkNotes[index] === "from_name" ? (
                         <>
