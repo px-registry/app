@@ -49,6 +49,23 @@ export class ItemAliasStore {
     return out;
   }
 
+  /**
+   * R2 GOAL（チャットポート）— port が mint 済みの公開 alias を、取り込んだ
+   * entry に結びつける（reverse-import の継続性: 次の publish が同じ alias を
+   * 送り、edge の basis_item_ref が指し続ける）。既に対応がある entry は上書き
+   * しない — alias の継続が常に勝つ。
+   */
+  async adopt(entryId: string, itemRef: string): Promise<void> {
+    const existing = await this.backend.get(entryId);
+    if (existing !== undefined) return;
+    await this.backend.put({ entryId, itemRef });
+  }
+
+  /** 既知の公開 alias 集合（reverse-import の照合用）。 */
+  async knownRefs(): Promise<Set<string>> {
+    return new Set((await this.backend.list()).map((a) => a.itemRef));
+  }
+
   clear(): Promise<void> {
     return this.backend.clear();
   }

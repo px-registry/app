@@ -303,6 +303,24 @@ test("inbox: notes are served through the mutual-EDGE join (structural pin)", as
   assert.ok(noteQuery!.sql.includes("OR"), "either orientation qualifies (人単位の行為)");
 });
 
+test("inbox: myItems = the caller's OWN public rows only (reverse-import serve)", async () => {
+  const me = await deriveParticipantRef(TOKEN);
+  const db = fakeD1((sql) =>
+    sql.includes("item_ref, kind, title, text, tags, business")
+      ? [{ item_ref: "ab12".repeat(4), kind: "want", title: "t", text: "x", tags: '["問い"]', business: 0 }]
+      : [],
+  );
+  const { res } = post(inboxPost, "inbox", { ownerToken: TOKEN }, db);
+  const body = (await (await res).json()) as { myItems: Array<Record<string, unknown>> };
+  assert.equal(body.myItems.length, 1);
+  assert.deepEqual(body.myItems[0].tags, ["問い"], "tags served parsed");
+  const q = db.calls.find((c) => c.sql.includes("item_ref, kind, title, text, tags, business"));
+  assert.ok(q, "myItems query issued");
+  assert.ok(q!.sql.includes("participant_ref = ?1"), "scoped to the caller");
+  assert.ok(q!.args.includes(me), "bound to the derived ref");
+  assert.ok(!q!.args.includes(TOKEN), "token never bound");
+});
+
 test("inbox: time order only, never a quality measure", async () => {
   const db = fakeD1(() => []);
   await post(inboxPost, "inbox", { ownerToken: TOKEN }, db).res;

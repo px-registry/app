@@ -122,11 +122,23 @@ export type InboxOutgoing = {
   closedFrom: string;
   dormant: boolean;
 };
+/** R2 GOAL（チャットポート）— 自分の公開面の写し（reverse-import の材料）。 */
+export type InboxMyItem = {
+  itemRef: string;
+  kind: string;
+  title: string;
+  text: string;
+  tags: string[];
+  business: boolean;
+};
+
 export type InboxData = {
   incoming: InboxIncoming[];
   outgoing: InboxOutgoing[];
   notes: Array<{ fromRef: string; note: string }>;
   myNotes: Array<{ peerRef: string; note: string }>;
+  /** R2 GOAL — port が立てた行を端末が取り込むための自分の公開面（additive key）。 */
+  myItems: InboxMyItem[];
   /** 第9便 C — today's read-count per OWN placed question (by projection position). */
   questionReads: Array<{ position: number; count: number }>;
 };
@@ -259,6 +271,21 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
       myNotes: arr(body.myNotes).filter(isRecord).flatMap((r) =>
         isParticipantRef(r.peerRef) && typeof r.note === "string"
           ? [{ peerRef: r.peerRef, note: r.note }]
+          : [],
+      ),
+      myItems: arr(body.myItems).filter(isRecord).flatMap((r) =>
+        typeof r.itemRef === "string" && /^[0-9a-f]{16}$/.test(r.itemRef) &&
+        typeof r.kind === "string" && typeof r.title === "string" && typeof r.text === "string"
+          ? [{
+              itemRef: r.itemRef,
+              kind: r.kind,
+              title: r.title,
+              text: r.text,
+              tags: Array.isArray(r.tags)
+                ? r.tags.filter((t): t is string => typeof t === "string")
+                : [],
+              business: r.business === true,
+            }]
           : [],
       ),
       questionReads: arr(body.questionReads).filter(isRecord).flatMap((r) =>

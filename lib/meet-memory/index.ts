@@ -40,6 +40,7 @@ export {
   isPlacedQuestion,
 } from "./placed.ts";
 export { toPublicView, hasPublicVariant } from "./public-view.ts";
+export { adoptPortItems, type PortServedItem } from "./portsync.ts";
 export {
   normalizeMaskText,
   parseMaskWords,

@@ -18,6 +18,7 @@ import {
   isOwnerToken,
   isAllowedWriteOrigin,
   deriveDormant,
+  parseTagsJson,
   type MeetEnv,
 } from "../../_meet.ts";
 
@@ -105,6 +106,17 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       .bind(me)
       .all<MyNoteRow>();
 
+    // R2 GOAL（チャットポート）— 自分の公開面の写し。port が additive に立てた
+    // アンテナを端末が次回訪問で取り込む（reverse-import）ための serve。自分の
+    // 公開行を自分に返すだけ — 新しい custody はない（additive key・黄申告済）。
+    const myItems = await env.BOARD
+      .prepare(
+        "SELECT item_ref, kind, title, text, tags, business FROM r15_pool_item " +
+          "WHERE participant_ref = ?1 ORDER BY position",
+      )
+      .bind(me)
+      .all<{ item_ref: string; kind: string; title: string; text: string; tags: string; business: number }>();
+
     // 気配 (第9便 C): today's read-count per OWN placed question — counts only,
     // served back to their owner (a fact, not a score).
     const day = new Date().toISOString().slice(0, 10);
@@ -148,6 +160,14 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       })),
       notes: (notes.results ?? []).map((r) => ({ fromRef: r.writer_ref, note: r.note })),
       myNotes: (myNotes.results ?? []).map((r) => ({ peerRef: r.peer_ref, note: r.note })),
+      myItems: (myItems.results ?? []).map((r) => ({
+        itemRef: r.item_ref,
+        kind: r.kind,
+        title: r.title,
+        text: r.text,
+        tags: parseTagsJson(r.tags),
+        business: r.business === 1,
+      })),
       questionReads: (reads.results ?? []).map((r) => ({ position: r.position, count: r.n })),
     });
   } catch {
