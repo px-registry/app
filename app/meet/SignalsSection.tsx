@@ -294,6 +294,14 @@ export function SignalsSection({
                 {sig.fromIntro.trim() !== "" && <p className="m-introline">{sig.fromIntro}</p>}
                 {sig.mutual ? (
                   <>
+                    {absentOf(sig) && (
+                      // c18c: a pair whose peer left the pool says so here too
+                      // (同一定数; 連絡メモ・c17面はそのまま — mutual は隠れず
+                      // 箒も出ない: 不在条件は非mutual のまま変えない)
+                      <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                        {MEET.home.signals.notInPool}
+                      </p>
+                    )}
                     <TalkFace
                       sig={sig}
                       face={firstNotes[sig.fromRef] ?? { basis: null, draft: "" }}

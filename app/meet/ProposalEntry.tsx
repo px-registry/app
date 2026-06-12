@@ -221,6 +221,15 @@ export function ProposalEntry({
                     <h3>{card.to}</h3>
                     {sent && <span className="m-statechip">{MEET.proposal.talkSent}</span>}
                   </div>
+                  {absent && (
+                    // c18b/c18c: the same line c18 answers with, BEFORE any
+                    // press — and directly under the sent chip too (a sent
+                    // card must not look alive-and-waiting; 同一定数のみ).
+                    // 箒は既存「この回を消す」のまま（新設なし）。
+                    <p className="m-note" aria-live="polite" style={{ margin: "0.3rem 0 0" }}>
+                      {MEET.home.signals.notInPool}
+                    </p>
+                  )}
                   {partnerIntro !== "" && (
                     <p className="m-item-tags" style={{ margin: "0.3rem 0 0" }}>
                       {card.to}——{partnerIntro}
@@ -243,14 +252,6 @@ export function ProposalEntry({
                           : basisItem.text}
                       </p>
                     </details>
-                  )}
-                  {absent && (
-                    // c18b: the same line c18 answers with, BEFORE any press
-                    // (同一定数 — never a second wording). 片づけは提案側は
-                    // 既存「この回を消す」がそのまま導線（新設なし）。
-                    <p className="m-note" aria-live="polite" style={{ marginTop: "0.5rem" }}>
-                      {MEET.home.signals.notInPool}
-                    </p>
                   )}
                   {!sent && (
                     <button

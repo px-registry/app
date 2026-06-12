@@ -292,6 +292,57 @@ try {
   check("c18b: サーバ行は残存（履歴不触）", inboxMine.body?.incoming?.some((s) => s.fromRef === refB) === true);
   await shot("07e-c18b-swept");
 
+  // 6d. c18c — sent＋不在のカードにも同一定数の一行（復帰で消灯）
+  const refA = await deriveRef(TOK_A);
+  await page.evaluate(async ({ refA }) => {
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open("px-meet", 2);
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction("received", "readwrite");
+        tx.objectStore("received").put({
+          entryId: "recv_c18c_fixture",
+          createdAt: new Date().toISOString(),
+          question: "",
+          modelLabel: "fixture",
+          raw: "[]",
+          cards: [{ to: "あや", line1: "床張りの相棒の件です。", line2: "", line3: "", basisItemId: "p1" }],
+          refs: { あや: refA },
+          basisItems: { p1: { ownerRef: "あや", title: "活版印刷の工房", text: "古い手キンで小ロット印刷ができる" } },
+          echoFlag: false,
+          readings: {},
+        });
+        tx.oncomplete = () => { db.close(); resolve(undefined); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }, { refA });
+  await page.reload({ waitUntil: "networkidle" });
+  const sentEntry = page.locator(".m-entry", { hasText: "床張りの相棒の件です。" });
+  await sentEntry.locator(".m-statechip").waitFor();
+  check("c18c: あや宛カードは sent チップ（mutual 済）", true);
+  check("c18c: 在籍中は一行なし", (await sentEntry.getByText("この相手は、いまは候補に出ていません。").count()) === 0);
+  const unpubA = await api("/api/meet/publish", { ownerToken: TOK_A, displayName: "あや", items: [] });
+  check("c18c: あや withdrew", unpubA.body?.ok === true);
+  await page.reload({ waitUntil: "networkidle" });
+  await waitCheck("c18c: sent＋不在 → チップ直下に一行", sentEntry.getByText("この相手は、いまは候補に出ていません。"));
+  const ayaCard = page.locator(".m-signal", { hasText: "あや" });
+  check("c18c: mutual 合図カードにも一行", (await ayaCard.getByText("この相手は、いまは候補に出ていません。").count()) === 1);
+  check("c18c: mutual に片づけるは出ない（箒の条件不変）", (await ayaCard.getByRole("button", { name: "片づける" }).count()) === 0);
+  check("c18c: c17 面は無傷", (await ayaCard.locator(".m-talkface").count()) === 1);
+  await shot("07f-c18c-sent-absent");
+  // 復帰 → 消灯（提案・合図とも）
+  const repubA = await api("/api/meet/publish", { ownerToken: TOK_A, displayName: "あや", items: [
+    { kind: "have", title: "活版印刷の工房", text: "古い手キンで小ロット印刷ができる", tags: ["手仕事"], position: 0 },
+    { kind: "want", title: "子どもと作る場", text: "親子で手を動かす時間をつくりたい", tags: ["親子"], position: 1 },
+  ] });
+  check("c18c: あや 復帰", repubA.body?.ok === true);
+  await page.reload({ waitUntil: "networkidle" });
+  await sentEntry.locator(".m-statechip").waitFor();
+  check("c18c: 復帰で消灯（提案）", (await sentEntry.getByText("この相手は、いまは候補に出ていません。").count()) === 0);
+  check("c18c: 復帰で消灯（合図）", (await ayaCard.getByText("この相手は、いまは候補に出ていません。").count()) === 0);
+
   // 7. receive attempt (fake key) — honest typed error, 第9便: as a DATED
   // ENTRY at the top of AIが見つけた提案
   await page.getByRole("button", { name: "探しに行く" }).click();

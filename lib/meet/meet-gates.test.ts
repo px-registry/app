@@ -292,6 +292,21 @@ test("M-13: 片づける is gated verbatim; the absent line is ONE constant ever
     assert.ok(src.includes("MEET.home.signals.notInPool"), `${rel} renders the shared constant`);
     assert.ok(src.includes("poolRefs"), `${rel} marks from the pool presence set`);
   }
+  // c18c: the mark is NOT gated on sent — a sent card says the line too
+  const pe = read("app/meet/ProposalEntry.tsx");
+  assert.ok(
+    pe.indexOf("MEET.home.signals.notInPool") < pe.indexOf("{!sent && ("),
+    "ProposalEntry: the absent line renders before (outside) the !sent gate — sent cards keep it",
+  );
+  const sec = read("app/meet/SignalsSection.tsx");
+  const mutualBranch = sec.slice(
+    sec.indexOf("sig.mutual ? ("),
+    sec.indexOf('className="m-contactfold"'),
+  );
+  assert.ok(
+    mutualBranch.includes("MEET.home.signals.notInPool"),
+    "SignalsSection: the mutual (sent相当) branch says the line when the peer is absent",
+  );
 });
 
 test("M-13b: the broom shows ONLY on debris; hiding never silences a living peer", () => {
