@@ -47,6 +47,9 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   binding 名（BOARD/AUTH/DELIVERIES）は本番と同一・実体だけ dev — コードは分岐しない。
 - Pages project **px-r2-dev**（px-r2-dev.pages.dev・Basic Auth あり・secrets 設定済）。
   アクセス情報は `Desktop\px-r2-dev-access.txt`（コミット禁止・チャット非経由）。
+- smoke（scripts\r2-edge-smoke.mjs）の罠2つ: ①R2_USER/R2_PASS/R2_BASE は**同一コマンド内**で
+  設定して実行（シェル状態は呼び出し間で消える — 別呼び出しだと全 401）②**実行前に dev D1 を掃除**
+  （edge id が固定定数のため、残骸があると冪等でない）。
 - deploy は `scripts\deploy-r2dev.ps1` だけを使う。**罠（実測）: `wrangler pages deploy` は
   `--config` を受けない**（"Pages does not support custom paths"）→ スクリプトが wrangler.toml を
   一時差し替えて finally で必ず復元する。`d1 migrations apply` は `--config wrangler.r2dev.toml` が効く。
