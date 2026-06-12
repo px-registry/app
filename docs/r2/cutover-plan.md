@@ -6,7 +6,8 @@
 - Phase 2 ✅ no-op 再確認（mutual 0 のまま）。※dry-run の訂正: "HIroto　Konishi" ref はスペルミスの重複入力（同一端末）・岡山カフェ=テスター — **typo ref の掃除は別 Go**（下記残件）
 - Phase 3 ✅ 空集合完了（平文 contact_note 0 件・新ビルドは E2EE のみ書く）→ **R8 hook arm 済**（px-guard.r8-armed）
 - Phase 4 ✅ deploy（px-r15・読み取り検証: 401/200・pool 27 行・itemRef/business serve・legacy alias='' は設計どおり）
-- 残: **完了後のテスター告知（Hiroto・Ctrl+F5 一行＋「候補を更新する」を一度=alias と鍵が生える）**／typo ref（3ae9bd…・pool 12 行＋signal 1 行）の掃除 Go／旧 /api/meet/contact 書込端点の退場（設計役卓へ）
+- typo ref 掃除 ✅（2026-06-12 Go・3ae9bd… の pool 12 行＋signal 1 行を削除 → pool 15 行=Hiroto 14＋岡山カフェ 1・signal 0。復元はバックアップから可能）
+- 残: **完了後のテスター告知（Hiroto・Ctrl+F5 一行＋「候補を更新する」を一度=alias と鍵が生える）**／旧 /api/meet/contact 書込端点の退場（設計役卓へ）／**push=次セッション冒頭プローブ直後（本番が未push commit 由来で動いている状態を長く置かない — Hiroto 指示）**
 
 （以下、当初の設計図を記録として保存）
 前提: 台帳 = docs/r2/cutover-ledger.md（8件）。テスト継続中の切替（「本日の完成版を本テストとする」裁定）。
