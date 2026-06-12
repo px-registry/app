@@ -1,6 +1,14 @@
-# カットオーバープラン — R2 完成形を five-test 本番へ（起草・実装なし）
+# カットオーバープラン — R2 完成形を five-test 本番へ
 
-状態: **起草（Hiroto Go の設計図）。本文書は着工指示ではない — 全 phase が /auto 停止線2。**
+状態: **実施済み（2026-06-12・Hiroto「カットオーバーGo」）。** 実施記録:
+- Phase 0 ✅ バックアップ=tmp-cutover-backup.sql（44KB・ローカル・コミットしない）／ロールバック座標=旧 deployment `696a41db`
+- Phase 1 ✅ 0010/0011/0012/0014 を px-app-board へ適用・pool 27 行無傷・新テーブル 0 件
+- Phase 2 ✅ no-op 再確認（mutual 0 のまま）。※dry-run の訂正: "HIroto　Konishi" ref はスペルミスの重複入力（同一端末）・岡山カフェ=テスター — **typo ref の掃除は別 Go**（下記残件）
+- Phase 3 ✅ 空集合完了（平文 contact_note 0 件・新ビルドは E2EE のみ書く）→ **R8 hook arm 済**（px-guard.r8-armed）
+- Phase 4 ✅ deploy（px-r15・読み取り検証: 401/200・pool 27 行・itemRef/business serve・legacy alias='' は設計どおり）
+- 残: **完了後のテスター告知（Hiroto・Ctrl+F5 一行＋「候補を更新する」を一度=alias と鍵が生える）**／typo ref（3ae9bd…・pool 12 行＋signal 1 行）の掃除 Go／旧 /api/meet/contact 書込端点の退場（設計役卓へ）
+
+（以下、当初の設計図を記録として保存）
 前提: 台帳 = docs/r2/cutover-ledger.md（8件）。テスト継続中の切替（「本日の完成版を本テストとする」裁定）。
 原則: **additive のみ・各 phase に検証と中止線・巻き戻しは出自で機械的に。**
 
