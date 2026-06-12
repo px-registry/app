@@ -43,6 +43,21 @@ ALTER TABLE r15_pool_item ADD COLUMN business INTEGER NOT NULL DEFAULT 0;  -- 0|
 migration → validatePublish/projection/alias 経路に boolean 1 個 → アンテナ確認カードに
 チェック → pool/host serve → pin（素通し・絞込不在）→ smoke 1 本。
 
+## 6. 照合観点への自己注記（design lead 4点・2026-06-12）
+
+- **(a) 一枚で打ち止め**: `business INTEGER (0|1)` の **boolean 一枚** — enum でも tags でも flags JSON
+  でもない。第二の旗（恋愛・趣味…）は**列の追加＝STOP②＋追補一行対話**を物理的に要求する形
+  （タクソノミの種を蒔かない。invariant 2 の「語彙表にしない」が条文側の蓋）。
+- **(b) 既定オフ・公開が自明**: DEFAULT 0・省略可。チェックの置き場は**アンテナの確認カード内**
+  （「相手のAIもあなたのアンテナを見つけられます」の confirmNote と同一カード）— 公開物で
+  あることはカード自体が language 済みなので**但し書きは足さない**。
+- **(c) 生成層への接続**: **R2 では渡すだけ** — pool serve に boolean が乗り、相手の AI が
+  マッチング材料として読む。**提案文の文体は変えない・rule9 不触**（プロンプトの POOL 行に
+  旗を写すかどうかも v0 では写さない＝serve のみ。写す日は law/prompt sync 便で別ゲート）。
+  design lead の傾きと一致。
+- **(d) 「□ ビジネス」の置き場**: アンテナ確認カードの「この内容で立てる」ボタンの直上・
+  titleLabel/textLabel と同列の一行（素のチェック・説明文なし — §3 と同じ）。
+
 ## 裁可欄
 
 design lead: 【通過 ／ 差し戻し】 → Hiroto: 【裁可 ／ 修正指示】

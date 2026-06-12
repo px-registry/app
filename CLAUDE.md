@@ -65,6 +65,10 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
 5. Wave ゲート文書の通過前実装（0010 等の STOP②文書は対話で通してから）
 6. 秘密・鍵（deny 継続・探さない）
 
+運用線（便3 判定で追加・2026-06-12）: **ゲート済テーブルへの追補列は、実装前に対話へ一行**
+（「この裁定は◯◯列を要求する — 異議あるか」・往復一回でよい・フルゲート再走は不要）。
+STOP② の縁を黙って跨ぐ前例を作らない。
+
 auto で進めてよい（止まらない・迷わない）:
 - stage-r2-complete へのローカルコミット（atomic 維持）／編集・テスト・build・lint
 - dev D1（px-app-board-r2dev）への migration 適用・seed・掃除 — 何度でも
