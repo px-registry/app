@@ -42,6 +42,13 @@ CREATE TABLE r15_edge (
 );
 CREATE INDEX idx_r15_edge_a ON r15_edge (a_ref);
 CREATE INDEX idx_r15_edge_b ON r15_edge (b_ref);
+
+-- ゲート条件1（2026-06-12）: 同一接点の重複 live edge 防止。
+--   state != 'closed'    → T6「再会は同 pair の新 edge」（同じ項目での再会も含む）を妨げない
+--   basis_item_ref != '' → backfill 疑似 edge（basis 空）同士の衝突を除外（⛔両案の無矛盾を保つ）
+CREATE UNIQUE INDEX idx_r15_edge_live_triple
+  ON r15_edge (a_ref, b_ref, basis_item_ref)
+  WHERE state != 'closed' AND basis_item_ref != '';
 ```
 
 - サーバが持つもの＝**edge のメタデータのみ**: 参照2つ・根拠項目の alias・不透明ポインタ・anchor 一行・
@@ -55,7 +62,7 @@ CREATE INDEX idx_r15_edge_b ON r15_edge (b_ref);
 
 | # | 遷移 | 書ける者 | 行為（UI 語は命名ゲート） | ガード |
 |---|---|---|---|---|
-| T1 | ∅→sent | a | 話してみる（提案カードから） | **b が pool 在籍**（c18 完成形＝新 edge 行為のみ検証）・a≠b |
+| T1 | ∅→sent | a | 話してみる（提案カードから） | **b が pool 在籍**（c18 完成形＝新 edge 行為のみ検証）・a≠b・**同三つ組 (a,b,basis) の live edge が既にあれば新規作成せず既存 edge を正直に返す**（既存 sent 文言系の再利用・押すことは一度押したこと） |
 | T2 | sent→mutual | **b のみ** | talkBack「この接点で話したい」 | edge が closed でないこと。**pool 在籍は要求しない**（§4-b） |
 | T3 | sent→closed | a | 合図の取り下げ（R2 台帳「合図削除API」の正体） | — |
 | T4 | sent→closed | b | 静かに閉じる | — |
@@ -121,6 +128,10 @@ closed は目覚めない — 同じ二人の再会は**新しい edge（T1）**
   anchor=旧 signal.anchor・出自 `r15-pair` ラベル（遷移表とは無矛盾・T5/T6 だけ効く）。
   白紙案＝r15_* をテスト档案として凍結。**実装はどちらでも 0010 の DDL を変えない**
   （backfill は INSERT スクリプトの有無だけ）。
+- **出自ラベルの所在（ゲート条件2）**: 列は増やさない（reason 列を作らない、と同じ筋）。
+  **edge_id の名前空間接頭辞 `r15pair_`** に住まわせる（例: `r15pair_<from>_<to>`）。
+  端末 mint の edge_id は別接頭辞（`edge_`）とし、**T1 検証は予約接頭辞 `r15pair_` を拒否**する —
+  名前空間の衝突も偽装もデータ形で塞ぐ。
 - 平文 r15_contact_note の終い方（予告つき終了時削除 vs 移行）。
 - **裁定がどちらに出ても本文書は再ゲートしない** — 変わるのは backfill INSERT スクリプトの有無だけで、
   DDL・遷移表・invariant は両案で同一。
@@ -134,4 +145,5 @@ closed は目覚めない — 同じ二人の再会は**新しい edge（T1）**
 
 ## 裁可欄
 
-design lead: 【通過 ／ 差し戻し】 → Hiroto: 【裁可 ／ 修正指示】
+design lead: **通過**（2026-06-12・条件1=重複 live edge 防止 / 条件2=出自ラベル所在、反映済み）
+Hiroto: 【裁可 ／ 修正指示】 → 裁可で便2 着工（migration dev → publish upsert 化 → signal edge 化）
