@@ -147,6 +147,9 @@ export function HomeView() {
   const [lastPatrolAt, setLastPatrolAt] = useState("");
   // 第9便 C — 気配: a count, never a list (M-6 stays).
   const [participants, setParticipants] = useState<number | null>(null);
+  // c18b — 受動マーキング: refs currently IN the pool, from the same fetch the
+  // 気配 already does (no new read endpoint; null = couldn't tell → no marks).
+  const [poolRefs, setPoolRefs] = useState<Set<string> | null>(null);
 
   const reload = useCallback(async () => {
     setQuestion(await memory.getQuestion());
@@ -176,7 +179,9 @@ export function HomeView() {
     // 気配: how many participants are in the pool right now (count only)
     const me = await deriveParticipantRef(getOrMintOwnerToken());
     const poolNow = await fetchPool(me);
-    setParticipants(poolNow.ok ? new Set(poolNow.items.map((it) => it.participantRef)).size : null);
+    const refsNow = poolNow.ok ? new Set(poolNow.items.map((it) => it.participantRef)) : null;
+    setParticipants(refsNow === null ? null : refsNow.size);
+    setPoolRefs(refsNow);
   }, [memory, shelf, notesLane]);
 
   useEffect(() => {
@@ -836,6 +841,7 @@ export function HomeView() {
       <SignalsSection
         inbox={inbox}
         firstNotes={firstNotes}
+        poolRefs={poolRefs}
         onTalkBack={talkBack}
         onSaveContact={saveContact}
         onMakeFirstNote={makeFirstNote}
@@ -893,6 +899,7 @@ export function HomeView() {
                   key={entry.entryId}
                   entry={entry}
                   sentRefs={sentRefs}
+                  poolRefs={poolRefs}
                   onTalk={talk}
                   onReading={reading}
                   onRemove={removeEntry}

@@ -18,7 +18,8 @@ const store = new Map<string, string>();
   removeItem: (k: string) => void store.delete(k),
 };
 
-const { getThemePref, setThemePref, THEME_INIT_SCRIPT } = await import("./local.ts");
+const { getThemePref, setThemePref, THEME_INIT_SCRIPT, getHiddenSignalRefs, addHiddenSignalRef } =
+  await import("./local.ts");
 
 test("LT-1: theme pref round-trips; junk reads as unset", () => {
   store.clear();
@@ -46,4 +47,20 @@ test("LT-3: the theme key lives in the existing pxmeet: prefix (no new lane)", (
   store.clear();
   setThemePref("sumi");
   assert.deepEqual([...store.keys()], ["pxmeet:theme"], "one key, existing prefix");
+});
+
+// ── LT-4 (c18b): 片づけた合図 — device-local hide list, fail-closed reads ───────
+
+test("LT-4: hidden signal refs round-trip, dedupe, and survive junk", () => {
+  store.clear();
+  assert.deepEqual(getHiddenSignalRefs(), [], "unset device hides nothing");
+  addHiddenSignalRef("cccccccccccccccc");
+  addHiddenSignalRef("dddddddddddddddd");
+  addHiddenSignalRef("cccccccccccccccc"); // pressing twice is pressing once
+  assert.deepEqual(getHiddenSignalRefs(), ["cccccccccccccccc", "dddddddddddddddd"]);
+  assert.deepEqual([...store.keys()], ["pxmeet:hidden-signals"], "existing pxmeet: prefix");
+  store.set("pxmeet:hidden-signals", "{broken"); // junk reads as empty, never throws
+  assert.deepEqual(getHiddenSignalRefs(), []);
+  store.set("pxmeet:hidden-signals", JSON.stringify(["ok", 7, null])); // non-strings drop
+  assert.deepEqual(getHiddenSignalRefs(), ["ok"]);
 });

@@ -16,7 +16,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import { useT } from "@/lib/i18n/context.tsx";
-import type { InboxData, InboxIncoming } from "@/lib/meet-net";
+import {
+  getHiddenSignalRefs,
+  addHiddenSignalRef,
+  type InboxData,
+  type InboxIncoming,
+} from "@/lib/meet-net";
 import { Ring } from "./Ring.tsx";
 
 /** 相手の公開項目 (basis) resolved by the caller from the owner-local shelf. */
@@ -214,6 +219,7 @@ function TalkFace({
 export function SignalsSection({
   inbox,
   firstNotes,
+  poolRefs,
   onTalkBack,
   onSaveContact,
   onMakeFirstNote,
@@ -222,6 +228,8 @@ export function SignalsSection({
   inbox: InboxData | null;
   /** c17: per-peer face data (basis + saved draft), owner-local only. */
   firstNotes: Record<string, FirstNoteFaceData>;
+  /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell. */
+  poolRefs: ReadonlySet<string> | null;
   /** c18: the send result comes back — a refusal renders an honest line. */
   onTalkBack: (toRef: string) => Promise<{ ok: boolean; code: string }>;
   onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
@@ -231,7 +239,24 @@ export function SignalsSection({
   const t = useT();
   // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by peer).
   const [backNotes, setBackNotes] = useState<Record<string, string>>({});
-  const incoming = inbox?.incoming ?? [];
+  // c18b — 片づけた合図 (device-local list; loaded after mount, SSR-safe).
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    setHidden(new Set(getHiddenSignalRefs()));
+  }, []);
+
+  // 押す前から無いと分かる — 確信があるときだけ (pool照合不能ではマークしない).
+  const absentOf = (sig: InboxIncoming): boolean =>
+    poolRefs !== null && !poolRefs.has(sig.fromRef);
+  // 片づけは「不在の残骸」だけを伏せる: 相手が pool に戻れば自動で再び見える
+  // (箒が生きた相手を隠さない)。mutual は常に見える。
+  const incoming = (inbox?.incoming ?? []).filter(
+    (sig) => sig.mutual || !(hidden.has(sig.fromRef) && absentOf(sig)),
+  );
+
+  const sweep = (ref: string) => {
+    setHidden(new Set(addHiddenSignalRef(ref)));
+  };
   return (
     <section className="m-section">
       <p className="m-eyebrow">{MEET.home.signals.eyebrow}</p>
@@ -290,10 +315,17 @@ export function SignalsSection({
                 ) : (
                   <>
                     <p className="m-wait">{t("meet.signal.notYet")}</p>
+                    {absentOf(sig) && (
+                      // c18b: the same line c18 answers with, BEFORE any press
+                      // (同一定数 — never a second wording)
+                      <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                        {MEET.home.signals.notInPool}
+                      </p>
+                    )}
                     <div className="m-respond">
                       <button
                         type="button"
-                        className="m-btn m-btn-primary m-btn-wide"
+                        className={`m-btn m-btn-wide ${absentOf(sig) ? "m-btn-quiet m-btn-dim" : "m-btn-primary"}`}
                         onClick={() =>
                           void onTalkBack(sig.fromRef).then((r) =>
                             setBackNotes((prev) => ({
@@ -305,6 +337,17 @@ export function SignalsSection({
                       >
                         {MEET.home.signals.talkBack}
                       </button>
+                      {absentOf(sig) && (
+                        // c18b: the broom — only on debris (a living card never
+                        // shows it). Device-local hide; the server row stays.
+                        <button
+                          type="button"
+                          className="m-btn m-btn-quiet"
+                          onClick={() => sweep(sig.fromRef)}
+                        >
+                          {MEET.home.signals.sweep}
+                        </button>
+                      )}
                     </div>
                     {(backNotes[sig.fromRef] ?? "") !== "" && (
                       // c18: refusal lines — dead edge / missing name / honest error

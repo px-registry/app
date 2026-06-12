@@ -12,6 +12,8 @@ export {
   getPatrolLastRun,
   getPatrolByQuestion,
   markPatrolRun,
+  getHiddenSignalRefs,
+  addHiddenSignalRef,
   getThemePref,
   setThemePref,
   THEME_INIT_SCRIPT,

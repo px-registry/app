@@ -275,6 +275,43 @@ test("M-12b: both send surfaces read the result and branch on the codes", () => 
   }
 });
 
+// ── M-13 (c18b): 残骸 — 押す前から正直に・一手で片づく・生きた相手は隠れない ─────
+
+test("M-13: 片づける is gated verbatim; the absent line is ONE constant everywhere", () => {
+  assert.equal(MEET.home.signals.sweep, "片づける");
+  // 同一定数 pin: the line exists once, in the label layer — no surface
+  // re-types it (a drifted second wording would break the 約束)
+  for (const { rel, code } of sourcesUnder("app/meet")) {
+    assert.ok(
+      !code.includes("この相手は、いまは候補に出ていません"),
+      `${rel} must reference MEET.home.signals.notInPool, not retype the line`,
+    );
+  }
+  for (const rel of ["app/meet/ProposalEntry.tsx", "app/meet/SignalsSection.tsx"]) {
+    const src = read(rel);
+    assert.ok(src.includes("MEET.home.signals.notInPool"), `${rel} renders the shared constant`);
+    assert.ok(src.includes("poolRefs"), `${rel} marks from the pool presence set`);
+  }
+});
+
+test("M-13b: the broom shows ONLY on debris; hiding never silences a living peer", () => {
+  const src = read("app/meet/SignalsSection.tsx");
+  // sweep renders inside the absent conditional (a living card has no broom)
+  assert.match(
+    src,
+    /absentOf\(sig\) && \([\s\S]{0,500}?MEET\.home\.signals\.sweep/,
+    "片づける is wrapped in the absent mark",
+  );
+  // the hide filter: mutual always shows; hidden suppresses only while absent
+  assert.ok(
+    /sig\.mutual \|\| !\(hidden\.has\(sig\.fromRef\) && absentOf\(sig\)\)/.test(src),
+    "a hidden peer back in the pool (or mutual) is visible again",
+  );
+  // no server delete — the hide is the device-local lane only
+  assert.ok(!src.includes("fetch("), "no direct network in the UI lane (M-3 restated)");
+  assert.ok(src.includes("addHiddenSignalRef"), "hide goes through the audited local lane");
+});
+
 // ── M-9 (第7便 D): 相手の候補から is ONE item — never a browsable list ──────────
 
 test("M-9: the basis fold resolves a single basisItemId; basisItems is never iterated", () => {

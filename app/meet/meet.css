@@ -1328,6 +1328,21 @@ textarea.m-field {
 }
 .m-respond {
   margin-top: 0.9rem;
+  display: flex;
+  gap: 0.5rem;
+}
+.m-respond .m-btn-wide {
+  flex: 1;
+  width: auto;
+}
+/* c18b 不在マーク — 行為ボタンの静かな見た目（テーマトークンのみ・押下は生きる） */
+.m-btn-dim {
+  color: var(--sub);
+  border-color: var(--line-soft);
+  background: transparent;
+}
+.m-btn-dim:hover {
+  border-color: var(--line-deep);
 }
 .m-foot-row {
   margin-top: 1rem;

@@ -68,6 +68,32 @@ export function setThemePref(phase: ThemePhase): void {
 // Inline, dependency-free; injected verbatim into the meet layout.
 export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t='paper';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
 
+// ── c18b — 片づけた合図 (device-local hide list; server rows stay untouched) ───
+//
+// 「片づける」 is the owner's broom for DEBRIS: a non-mutual signal whose
+// sender has left the pool. Hiding is a device-local list of peer refs — no
+// server delete (R2), no history rewrite (c15 裁定). The list only SUPPRESSES
+// a card while the peer is absent; a peer back in the pool shows again (the
+// broom must never hide a living counterpart).
+
+const HIDDEN_SIGNALS_KEY = "pxmeet:hidden-signals";
+
+export function getHiddenSignalRefs(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(HIDDEN_SIGNALS_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addHiddenSignalRef(ref: string): string[] {
+  const list = getHiddenSignalRefs();
+  if (!list.includes(ref)) list.push(ref);
+  localStorage.setItem(HIDDEN_SIGNALS_KEY, JSON.stringify(list));
+  return list;
+}
+
 // ── 第9便 B — 見回りの last-run (device-local; the 6h throttle's memory) ──────
 
 const PATROL_GLOBAL_KEY = "pxmeet:patrol-last";

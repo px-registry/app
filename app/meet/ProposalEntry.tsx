@@ -119,6 +119,7 @@ function ReadingEditor({
 export function ProposalEntry({
   entry,
   sentRefs,
+  poolRefs,
   onTalk,
   onReading,
   onRemove,
@@ -126,6 +127,9 @@ export function ProposalEntry({
   entry: ReceivedProposalV1;
   /** refs this owner has already signalled (from the inbox outgoing list). */
   sentRefs: ReadonlySet<string>;
+  /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell.
+   *  Marking is advisory — c18's act-time check stays the second guard. */
+  poolRefs: ReadonlySet<string> | null;
   /** c11/c13: the caller composes the recipient-addressed anchor from the
    *  card's lines (v3: 式 is line2; v2 stock: line1) and the addressee.
    *  c18: the send RESULT comes back — a refusal renders an honest line. */
@@ -203,6 +207,9 @@ export function ProposalEntry({
             {kept.map(({ card, index }) => {
               const toRef = entry.refs[card.to]; // non-empty — the gate's invariant
               const sent = sentRefs.has(toRef);
+              // c18b 受動マーキング: 押す前から無いと分かる。確信があるとき
+              // だけ（pool照合不能=null では偽の不在も嘘なのでマークしない）。
+              const absent = poolRefs !== null && !poolRefs.has(toRef);
               const partnerIntro = (entry.intros?.[card.to] ?? "").trim();
               const basisItem = entry.basisItems?.[card.basisItemId];
               return (
@@ -237,10 +244,18 @@ export function ProposalEntry({
                       </p>
                     </details>
                   )}
+                  {absent && (
+                    // c18b: the same line c18 answers with, BEFORE any press
+                    // (同一定数 — never a second wording). 片づけは提案側は
+                    // 既存「この回を消す」がそのまま導線（新設なし）。
+                    <p className="m-note" aria-live="polite" style={{ marginTop: "0.5rem" }}>
+                      {MEET.home.signals.notInPool}
+                    </p>
+                  )}
                   {!sent && (
                     <button
                       type="button"
-                      className="m-btn m-btn-primary m-proposal-talk"
+                      className={`m-btn m-proposal-talk ${absent ? "m-btn-quiet m-btn-dim" : "m-btn-primary"}`}
                       style={{ marginTop: "0.7rem" }}
                       onClick={() =>
                         void onTalk(toRef, card.line1, card.line2, card.to).then((r) =>
