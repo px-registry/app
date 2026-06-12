@@ -71,6 +71,15 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   R4（AI 相互読解・injection 硬化・縁の記録戸口）は設計メモのみ・実装は待て。
   **→ 達成（2026-06-12 本便）**: px-r15 本番に deploy 済・実チャット LLM（claude -p + MCP）で
   本番 port 一周を確認（law 読み→候補読み→「今日は無い」の正直）。R4 メモ= docs/r2/r4-design-notes.md。
+- polish 便（2026-06-13・984e1da まで本番反映済）: 二態の対句（看板調=二扉見出し級のみ・本文です調・
+  不足新文は STOP④・「世界中」は UI 不可=ブランド層）／Antenna 見出し・探しにいく（ひらがな）対ボタン・
+  時間帯 placeholder v1。**能動側テーマ語は空席（命名台帳・設計役）— 観察項目: テスターが
+  「探してもらう」をどう言い換えるか**。
+- **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
+  **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
+  内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・
+  受け皿三原則（memory: px-memory-vessel.md）・後日談ループ・Dock。§3 問い束の本丸=5（アンテナの世話
+  — AI が owner の探しごとの庭師になる）。
 
 **チャットポート（/port/mcp・本便開設）**
 
@@ -113,27 +122,28 @@ auto で進めてよい（止まらない・迷わない）:
 - 依存追加（allow リスト準拠）／smoke・fixture 整備／CLAUDE.md・docs 追記（正本 verbatim 原則は維持）
 
 報告律動: 便の終わりに証拠つき報告（テスト数・smoke・スクショ・コミット列・罠と学び）。便中は STOP 時のみ発話。
+**運用線（2026-06-13・設計役）**: 観察期間中の本番 read（pool serve・port read_candidates 等）は
+気配の数字を曇らせる — **必要最小・実施記録つき**でだけ行う（テスターの気配は人間を映す）。
 **迂回の常時報告（恒久・2026-06-12 昇格）**: 守り（permission/deny 等）を迂回する操作は、内容が無害でも
 必ず報告に明記する（便1 のワイルドカード削除の報告形が規範）。
 Phase 0.5 の設計対話は Wave ゲートごとに従来どおり（auto は便内の手の速さであって、Wave 間の対話を省く話ではない）。
 
 **一行原則: auto は速度の話で、決定権の話ではない。止まる場所は減らさない。止まらない場所で迷わない。**
 
-## ローカル smoke ループ
+## ローカル smoke ループ（R2 現役）
 
 ```powershell
 npx wrangler pages dev out --port 8788          # .dev.vars: BETA_USER/BETA_PASS/FACILITATOR_KEY
-npx wrangler d1 execute px-app-board --local --command "DELETE FROM r15_pool_item; DELETE FROM r15_signal; DELETE FROM r15_contact_note; DELETE FROM r15_log; DELETE FROM r15_question_serve;"
-.\scripts\r15-smoke.ps1                          # API 18項目 + seed（あや/カフェの人）
-node scripts\r15-ui-smoke.mjs                    # UI 一周（モバイル）
-node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Ollama）
+npx wrangler d1 execute px-app-board --local --command "DELETE FROM r15_pool_item; DELETE FROM r15_edge; DELETE FROM r15_envelope; DELETE FROM r15_contact_note; DELETE FROM r15_log; DELETE FROM r15_question_serve; DELETE FROM r15_enc_key;"
+node scripts\r2-edge-smoke.mjs                   # edge/封筒/閉じ系（R2 の正本 smoke）
+node scripts\r2-port-smoke.mjs                   # チャットポート API（要: 事前掃除）
+node scripts\r2-goal-ui-smoke.mjs                # UI 一周（二扉/pair面/#draft=/Dock L2・実 Ollama）
 ```
 
-- 便別 smoke: batch2（問いを置く/書き方射影）・batch3（provenance/読み自動保存）・
-  batch4（伏せ字の反転）・batch7（紹介/basis）・batch8（沈黙の禁止・モック6経路）・
-  batch9（見回り/気配）・c17（第一信下書き・実 Ollama・PX無送信 tripwire）・
-  ollama-smoke（接続表示）・responsive-sweep（4幅×4面）。
-- スクショは `C:\Users\User\Desktop\スクショ\r15<x>-NN.png`（コミットしない）。
+- **退役（2026-06-13）**: r15-ui-smoke.mjs は pre-R2 の signal 形で恒久 stale → 削除（歴史は git）。
+  r15-smoke.ps1 も同 stale — R2 では使わない（档案として残置）。
+- 便別 smoke（R1.5 期・対象機能の回帰確認にだけ使う）: batch2-9・c17・ollama-smoke・responsive-sweep。
+- スクショは `C:\Users\User\Desktop\スクショ\r2g-NN.png`（コミットしない）。
 
 ## 既知の罠（実地で踏んだもの）
 
