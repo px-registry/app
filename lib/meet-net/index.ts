@@ -1,7 +1,7 @@
 // R1.5 meet network lane — barrel. app/meet imports ONLY from here; the gates
 // pin fetch to api.ts and localStorage to local.ts.
 
-export { deriveParticipantRef, isParticipantRef, isOwnerToken, mintEdgeId } from "./ref.ts";
+export { deriveParticipantRef, isParticipantRef, isOwnerToken, mintEdgeId, mintEnvelopeId } from "./ref.ts";
 export {
   getOrMintOwnerToken,
   clearOwnerToken,
@@ -30,6 +30,13 @@ export {
   publishProjection,
   fetchEncKey,
   fetchPool,
+  sendEnvelope,
+  fetchEnvelopes,
+  ackEnvelopes,
+  type SealedFields,
+  type EnvelopeKind,
+  type FetchedEnvelope,
+  type ExpiredEnvelope,
   sendSignal,
   sendTalkBack,
   sendClose,

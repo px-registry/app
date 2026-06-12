@@ -323,6 +323,108 @@ export async function fetchHostView(
   }
 }
 
+// ── R2 0013 — 封筒レーン（PX は ciphertext を運ぶだけ・平文はこの lane を通らない）──
+
+export type SealedFields = { ephPub: string; iv: string; ciphertext: string };
+export type EnvelopeKind = "message" | "note" | "contact";
+
+export type FetchedEnvelope = SealedFields & {
+  envelopeId: string;
+  edgeId: string;
+  fromRef: string;
+  kind: EnvelopeKind;
+  createdAt: string;
+};
+export type ExpiredEnvelope = {
+  envelopeId: string;
+  edgeId: string;
+  kind: EnvelopeKind;
+  /** true = 自分が出した封筒が届かなかった（両者に正直な一行 — 0013 §4）。 */
+  mine: boolean;
+  createdAt: string;
+};
+
+/** 投函 — mutual edge の participant のみ（サーバ述語が床）。 */
+export async function sendEnvelope(input: {
+  ownerToken: string;
+  envelopeId: string;
+  edgeId: string;
+  kind: EnvelopeKind;
+} & SealedFields): Promise<NetResult<{ envelopeId: string }>> {
+  try {
+    const { body } = await postJson("/api/meet/envelope", input);
+    if (!isRecord(body) || body.ok !== true || typeof body.envelopeId !== "string") {
+      return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "envelope_failed" };
+    }
+    return { ok: true, envelopeId: body.envelopeId };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+function parseEnvelopeKind(v: unknown): EnvelopeKind | null {
+  return v === "message" || v === "note" || v === "contact" ? v : null;
+}
+
+/** 受け取りに行く（pull・通知なし）。返るのは ciphertext のまま。 */
+export async function fetchEnvelopes(
+  ownerToken: string,
+): Promise<NetResult<{ incoming: FetchedEnvelope[]; expired: ExpiredEnvelope[] }>> {
+  try {
+    const { body } = await postJson("/api/meet/envelope-fetch", { ownerToken });
+    if (!isRecord(body) || body.ok !== true) return { ok: false, error: "fetch_failed" };
+    const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+    return {
+      ok: true,
+      incoming: arr(body.incoming).filter(isRecord).flatMap((r) => {
+        const kind = parseEnvelopeKind(r.kind);
+        return typeof r.envelopeId === "string" && typeof r.edgeId === "string" &&
+          isParticipantRef(r.fromRef) && kind !== null &&
+          typeof r.ephPub === "string" && typeof r.iv === "string" && typeof r.ciphertext === "string"
+          ? [{
+              envelopeId: r.envelopeId,
+              edgeId: r.edgeId,
+              fromRef: r.fromRef,
+              kind,
+              ephPub: r.ephPub,
+              iv: r.iv,
+              ciphertext: r.ciphertext,
+              createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
+            }]
+          : [];
+      }),
+      expired: arr(body.expired).filter(isRecord).flatMap((r) => {
+        const kind = parseEnvelopeKind(r.kind);
+        return typeof r.envelopeId === "string" && typeof r.edgeId === "string" && kind !== null
+          ? [{
+              envelopeId: r.envelopeId,
+              edgeId: r.edgeId,
+              kind,
+              mine: r.mine === true,
+              createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
+            }]
+          : [];
+      }),
+    };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+/** 受信完了の内部信号 — 相手に通知されない・相手の UI に状態を作らない（0013 条件2）。 */
+export async function ackEnvelopes(
+  ownerToken: string,
+  envelopeIds: string[],
+): Promise<NetResult<Record<never, never>>> {
+  try {
+    const { body } = await postJson("/api/meet/envelope-ack", { ownerToken, envelopeIds });
+    if (!isRecord(body) || body.ok !== true) return { ok: false, error: "ack_failed" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
 /** R2 0013 — a peer's E2EE public key (public material; survives pool departure). */
 export async function fetchEncKey(
   ref: string,

@@ -72,6 +72,10 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
 （「この裁定は◯◯列を要求する — 異議あるか」・往復一回でよい・フルゲート再走は不要）。
 STOP② の縁を黙って跨ぐ前例を作らない。
 
+push 常設（2026-06-12 裁定）: **stage-r2-complete への push は常設可（hook 発火プローブの
+確認後に有効）。他 branch は従来どおり裁可制。本番線（停止線2）は不変。**
+次セッション冒頭: プローブ →「px-guard 遮断[push]」確認 → 以後 push は止まらない。
+
 auto で進めてよい（止まらない・迷わない）:
 - stage-r2-complete へのローカルコミット（atomic 維持）／編集・テスト・build・lint
 - dev D1（px-app-board-r2dev）への migration 適用・seed・掃除 — 何度でも

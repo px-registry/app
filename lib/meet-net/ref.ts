@@ -36,3 +36,11 @@ export function mintEdgeId(): string {
   for (const b of bytes) hex += b.toString(16).padStart(2, "0");
   return `edge_${hex}`;
 }
+
+/** R2 0013 — mint an envelope id (env_ namespace, device-minted). */
+export function mintEnvelopeId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  let hex = "";
+  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+  return `env_${hex}`;
+}

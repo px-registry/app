@@ -1617,3 +1617,16 @@ textarea.m-field {
     transform: none !important;
   }
 }
+
+/* ── 便6: トーク — LINE/Slack の形・圧なし（既読/入力中/presence/バッジ無し） ── */
+.m-talk { margin-top: 0.7rem; }
+.m-talk-day {
+  text-align: center; font-size: 0.72rem; color: var(--sub);
+  margin: 0.5rem 0 0.25rem;
+}
+.m-talk-msg {
+  max-width: 86%; padding: 0.4rem 0.6rem; border-radius: 8px;
+  margin: 0.2rem 0; font-size: 0.92rem; line-height: 1.55;
+}
+.m-talk-in { background: var(--ground-lo); margin-right: auto; }
+.m-talk-out { background: var(--shu-soft); margin-left: auto; }

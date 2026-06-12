@@ -25,10 +25,12 @@ export const RECEIVED_STORE = "received";
 export const FIRSTNOTE_STORE = "firstnote";
 export const ALIAS_STORE = "aliasmap";
 export const ENCKEY_STORE = "enckey";
-// v4 (R2 0013): + enckey store. v3 (R2 0010): + aliasmap. v2 (c17): + firstnote.
-// onupgradeneeded creates only what is missing, so older databases upgrade in
-// place without touching existing lanes.
-const VERSION = 4;
+export const TALK_STORE = "talk";
+export const PEERKEY_STORE = "peerkey";
+// v5 (R2 便6): + talk / peerkey. v4 (R2 0013): + enckey. v3 (R2 0010): + aliasmap.
+// v2 (c17): + firstnote. onupgradeneeded creates only what is missing, so older
+// databases upgrade in place without touching existing lanes.
+const VERSION = 5;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -49,6 +51,12 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(ENCKEY_STORE)) {
         db.createObjectStore(ENCKEY_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(TALK_STORE)) {
+        db.createObjectStore(TALK_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(PEERKEY_STORE)) {
+        db.createObjectStore(PEERKEY_STORE, { keyPath: "entryId" });
       }
     };
     req.onsuccess = () => resolve(req.result);

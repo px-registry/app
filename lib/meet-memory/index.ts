@@ -22,6 +22,7 @@ export { ReceivedStore, type ReceivedProposalV1, type ReadingV1 } from "./receiv
 export { FirstNoteStore, firstNoteKey, legacyFirstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
 export { ItemAliasStore, mintItemRef, type ItemAliasV1 } from "./alias.ts";
 export { EncKeyStore, type EncKeyRecordV1 } from "./enckey.ts";
+export { TalkStore, PeerKeyStore, type TalkEntryV1, type TalkEntryKind } from "./talk.ts";
 export { validateNewEntry, validateStoredEntry, type ValidationResult } from "./validate.ts";
 export {
   MeetMemoryStore,
@@ -50,12 +51,13 @@ export {
   type MaskPair,
 } from "./mask-check.ts";
 
-import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE } from "./indexeddb.ts";
+import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";
 import { ReceivedStore, type ReceivedProposalV1 } from "./received.ts";
 import { FirstNoteStore, type FirstNoteDraftV1 } from "./firstnote.ts";
 import { ItemAliasStore, type ItemAliasV1 } from "./alias.ts";
 import { EncKeyStore, type EncKeyRecordV1 } from "./enckey.ts";
+import { TalkStore, PeerKeyStore, type TalkEntryV1, type PeerKeyGenV1 } from "./talk.ts";
 import type { MeetMemoryEntryV1 } from "./types.ts";
 
 /** Browser-side memory store over IndexedDB. Call only from client components. */
@@ -81,4 +83,14 @@ export function openItemAliases(): ItemAliasStore {
 /** Browser-side E2EE keypair store (R2 0013). Call only from client components. */
 export function openEncKeys(): EncKeyStore {
   return new EncKeyStore(new IndexedDbMeetBackend<EncKeyRecordV1>(ENCKEY_STORE));
+}
+
+/** Browser-side トークの棚 (R2 便6). Call only from client components. */
+export function openTalk(): TalkStore {
+  return new TalkStore(new IndexedDbMeetBackend<TalkEntryV1>(TALK_STORE));
+}
+
+/** Browser-side peer 鍵世代の覚え (R2 便6). Call only from client components. */
+export function openPeerKeys(): PeerKeyStore {
+  return new PeerKeyStore(new IndexedDbMeetBackend<PeerKeyGenV1>(PEERKEY_STORE));
 }

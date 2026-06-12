@@ -20,6 +20,8 @@ import {
   openFirstNotes,
   openItemAliases,
   openEncKeys,
+  openTalk,
+  openPeerKeys,
   PLACED_QUESTION_TAG,
   draftPlacedQuestionTitle,
   isPlacedQuestion,
@@ -27,17 +29,22 @@ import {
   type MeetRigItemV1,
   type ReceivedProposalV1,
   type ReadingV1,
+  type TalkEntryV1,
 } from "@/lib/meet-memory";
 import {
   getOrMintOwnerToken,
   deriveParticipantRef,
   mintEdgeId,
+  mintEnvelopeId,
   fetchPool,
   fetchInbox,
+  fetchEncKey,
   sendSignal,
   sendTalkBack,
   sendClose,
-  saveContactNote,
+  sendEnvelope,
+  fetchEnvelopes,
+  ackEnvelopes,
   submitLog,
   buildOutboundProjection,
   publishProjection,
@@ -66,7 +73,8 @@ import {
   firstNoteMaterialFor,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
-import { mintEncKeyPair, encPubToString } from "@/lib/meet-crypto/keys.ts";
+import { mintEncKeyPair, encPubToString, parseEncPub } from "@/lib/meet-crypto/keys.ts";
+import { sealEnvelope, openEnvelope } from "@/lib/meet-crypto/envelope.ts";
 import { useT } from "@/lib/i18n/context.tsx";
 import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection, type FirstNoteFaceData } from "./SignalsSection.tsx";
@@ -138,6 +146,9 @@ export function HomeView() {
   const aliasLane = useMemo(() => openItemAliases(), []);
   // R2 0013: E2EE 鍵対（秘密鍵はこの端末の IndexedDB だけ・公開鍵を publish に同送）
   const encLane = useMemo(() => openEncKeys(), []);
+  // R2 便6: トークの棚（開封済み本文の唯一の置き場）＋ peer 鍵世代の覚え
+  const talkLane = useMemo(() => openTalk(), []);
+  const peerKeyLane = useMemo(() => openPeerKeys(), []);
 
   const [question, setQuestion] = useState("");
   const [rigEntries, setRigEntries] = useState<RigEntry[]>([]);
@@ -161,6 +172,9 @@ export function HomeView() {
   // c18b — 受動マーキング: refs currently IN the pool, from the same fetch the
   // 気配 already does (no new read endpoint; null = couldn't tell → no marks).
   const [poolRefs, setPoolRefs] = useState<Set<string> | null>(null);
+  // 便6 — edge ごとのトーク（開封済み・時刻順）と、相手の立てたノート（standing）
+  const [threads, setThreads] = useState<Record<string, TalkEntryV1[]>>({});
+  const [peerNotes, setPeerNotes] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
     setQuestion(await memory.getQuestion());
@@ -197,6 +211,42 @@ export function HomeView() {
       }
     }
     setFirstNotes(fn);
+    // ── 便6: 封筒の受け取り（pull・通知なし）→ 端末で開封 → トークの棚 → ack ──
+    // ack は内部信号 — 相手の UI には何も生まれない（0013 条件2）。開封できない
+    // 封筒（鍵違い等）は held のまま残し、TTL が不達として正直に処理する（fail-closed）。
+    const myKeys = await encLane.getOrMint(mintEncKeyPair);
+    const envRes = await fetchEnvelopes(getOrMintOwnerToken());
+    if (envRes.ok) {
+      const notes: Record<string, string> = {};
+      const ackIds: string[] = [];
+      for (const v of envRes.incoming) {
+        const text = await openEnvelope(myKeys.priv, v);
+        if (v.kind === "note") {
+          // ノートは standing — ack しない（畳むのは author の上書きか縁の閉じ）
+          if (text !== null) notes[v.edgeId] = text;
+          continue;
+        }
+        if (text === null) continue;
+        await talkLane.put({
+          entryId: v.envelopeId,
+          edgeId: v.edgeId,
+          kind: v.kind === "contact" ? "contact-in" : "in",
+          text,
+          at: v.createdAt,
+        });
+        ackIds.push(v.envelopeId);
+      }
+      for (const x of envRes.expired) {
+        // 不達の正直な一行 — スレッドの事実行として残してから tombstone を片づける
+        await talkLane.put({ entryId: x.envelopeId, edgeId: x.edgeId, kind: "expired", text: "", at: x.createdAt });
+        ackIds.push(x.envelopeId);
+      }
+      if (ackIds.length > 0) void ackEnvelopes(getOrMintOwnerToken(), ackIds);
+      setPeerNotes(notes);
+    }
+    // 並び（時刻順）は棚の責務 — UI レーンは sort しない（M-4）
+    setThreads(await talkLane.threadsByEdge());
+
     setLastPatrolAt(getPatrolLastRun());
     // 気配: how many participants are in the pool right now (count only)
     const me = await deriveParticipantRef(getOrMintOwnerToken());
@@ -204,7 +254,7 @@ export function HomeView() {
     const refsNow = poolNow.ok ? new Set(poolNow.items.map((it) => it.participantRef)) : null;
     setParticipants(refsNow === null ? null : refsNow.size);
     setPoolRefs(refsNow);
-  }, [memory, shelf, notesLane, aliasLane]);
+  }, [memory, shelf, notesLane, aliasLane, encLane, talkLane]);
 
   useEffect(() => {
     void reload();
@@ -557,9 +607,51 @@ export function HomeView() {
     return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
   };
 
-  const saveContact = async (peerRef: string, note: string): Promise<boolean> => {
-    const r = await saveContactNote({ ownerToken: getOrMintOwnerToken(), peerRef, note });
-    if (r.ok) await reload();
+  // ── 便6: トーク — 端末で施錠して投函・自分の転写は端末の棚へ ────────────────────
+  // 鍵世代が変わっていたら「相手の鍵が変わりました。」の事実行をスレッドへ（判定なし）。
+  const sealAndSend = async (
+    edgeId: string,
+    peerRef: string,
+    kind: "message" | "contact",
+    text: string,
+  ): Promise<{ ok: boolean; code: string }> => {
+    const k = await fetchEncKey(peerRef);
+    if (!k.ok) return { ok: false, code: k.error };
+    const pub = parseEncPub(k.encPub);
+    if (pub === null) return { ok: false, code: "enckey_failed" };
+    const prevGen = await peerKeyLane.get(peerRef);
+    if (prevGen !== null && k.gen > prevGen) {
+      await talkLane.put({
+        entryId: `tkey_${peerRef}_${k.gen}`,
+        edgeId,
+        kind: "keychange",
+        text: "",
+        at: new Date().toISOString(),
+      });
+    }
+    await peerKeyLane.set(peerRef, k.gen);
+    const sealed = await sealEnvelope(pub, text);
+    const envelopeId = mintEnvelopeId();
+    const r = await sendEnvelope({ ownerToken: getOrMintOwnerToken(), envelopeId, edgeId, kind, ...sealed });
+    if (!r.ok) return { ok: false, code: r.error };
+    await talkLane.put({
+      entryId: envelopeId,
+      edgeId,
+      kind: kind === "contact" ? "contact-out" : "out",
+      text,
+      at: new Date().toISOString(),
+    });
+    await reload();
+    return { ok: true, code: "" };
+  };
+
+  const sendTalkMessage = (edgeId: string, peerRef: string, text: string) =>
+    sealAndSend(edgeId, peerRef, "message", text);
+
+  // 便6-3: 渡す（contact）は E2EE 封筒へ — 平文レーン（saveContactNote）は新規の
+  // 書込に使わない（既存平文の読みはカットオーバーの二重読み窓まで残る）。
+  const saveContact = async (edgeId: string, peerRef: string, note: string): Promise<boolean> => {
+    const r = await sealAndSend(edgeId, peerRef, "contact", note);
     return r.ok;
   };
 
@@ -946,9 +1038,12 @@ export function HomeView() {
         inbox={inbox}
         outgoingPairs={outgoingPairs}
         firstNotes={firstNotes}
+        threads={threads}
+        peerNotes={peerNotes}
         poolRefs={poolRefs}
         onTalkBack={talkBack}
         onClose={closeEdge}
+        onSendMessage={sendTalkMessage}
         onSaveContact={saveContact}
         onMakeFirstNote={makeFirstNote}
         onSaveFirstNote={saveFirstNote}

@@ -113,6 +113,10 @@ test("ENV-4: held queue cap → 429 queue_full（物理律速・課金なし）"
   const r = await post(sendPost, "envelope", GOOD, db).res;
   assert.equal(r.status, 429);
   assert.equal((await r.json()).error, "queue_full");
+  // 追補 pin（design lead 確認 2026-06-12）: expired tombstone は深さに数えない —
+  // 数えると不在の相手の edge が死蔵で詰まったままになる。
+  const cap = db.calls.find((c) => c.sql.includes("COUNT(*)"));
+  assert.match(cap!.sql, /state = 'held'/, "cap counts held only — tombstones never clog the queue");
 });
 
 test("ENV-5: fetch — 規則の機械的実行（TTL→expired・closed のノート畳み）＋自分の held は返らない", async () => {

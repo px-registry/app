@@ -23,6 +23,7 @@ import {
   type InboxIncoming,
   type InboxOutgoing,
 } from "@/lib/meet-net";
+import type { TalkEntryV1 } from "@/lib/meet-memory";
 import { Ring } from "./Ring.tsx";
 
 /** 相手の公開項目 (basis) resolved by the caller from the owner-local shelf. */
@@ -32,17 +33,20 @@ export type FirstNoteFaceData = {
 };
 
 function ContactExchange({
+  edgeId,
   peerRef,
   peerName,
   myNote,
   theirNote,
   onSave,
 }: {
+  /** 便6-3: 渡すは E2EE 封筒 — この edge を通って届く。 */
+  edgeId: string;
   peerRef: string;
   peerName: string;
   myNote: string;
   theirNote: string | null;
-  onSave: (peerRef: string, note: string) => Promise<boolean>;
+  onSave: (edgeId: string, peerRef: string, note: string) => Promise<boolean>;
 }) {
   const [note, setNote] = useState(myNote);
   const [state, setState] = useState<"idle" | "saved" | "failed">("idle");
@@ -81,7 +85,7 @@ function ContactExchange({
           className="m-btn m-btn-quiet"
           disabled={note.trim() === ""}
           onClick={() => {
-            void onSave(peerRef, note.trim()).then((ok) => setState(ok ? "saved" : "failed"));
+            void onSave(edgeId, peerRef, note.trim()).then((ok) => setState(ok ? "saved" : "failed"));
           }}
         >
           {state === "saved" ? MEET.home.signals.contactSaved : MEET.home.signals.contactSave}
@@ -223,13 +227,106 @@ function TalkFace({
   );
 }
 
+// ── 便6: トーク — LINE/Slack の「形」を採り「圧」を採らない（spec §10）。
+// 時系列・自他の整列・日付区切り・下書きの保全。既読・入力中・presence・
+// 未読バッジは存在しない（このコンポーネントにその語彙がないことが pin）。
+function dayOf(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function TalkThread({
+  edgeId,
+  peerRef,
+  entries,
+  onSend,
+}: {
+  edgeId: string;
+  peerRef: string;
+  entries: TalkEntryV1[];
+  onSend: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
+}) {
+  // 下書きの保全: 送信が失敗しても書いた文は欄に残る（沈黙の禁止＋床は紙）
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failCode, setFailCode] = useState("");
+
+  const send = () => {
+    const text = draft.trim();
+    if (text === "" || busy) return;
+    setBusy(true);
+    setFailCode("");
+    void onSend(edgeId, peerRef, text).then((r) => {
+      setBusy(false);
+      if (r.ok) {
+        setDraft(""); // 成功したときだけ欄が空く
+      } else {
+        setFailCode(r.code); // 失敗は一行・下書きは残る
+      }
+    });
+  };
+
+  let lastDay = "";
+  return (
+    <div className="m-talk">
+      {entries.map((e) => {
+        const day = dayOf(e.at);
+        const divider = day !== lastDay;
+        lastDay = day;
+        return (
+          <div key={e.entryId}>
+            {divider && <p className="m-talk-day">{day}</p>}
+            {e.kind === "expired" ? (
+              <p className="m-note" aria-live="polite">{MEET.home.talk.expired}</p>
+            ) : e.kind === "keychange" ? (
+              <p className="m-note">{MEET.home.talk.keyChanged}</p>
+            ) : (
+              <p
+                className={`m-talk-msg ${e.kind === "out" || e.kind === "contact-out" ? "m-talk-out" : "m-talk-in"}`}
+                style={{ whiteSpace: "pre-wrap" }}
+              >
+                {e.text}
+              </p>
+            )}
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.5rem" }}>
+        <textarea
+          className="m-field"
+          rows={1}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={MEET.home.talk.placeholder}
+        />
+        <button
+          type="button"
+          className="m-btn m-btn-primary"
+          disabled={draft.trim() === "" || busy}
+          onClick={send}
+        >
+          {MEET.home.talk.send}
+        </button>
+      </div>
+      {failCode !== "" && (
+        <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+          {MEET.receive.errors[failCode] ?? MEET.receive.errors.unknown}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function SignalsSection({
   inbox,
   outgoingPairs,
   firstNotes,
+  threads,
+  peerNotes,
   poolRefs,
   onTalkBack,
   onClose,
+  onSendMessage,
   onSaveContact,
   onMakeFirstNote,
   onSaveFirstNote,
@@ -239,6 +336,10 @@ export function SignalsSection({
   outgoingPairs: InboxOutgoing[];
   /** c17: per-peer face data (basis + saved draft), owner-local only. */
   firstNotes: Record<string, FirstNoteFaceData>;
+  /** 便6: edge ごとのトーク（開封済み・時刻順・owner-local の棚から）。 */
+  threads: Record<string, TalkEntryV1[]>;
+  /** 便6: 相手の立てたノート（standing・開封済み）。 */
+  peerNotes: Record<string, string>;
   /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell. */
   poolRefs: ReadonlySet<string> | null;
   /** c18: the send result comes back — a refusal renders an honest line.
@@ -246,7 +347,9 @@ export function SignalsSection({
   onTalkBack: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
   /** 便3 T4/T5 — 閉じる（participant の行為のみ・結果は reload が運ぶ）。 */
   onClose: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
-  onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
+  /** 便6 — トークの投函（端末で施錠・失敗は一行で返る）。 */
+  onSendMessage: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
+  onSaveContact: (edgeId: string, peerRef: string, note: string) => Promise<boolean>;
   /** 便4: 下書きは edge 単位（保存キー=edgeId・素材=peer）。 */
   onMakeFirstNote: (edgeId: string, peerRef: string) => Promise<string | null>;
   onSaveFirstNote: (edgeId: string, text: string) => Promise<void>;
@@ -304,9 +407,16 @@ export function SignalsSection({
       ) : (
         <ul className="m-itemlist">
           {incoming.map((sig) => {
+            // 便6-3: 渡すは E2EE が主・平文行は二重読み窓の legacy（カットオーバーで終い）
+            const th = threads[sig.edgeId] ?? [];
             const theirNote =
-              inbox?.notes.find((n) => n.fromRef === sig.fromRef)?.note ?? null;
-            const myNote = inbox?.myNotes.find((n) => n.peerRef === sig.fromRef)?.note ?? "";
+              [...th].reverse().find((e) => e.kind === "contact-in")?.text ??
+              inbox?.notes.find((n) => n.fromRef === sig.fromRef)?.note ??
+              null;
+            const myNote =
+              [...th].reverse().find((e) => e.kind === "contact-out")?.text ??
+              inbox?.myNotes.find((n) => n.peerRef === sig.fromRef)?.note ??
+              "";
             const isMutual = sig.state === "mutual";
             const isClosed = sig.state === "closed";
             return (
@@ -374,10 +484,24 @@ export function SignalsSection({
                       onMake={onMakeFirstNote}
                       onSaveDraft={onSaveFirstNote}
                     />
-                    {/* c17: 連絡メモ交換は従属位置の fold へ — 中身は従来のまま */}
+                    {/* 便6: 相手の立てたノート（standing・読者明示はノート側 UI が担う） */}
+                    {(peerNotes[sig.edgeId] ?? "") !== "" && (
+                      <p className="m-introline" style={{ whiteSpace: "pre-wrap" }}>
+                        {peerNotes[sig.edgeId]}
+                      </p>
+                    )}
+                    {/* 便6: トーク — 素の往復が主（spec §10/§14） */}
+                    <TalkThread
+                      edgeId={sig.edgeId}
+                      peerRef={sig.fromRef}
+                      entries={threads[sig.edgeId] ?? []}
+                      onSend={onSendMessage}
+                    />
+                    {/* c17: 連絡メモ交換は従属位置の fold へ — 便6-3 で E2EE 封筒に */}
                     <details className="m-contactfold">
                       <summary>{MEET.firstNote.contactOpen}</summary>
                       <ContactExchange
+                        edgeId={sig.edgeId}
                         peerRef={sig.fromRef}
                         peerName={sig.fromName}
                         myNote={myNote}
@@ -465,9 +589,15 @@ export function SignalsSection({
             .map((pair) => {
             const name = pair.toName !== "" ? pair.toName : pair.toRef;
             const isClosed = pair.state === "closed";
+            const th = threads[pair.edgeId] ?? [];
             const theirNote =
-              inbox?.notes.find((n) => n.fromRef === pair.toRef)?.note ?? null;
-            const myNote = inbox?.myNotes.find((n) => n.peerRef === pair.toRef)?.note ?? "";
+              [...th].reverse().find((e) => e.kind === "contact-in")?.text ??
+              inbox?.notes.find((n) => n.fromRef === pair.toRef)?.note ??
+              null;
+            const myNote =
+              [...th].reverse().find((e) => e.kind === "contact-out")?.text ??
+              inbox?.myNotes.find((n) => n.peerRef === pair.toRef)?.note ??
+              "";
             const absent = poolRefs !== null && !poolRefs.has(pair.toRef);
             return (
               <li key={pair.edgeId} className="m-signal">
@@ -514,9 +644,21 @@ export function SignalsSection({
                       onMake={onMakeFirstNote}
                       onSaveDraft={onSaveFirstNote}
                     />
+                    {(peerNotes[pair.edgeId] ?? "") !== "" && (
+                      <p className="m-introline" style={{ whiteSpace: "pre-wrap" }}>
+                        {peerNotes[pair.edgeId]}
+                      </p>
+                    )}
+                    <TalkThread
+                      edgeId={pair.edgeId}
+                      peerRef={pair.toRef}
+                      entries={threads[pair.edgeId] ?? []}
+                      onSend={onSendMessage}
+                    />
                     <details className="m-contactfold">
                       <summary>{MEET.firstNote.contactOpen}</summary>
                       <ContactExchange
+                        edgeId={pair.edgeId}
                         peerRef={pair.toRef}
                         peerName={name}
                         myNote={myNote}
