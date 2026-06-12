@@ -1003,7 +1003,7 @@ export function HomeView() {
           <h2 className="m-h2">{MEET.home.place.heading}</h2>
         </div>
         <textarea
-          className="m-field"
+          className="m-field m-composer"
           rows={2}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}

@@ -78,6 +78,17 @@ test("VR-6: --faint never colours text (rules & ornament only)", () => {
       assert.ok(/ring/.test(selector), `--faint as a text colour outside a ring: ${selector.trim()}`);
     }
   }
+  // --ghost (2026-06-13 Hiroto 指定・薄墨の hint ink) — placeholder の一枚扉のみ。
+  // 同じ規律の親戚: 値の墨（--text/--sub）と気配の墨を混ぜない。
+  for (const b of blocks) {
+    if (/color:\s*var\(--ghost\)/.test(b)) {
+      const selector = b.slice(0, b.indexOf("{"));
+      assert.ok(
+        /::placeholder/.test(selector),
+        `--ghost outside ::placeholder: ${selector.trim()}`,
+      );
+    }
+  }
 });
 
 test("VR-8 (c12): JA-fixed for this test — EN toggle hidden, machinery kept", () => {

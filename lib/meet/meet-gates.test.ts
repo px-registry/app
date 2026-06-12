@@ -163,7 +163,7 @@ test("M-7: the generate verb is 探しにいく; the 聞く-era wording is extin
   );
   assert.equal(
     MEET.home.question.placeholderNight,
-    "夜ふかしですね。気になっていること、書いておきませんか。",
+    "静かな時間ですね。気になっていることを、書き置きしておきませんか。",
   );
   assert.equal(questionPlaceholderByHour(7), MEET.home.question.placeholderMorning);
   assert.equal(questionPlaceholderByHour(13), MEET.home.question.placeholderDaytime);
