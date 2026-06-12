@@ -63,8 +63,14 @@ CREATE INDEX idx_r15_edge_b ON r15_edge (b_ref);
 | T6 | closed→* | **誰も** | — | 終端。再会は同 pair の**新 edge**（T1） |
 | — | dormant | **状態ではない** | — | 読み時導出: now − max(last_act_a, last_act_b) > TTL（仮90日・命名調整は後続） |
 
-## 4. invariant（このゲートで凍結する四本＋裁定二件）
+**眠る／目覚める × closed の関係（§11-8 との接続・一行定義）**:
+dormant は導出であり、どちらかの行為で目覚める（dormant 由来の sent への T2 も可）。
+closed は目覚めない — 同じ二人の再会は**新しい edge（T1）**で起きる。
+縁の単位は edge、縁の連続性は pair 側に宿る（縁の使い捨て禁止は「同 pair の新 edge がいつでも立つ」ことで満たす）。
 
+## 4. invariant（新設四本＋継承二本＋裁定二件）
+
+新設（この table が新たに招く事故への防壁）:
 1. **PX は遷移を書かない** — 全遷移に actor（a か b）が記録される。TTL・cron・サーバ判断による
    状態書き込みは存在しない（判定しないのデータ版・dormant が導出である理由と同根）。
 2. **行為のみが last_act を動かす** — letter・note・札・畳む等の書き込みだけ。**読みは行為ではない**
@@ -72,6 +78,13 @@ CREATE INDEX idx_r15_edge_b ON r15_edge (b_ref);
 3. **anchor＝紙の床** — basis_item_ref が完全削除で引けなくなっても、前室は anchor で読める。
 4. **closed に reason 列を作らない** — 取り下げ・断る・畳むはデータ上同一の closed＋closed_by。
    理由の分類は判定語彙の入口。語り分けは UI 文言（命名ゲート）だけに置く。
+
+継承（既存恒久条項のスキーマ面への写し・このゲートで明文化）:
+5. **item_ref 経由のみ** — raw internal id は公開射影・edge 行のどこにも乗らない
+   （lib/meet-memory/types.ts の既存境界をサーバスキーマ側でも凍結）。
+6. **pre-mutual の前室不開放** — edge 行は sent から存在するが、前室の中身（封書・接点メモ・連絡）の
+   serve は mutual まで開かない。§10 恒久条項のデータ面への写しで、c 系の mutual-join SQL 文法を
+   edge 版でも継承する（開示規則は serve の SQL に焼く）。
 
 裁定済みの精密化（Phase 0.5 第三便）:
 - **両方向 sent ≠ mutual** — mutual は「この接点で話したい」が両側で揃った状態。旧ペア単位の
@@ -99,6 +112,9 @@ CREATE INDEX idx_r15_edge_b ON r15_edge (b_ref);
 | hidden-signals（localStorage の片づけレーン・クライアント化粧） | T3/T4 がサーバの事実になるためレーンごと引退 |
 | c18 peer_not_in_pool の全面拒否 | T1 のみに縮退（新 edge 行為だけ検証・既存 edge は可達） |
 
+**端末側レーンの所在**: fnote の edge キー化・hidden-signals の退場は**本文書の射程**（姉妹文書なし）。
+ただし STOP② に当たるのはサーバ面のみ — 端末側は便2〜4 の実装裁量で、0010 通過が前提。
+
 ## 7. ⛔ 分岐を残す箇所（Hiroto 裁定待ち・設計は両対応）
 
 - **backfill か白紙か**: 疑似 edge 案＝既存 mutual ペア → state=mutual・basis_item_ref=''・
@@ -106,6 +122,8 @@ CREATE INDEX idx_r15_edge_b ON r15_edge (b_ref);
   白紙案＝r15_* をテスト档案として凍結。**実装はどちらでも 0010 の DDL を変えない**
   （backfill は INSERT スクリプトの有無だけ）。
 - 平文 r15_contact_note の終い方（予告つき終了時削除 vs 移行）。
+- **裁定がどちらに出ても本文書は再ゲートしない** — 変わるのは backfill INSERT スクリプトの有無だけで、
+  DDL・遷移表・invariant は両案で同一。
 
 ## 8. ゲート後の実装順（便2 案）
 
