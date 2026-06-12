@@ -5,10 +5,9 @@
 // identity is the derived ref (token dropped, as everywhere). No notification
 // machinery: the receiver sees it on their next visit.
 //
-// T1 guards (the gate's transition table is the authority):
-//   * b must be in the pool NOW, and the basis item must be b's published item
-//     (act-time validation only — existing edges stay reachable; that is the
-//     pool-departure / reachability separation, c18 lifted to its final form).
+// T1 guards live in performT1 (functions/_meet.ts) — shared with the chat port
+// so the page and the port walk the SAME transition table (0010 が正本のまま):
+//   * b must be in the pool NOW, and the basis item must be b's published item.
 //   * One live edge per (a, b, basis) triple: pressing again returns the
 //     EXISTING edge honestly (押すことは一度押したこと) — never a duplicate room.
 //   * edge_id is device-minted with the edge_ prefix; the r15pair_ namespace is
@@ -24,6 +23,7 @@ import {
   isItemRef,
   isClientEdgeId,
   isAllowedWriteOrigin,
+  performT1,
   MAX_ANCHOR,
   MAX_NAME,
   type MeetEnv,
@@ -57,70 +57,24 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
   const fromRef = await deriveParticipantRef(raw.ownerToken);
   if (fromRef === raw.toRef) return json({ ok: false, error: "self_signal" }, 400);
 
-  try {
-    // T1 guard: the addressee must be in the pool NOW and the basis item must be
-    // THEIR published item. Distinct honest codes: peer gone vs item withdrawn.
-    const present = await env.BOARD
-      .prepare("SELECT 1 AS x FROM r15_pool_item WHERE participant_ref = ?1 LIMIT 1")
-      .bind(raw.toRef)
-      .all();
-    if ((present.results ?? []).length === 0) {
-      return json({ ok: false, error: "peer_not_in_pool" }, 404);
-    }
-    const basis = await env.BOARD
-      .prepare(
-        "SELECT 1 AS x FROM r15_pool_item WHERE participant_ref = ?1 AND item_ref = ?2 LIMIT 1",
-      )
-      .bind(raw.toRef, raw.basisItemRef)
-      .all();
-    if ((basis.results ?? []).length === 0) {
-      return json({ ok: false, error: "basis_not_in_pool" }, 404);
-    }
-
-    // Live-triple idempotency (gate condition 1): an existing live edge on the
-    // same (a, b, basis) is returned as-is — no second room, no state change.
-    const live = await env.BOARD
-      .prepare(
-        "SELECT edge_id, state FROM r15_edge " +
-          "WHERE a_ref = ?1 AND b_ref = ?2 AND basis_item_ref = ?3 AND state != 'closed' LIMIT 1",
-      )
-      .bind(fromRef, raw.toRef, raw.basisItemRef)
-      .all<{ edge_id: string; state: string }>();
-    const existing = (live.results ?? [])[0];
-    if (existing !== undefined) {
-      return json({ ok: true, edgeId: existing.edge_id, state: existing.state, existing: true });
-    }
-
-    const now = new Date().toISOString();
-    await env.BOARD
-      .prepare(
-        "INSERT INTO r15_edge " +
-          "(edge_id, a_ref, b_ref, basis_item_ref, proposal_ptr, anchor, from_name, to_name, state, created_at, last_act_a_at) " +
-          "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'sent', ?9, ?9)",
-      )
-      .bind(raw.edgeId, fromRef, raw.toRef, raw.basisItemRef, proposalPtr, anchor, fromName, toName, now)
-      .run();
-    return json({ ok: true, edgeId: raw.edgeId, state: "sent", existing: false }, 201);
-  } catch {
-    // Includes the UNIQUE live-triple race: two concurrent presses — re-read and
-    // answer honestly with whichever edge won.
-    try {
-      const after = await env.BOARD
-        .prepare(
-          "SELECT edge_id, state FROM r15_edge " +
-            "WHERE a_ref = ?1 AND b_ref = ?2 AND basis_item_ref = ?3 AND state != 'closed' LIMIT 1",
-        )
-        .bind(fromRef, raw.toRef, raw.basisItemRef)
-        .all<{ edge_id: string; state: string }>();
-      const won = (after.results ?? [])[0];
-      if (won !== undefined) {
-        return json({ ok: true, edgeId: won.edge_id, state: won.state, existing: true });
-      }
-    } catch {
-      // fall through to the honest failure below
-    }
-    return json({ ok: false, error: "signal_failed" }, 500);
+  const t1 = await performT1(env, {
+    fromRef,
+    toRef: raw.toRef,
+    edgeId: raw.edgeId,
+    basisItemRef: raw.basisItemRef,
+    fromName,
+    toName,
+    anchor,
+    proposalPtr,
+  });
+  if (!t1.ok) {
+    const status = t1.error === "signal_failed" ? 500 : 404;
+    return json({ ok: false, error: t1.error }, status);
   }
+  return json(
+    { ok: true, edgeId: t1.edgeId, state: t1.state, existing: t1.existing },
+    t1.existing ? 200 : 201,
+  );
 };
 
 export const onRequestOptions: PagesFunction<MeetEnv> = async () =>

@@ -203,6 +203,154 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
   return { ok: true, value: { ownerToken: raw.ownerToken, displayName, intro, encPub, items } };
 }
 
+// ── 気配 (第9便 C) — 問いの serve 日次カウント（pool serve と port serve の共有形）─
+// Day-scoped one-way dedup token — never a stored viewer id.
+async function serveDedup(
+  day: string,
+  viewer: string,
+  owner: string,
+  position: number,
+): Promise<string> {
+  const data = new TextEncoder().encode(`r15-serve:${day}:${viewer}:${owner}:${position}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function parseTagsJson(s: string): string[] {
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v.filter((t): t is string => typeof t === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export { parseTagsJson };
+
+/**
+ * 置かれた問い（アンテナ）が viewer の AI に serve された事実を、viewer ごと日次
+ * 一回だけ数える。Best-effort: 数え損ねは serve を壊さない。viewer 列は保存しない
+ * （dedup は一方向ハッシュ）。pool.ts（ページの serve）と port（チャットの serve）
+ * の両方が同じ一枚を通る — serve の意味を二重定義しない。
+ */
+export async function recordQuestionServes(
+  env: MeetEnv,
+  viewerRef: string,
+  rows: Array<{ participant_ref: string; tags: string; position: number }>,
+): Promise<void> {
+  if (viewerRef === "") return;
+  const day = new Date().toISOString().slice(0, 10);
+  const stmts = [];
+  for (const r of rows) {
+    if (!parseTagsJson(r.tags).includes("問い")) continue;
+    const dedup = await serveDedup(day, viewerRef, r.participant_ref, r.position);
+    stmts.push(
+      env.BOARD
+        .prepare(
+          "INSERT OR IGNORE INTO r15_question_serve (owner_ref, position, day, dedup) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(r.participant_ref, r.position, day, dedup),
+    );
+  }
+  if (stmts.length > 0) await env.BOARD.batch(stmts).catch(() => {});
+}
+
+// ── T1（∅→sent）の共有形 — signal.ts（ページ）と port（チャット）が同じ遷移を通る ──
+// ガードは 0010 の遷移表どおり: 宛先の在籍・basis の実在・live 三つ組の冪等。
+// mutual はここでは決して書かれない（T2 = talkback だけが書く）。
+
+export type T1Input = {
+  fromRef: string;
+  toRef: string;
+  edgeId: string;
+  basisItemRef: string;
+  fromName: string;
+  toName: string;
+  anchor: string;
+  proposalPtr: string;
+};
+
+export type T1Outcome =
+  | { ok: true; edgeId: string; state: string; existing: boolean }
+  | { ok: false; error: "peer_not_in_pool" | "basis_not_in_pool" | "signal_failed" };
+
+export async function performT1(env: MeetEnv, input: T1Input): Promise<T1Outcome> {
+  try {
+    // T1 guard: the addressee must be in the pool NOW and the basis item must be
+    // THEIR published item. Distinct honest codes: peer gone vs item withdrawn.
+    const present = await env.BOARD
+      .prepare("SELECT 1 AS x FROM r15_pool_item WHERE participant_ref = ?1 LIMIT 1")
+      .bind(input.toRef)
+      .all();
+    if ((present.results ?? []).length === 0) {
+      return { ok: false, error: "peer_not_in_pool" };
+    }
+    const basis = await env.BOARD
+      .prepare(
+        "SELECT 1 AS x FROM r15_pool_item WHERE participant_ref = ?1 AND item_ref = ?2 LIMIT 1",
+      )
+      .bind(input.toRef, input.basisItemRef)
+      .all();
+    if ((basis.results ?? []).length === 0) {
+      return { ok: false, error: "basis_not_in_pool" };
+    }
+
+    // Live-triple idempotency (gate condition 1): an existing live edge on the
+    // same (a, b, basis) is returned as-is — no second room, no state change.
+    const live = await env.BOARD
+      .prepare(
+        "SELECT edge_id, state FROM r15_edge " +
+          "WHERE a_ref = ?1 AND b_ref = ?2 AND basis_item_ref = ?3 AND state != 'closed' LIMIT 1",
+      )
+      .bind(input.fromRef, input.toRef, input.basisItemRef)
+      .all<{ edge_id: string; state: string }>();
+    const existing = (live.results ?? [])[0];
+    if (existing !== undefined) {
+      return { ok: true, edgeId: existing.edge_id, state: existing.state, existing: true };
+    }
+
+    const now = new Date().toISOString();
+    await env.BOARD
+      .prepare(
+        "INSERT INTO r15_edge " +
+          "(edge_id, a_ref, b_ref, basis_item_ref, proposal_ptr, anchor, from_name, to_name, state, created_at, last_act_a_at) " +
+          "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'sent', ?9, ?9)",
+      )
+      .bind(
+        input.edgeId,
+        input.fromRef,
+        input.toRef,
+        input.basisItemRef,
+        input.proposalPtr,
+        input.anchor,
+        input.fromName,
+        input.toName,
+        now,
+      )
+      .run();
+    return { ok: true, edgeId: input.edgeId, state: "sent", existing: false };
+  } catch {
+    // Includes the UNIQUE live-triple race: two concurrent presses — re-read and
+    // answer honestly with whichever edge won.
+    try {
+      const after = await env.BOARD
+        .prepare(
+          "SELECT edge_id, state FROM r15_edge " +
+            "WHERE a_ref = ?1 AND b_ref = ?2 AND basis_item_ref = ?3 AND state != 'closed' LIMIT 1",
+        )
+        .bind(input.fromRef, input.toRef, input.basisItemRef)
+        .all<{ edge_id: string; state: string }>();
+      const won = (after.results ?? [])[0];
+      if (won !== undefined) {
+        return { ok: true, edgeId: won.edge_id, state: won.state, existing: true };
+      }
+    } catch {
+      // fall through to the honest failure below
+    }
+    return { ok: false, error: "signal_failed" };
+  }
+}
+
 /** Same-origin write guard (lineage: functions/_ownerboard.ts). */
 export function isAllowedWriteOrigin(request: Request): boolean {
   const origin = request.headers.get("Origin");

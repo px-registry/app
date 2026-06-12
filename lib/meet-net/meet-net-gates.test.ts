@@ -198,8 +198,14 @@ test("MN-8: r15_question_serve stores no viewer id (one-way dedup only)", () => 
     assert.ok(!sql.includes(banned), `serve table must not carry a ${banned} column`);
   }
   assert.ok(sql.includes("dedup"), "the one-way dedup token is the only per-viewer trace");
-  // and the writer (pool.ts) derives it one-way, never binding the raw viewer
+  // and the writer derives it one-way, never binding the raw viewer.
+  // 期待の追従（R2 GOAL 便）: the dedup writer moved from pool.ts into the shared
+  // recordQuestionServes (functions/_meet.ts) so the page serve AND the chat-port
+  // serve count through the SAME one-way digest — pool.ts now calls it.
+  const meet = read("functions/_meet.ts");
+  assert.ok(/sha-?256/i.test(meet), "dedup is a digest");
+  assert.ok(!/INSERT[^;]*viewer/i.test(meet), "no viewer column write");
   const pool = read("functions/api/meet/pool.ts");
-  assert.ok(/sha-?256/i.test(pool), "dedup is a digest");
+  assert.ok(/recordQuestionServes/.test(pool), "pool serve counts through the shared writer");
   assert.ok(!/INSERT[^;]*viewer/i.test(pool), "no viewer column write");
 });
