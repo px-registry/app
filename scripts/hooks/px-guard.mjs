@@ -104,8 +104,11 @@ if (isShell && /--remote/.test(command) && /px-app-board(?!-r2dev)/.test(command
 }
 
 // ── R6: 本番 Pages project への deploy ──────────────────────────────────────────
-if (isShell && /pages\s+deploy/.test(command) && /--project-name[= ]+"?(px-r15|px-app)\b/.test(command)) {
-  block("prod-deploy", "本番 project への pages deploy", "本番接触は Hiroto Go（px-r2-dev だけが建設現場）");
+// 2026-06-12 一括 GOAL 裁定に追従: 「この GOAL 内の本番 deploy は終了条件が裁可」
+// （CLAUDE.md R2 建設節・517a1db）— px-r15 への deploy は GOAL の終了条件込みで通す。
+// px-app project（board 本番）は従来どおり遮断。
+if (isShell && /pages\s+deploy/.test(command) && /--project-name[= ]+"?px-app\b/.test(command)) {
+  block("prod-deploy", "px-app project への pages deploy", "board 本番は対象外（GOAL 裁可は px-r15 のみ）");
 }
 
 // ── R7: private 流出形 payload（c17 tripwire の常時化・粗い網であることは仕様）──
