@@ -5,6 +5,8 @@ PX の本番 app。R1.5（五人テスト）は branch `stage-r15-five-test`（P
 
 - 設計正典: `MEET_FINAL_SPEC.md`（R2以降の指示書は§番号で引用）
 - 事業正典: `PX_BUSINESS_CONTRACT.md` v0.6
+- 凡例: PX_BUSINESS_CONTRACT 文中の git ハッシュ（v0.3〜v0.5 zone 内の 97a99ce・2a6be92 等）は
+  移植前アーカイブ repo のもの — この repo の履歴では引けない（53e6466 で byte-stable 移植）。
 
 ## R1.5 /meet の構え
 
