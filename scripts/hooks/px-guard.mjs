@@ -43,9 +43,16 @@ function block(ruleId, what, why) {
 const isShell = tool === "Bash" || tool === "PowerShell";
 const isEdit = tool === "Edit" || tool === "Write" || tool === "NotebookEdit";
 
-// ── R1: git push（px-app は Hiroto 裁可制・px-table の branch push は通常運用）──
-if (isShell && /\bgit\b[^\n;|&]*\bpush\b/.test(command) && !command.includes("px-table")) {
-  block("push", "git push", "px-app の origin push は Hiroto 裁可制（恒久線）");
+// ── R1: git push — 常設許可は stage-r2-complete のみ（2026-06-12 Hiroto 裁定）。
+// px-table の branch push は通常運用。それ以外（main・他 branch・branch 無記名の
+// 裸 push）は従来どおり裁可制 — 許可 branch を**コマンドに明示**した push だけが通る。
+if (
+  isShell &&
+  /\bgit\b[^\n;|&]*\bpush\b/.test(command) &&
+  !command.includes("px-table") &&
+  !command.includes("stage-r2-complete")
+) {
+  block("push", "git push", "px-app の push 常設は stage-r2-complete の明示形のみ（他は Hiroto 裁可制）");
 }
 
 // ── R2: 保護ブランチへの直コミット ──────────────────────────────────────────────
