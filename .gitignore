@@ -30,6 +30,7 @@ next-env.d.ts
 
 # cloudflare
 .wrangler/
+.dev.vars
 
 # claude code local project dir
 /.claude/

@@ -191,4 +191,27 @@ export const en: Dict = {
   "preview.receiverLabel": "Receiver’s view",
   "preview.buyerLabel": "Buyer’s view",
   "preview.building": "Building preview…",
+
+  // ── meet visual refresh ───────────────────────────────────
+  // EN: draft, ungated — initial values from the attached EN mocks
+  // (px-home-english-ver / px-home-daylight-final); the few lines those mocks
+  // don't cover (empty face, notYet) are gap-fill drafts in the same voice.
+  // The toggle defaults to JA; there is no public EN entry point.
+  "meet.hero.lead": "Your AI finds your people. ",
+  "meet.hero.accentPre": "",
+  "meet.hero.accentEm": "No one in between.",
+  "meet.hero.accentPost": "",
+  "meet.hero.sub":
+    "Out of each other's memory — connections neither side could have reached alone. Your AI goes looking. You decide.",
+  "meet.meter.lastPre": "Last sweep ",
+  "meet.meter.auto": "Sweeps automatically when you open",
+  "meet.meter.keys": "Your keys never leave this device",
+  "meet.empty.title": "Nothing today.",
+  "meet.empty.evPre": "The sweep ran at ",
+  "meet.empty.evMid": " — everything readable was read.",
+  "meet.empty.evRest": "No connection to propose today.",
+  "meet.empty.herePre": "Right now, ",
+  "meet.empty.herePost": " here",
+  "meet.empty.next": "Tomorrow too, it sweeps when you open.",
+  "meet.signal.notYet": "You haven't pressed yet.",
 };

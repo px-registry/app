@@ -1,0 +1,15 @@
+# Cloudflare Pages headers (copied into out/ by the Next build).
+#
+# 第8便 A — the silence regression's root: HTML was served with NO
+# Cache-Control, so browsers heuristically cached stale pages whose hashed
+# /_next chunks no longer exist after a redeploy → hydration never ran →
+# every button dead, honestly-looking page. HTML must revalidate every time;
+# hashed assets are immutable by content.
+
+/*
+  Cache-Control: no-cache
+
+# more-specific rules INHERIT the catch-all; detach it first (Pages "!" syntax)
+/_next/static/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
