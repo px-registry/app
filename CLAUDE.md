@@ -38,6 +38,44 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   既にキャッシュ済みの端末には効かない→その場合はハードリロード（Ctrl+F5）を案内。
 - 本番アクセス情報（BETA user/pass・進行役の合鍵）は `Desktop\px-r15-access.txt`（コミット禁止・チャット非経由）。
 
+## R2 完成形建設（stage-r2-complete）
+
+**隔離現場（便1 開設・2026-06-12）** — five-test 本番を実験台にしない:
+
+- branch `stage-r2-complete`（4218d5c 起点）。`stage-r15-five-test` は凍結（hotfix cherry-pick も Hiroto Go 必須）。
+- 資源は名前ごと分離: D1 `px-app-board-r2dev`／KV `AUTH_R2DEV`／R2 `px-app-deliveries-r2dev`。
+  binding 名（BOARD/AUTH/DELIVERIES）は本番と同一・実体だけ dev — コードは分岐しない。
+- Pages project **px-r2-dev**（px-r2-dev.pages.dev・Basic Auth あり・secrets 設定済）。
+  アクセス情報は `Desktop\px-r2-dev-access.txt`（コミット禁止・チャット非経由）。
+- deploy は `scripts\deploy-r2dev.ps1` だけを使う。**罠（実測）: `wrangler pages deploy` は
+  `--config` を受けない**（"Pages does not support custom paths"）→ スクリプトが wrangler.toml を
+  一時差し替えて finally で必ず復元する。`d1 migrations apply` は `--config wrangler.r2dev.toml` が効く。
+- **migration 規律: 0010 以降を本番 `px-app-board` へ `--remote` 適用しない**（カットオーバーゲートまで）。
+  dev への適用は `npx wrangler d1 migrations apply px-app-board-r2dev --remote --config wrangler.r2dev.toml`。
+
+**/auto 運転規約 — stage-r2-complete（Hiroto 裁定 2026-06-12・便1 から適用）**
+
+既定＝/auto。下の停止線でのみ止まる。それ以外で確認を求めない。
+
+止まる（auto 免除なし・従来どおり）:
+1. 4 STOP（設計曖昧／憲法・境界＝サーバデータ新設・意味拡張・公開射影の変更含む／不可逆破壊／命名＝ゲート済文言なき新規 user-facing 文言）
+2. 本番接触の一切: px-r15・px-table 本番への deploy／px-app-board（本番 D1）への --remote 適用／stage-r15-five-test への変更（hotfix cherry-pick も Go 必須）
+3. origin push（Hiroto 裁可制・インシデント以来の恒久線）
+4. ⛔印（Hiroto 裁定待ち: backfill・E2EE 既存行・命名束・熱量語彙）＝設計まで進めて実装停止
+5. Wave ゲート文書の通過前実装（0010 等の STOP②文書は対話で通してから）
+6. 秘密・鍵（deny 継続・探さない）
+
+auto で進めてよい（止まらない・迷わない）:
+- stage-r2-complete へのローカルコミット（atomic 維持）／編集・テスト・build・lint
+- dev D1（px-app-board-r2dev）への migration 適用・seed・掃除 — 何度でも
+- px-r2-dev への deploy — 隔離面は建設現場。回数自由・Go 不要
+- 依存追加（allow リスト準拠）／smoke・fixture 整備／CLAUDE.md・docs 追記（正本 verbatim 原則は維持）
+
+報告律動: 便の終わりに証拠つき報告（テスト数・smoke・スクショ・コミット列・罠と学び）。便中は STOP 時のみ発話。
+Phase 0.5 の設計対話は Wave ゲートごとに従来どおり（auto は便内の手の速さであって、Wave 間の対話を省く話ではない）。
+
+**一行原則: auto は速度の話で、決定権の話ではない。止まる場所は減らさない。止まらない場所で迷わない。**
+
 ## ローカル smoke ループ
 
 ```powershell

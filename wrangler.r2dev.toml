@@ -1,0 +1,32 @@
+# R2 完成形建設の隔離現場 (px-r2-dev) — 便1 で新設。
+#
+# 本番 (px-r15 / wrangler.toml) と binding 名は同一、実体だけ dev 資源:
+#   D1  BOARD      → px-app-board-r2dev   (five-test 本番 px-app-board に触れない)
+#   KV  AUTH       → AUTH_R2DEV
+#   R2  DELIVERIES → px-app-deliveries-r2dev
+# コードは一切分岐しない — 差し替わるのはこのファイルだけ。
+#
+# 使い方 (scripts/deploy-r2dev.ps1 が正本):
+#   npx wrangler d1 migrations apply px-app-board-r2dev --remote --config wrangler.r2dev.toml
+#   npx wrangler pages deploy out --project-name px-r2-dev --branch stage-r2-complete --config wrangler.r2dev.toml
+#
+# 規律: 0010 以降の migration は本番 px-app-board へ --remote 適用しない
+# (カットオーバーゲートまで)。本番の database_name をこのファイルに書かない。
+
+name = "px-app"
+compatibility_date = "2026-05-27"
+pages_build_output_dir = "out"
+
+[[r2_buckets]]
+binding = "DELIVERIES"
+bucket_name = "px-app-deliveries-r2dev"
+
+[[kv_namespaces]]
+binding = "AUTH"
+id = "4cf6b4a3c83f4cf0b22fb655c77a214a"
+
+[[d1_databases]]
+binding = "BOARD"
+database_name = "px-app-board-r2dev"
+database_id = "6a0b0a28-5076-4544-b9fa-0819c2219417"
+migrations_dir = "migrations"
