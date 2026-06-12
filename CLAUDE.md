@@ -3,6 +3,9 @@
 PX の本番 app。R1.5（五人テスト）は branch `stage-r15-five-test`（PR #1, base=spine）。
 グローバルの働き方は `~/.claude/CLAUDE.md`。ここには**この repo 固有の手順と罠**だけを置く。
 
+- 設計正典: `MEET_FINAL_SPEC.md`（R2以降の指示書は§番号で引用）
+- 事業正典: `PX_BUSINESS_CONTRACT.md` v0.6
+
 ## R1.5 /meet の構え
 
 - レーン分離（gate が pin）: `lib/rig`（凍結コア・law）/ `lib/meet`（copy・禁止語）/
@@ -72,10 +75,8 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 ## RIG_LAW
 
 `lib/rig/rig.ts` は px-table（法の原本）からの移植。文言改訂は Hiroto 裁定→両 repo 同期
-（直近: rule 9 改訂 = px-table PR #36）。rig-gates.test.ts の独立 verbatim copy が drift を検知する。
-
-- **同期課題: px-app=rule9 v3（2026-06-11裁定）。px-table原本（d0b8c29・2行）は未同期 —
-  次のpx-table便で v3へ直接同期（v2を経由しない）。**
+（直近: rule 9 v3 直行同期 = px-table PR #37、両 repo 同文確認済 2026-06-12）。
+rig-gates.test.ts の独立 verbatim copy が drift を検知する。
 
 ## 設計原理（c14 記録）
 
@@ -86,7 +87,11 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 
 - c18: sent 状態は **ペア単位**（inbox.outgoing の toRef 集合）— 同一相手の全カードが
   一斉に「伝えてあります」になる。カード（edge）単位化は signal のスキーマ変更が要るため R2。
-
+  対応§: spec §10（文脈の鮮度原則 — 相手単位は過渡形、最終形は edge 単位）。
+- プール離脱と可達性の分離（c18 peer_not_in_pool: 取り下げ＝即・不可達の現状）。
+  対応§: spec §10（状態機械 — dormant は削除でない）・§11-8（眠る縁・目覚める縁）。
+- 合図削除API（送った合図をサーバ側からも取り下げ・片づけられる経路）。
+  対応§: spec §10（状態機械: dormant／closed）・§11-7（縁を畳む — owner の行為、PX 裁定なし）。
 - EN文言の全面ゲート（現状ドラフト・既存文言は未訳）。
 - EN表示書体 Cormorant Garamond の woff2 同梱（現状OSフォールバックで端末差が出る —
   Hiroto報告の2端末差の根因）。
