@@ -66,6 +66,8 @@ if (isShell && /\bgit\b[^\n;|&]*\bcommit\b/.test(command)) {
 
 // ── R3: .sort( の忍び込み（順位付けの種）────────────────────────────────────────
 // owner-local の並べ替え・時刻順は明示許可箇所のみ。allowlist は path 前方一致。
+// 入場試験（design lead 2026-06-12）: ここに載ってよいのは時間・到着順のみ。
+// 品質・適合度・頻度・回数による並びは永久に載らない。
 const SORT_ALLOW = [
   "lib/meet-memory/received.ts", // 到着時刻順（時間であって品質でない・既存）
   "lib/meet-memory/talk.ts",     // トークの時刻順（便6 一行対話済み・received と同類）

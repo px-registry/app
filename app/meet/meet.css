@@ -1630,3 +1630,8 @@ textarea.m-field {
 }
 .m-talk-in { background: var(--ground-lo); margin-right: auto; }
 .m-talk-out { background: var(--shu-soft); margin-left: auto; }
+
+/* 便6: ノートの fold — 連絡メモの fold と同じ佇まい */
+.m-notefold { margin-top: 0.6rem; }
+.m-notefold summary { cursor: pointer; font-size: 0.85rem; color: var(--sub); }
+.m-notefold summary:hover { color: var(--text); }

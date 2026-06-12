@@ -612,7 +612,7 @@ export function HomeView() {
   const sealAndSend = async (
     edgeId: string,
     peerRef: string,
-    kind: "message" | "contact",
+    kind: "message" | "contact" | "note",
     text: string,
   ): Promise<{ ok: boolean; code: string }> => {
     const k = await fetchEncKey(peerRef);
@@ -634,19 +634,33 @@ export function HomeView() {
     const envelopeId = mintEnvelopeId();
     const r = await sendEnvelope({ ownerToken: getOrMintOwnerToken(), envelopeId, edgeId, kind, ...sealed });
     if (!r.ok) return { ok: false, code: r.error };
-    await talkLane.put({
-      entryId: envelopeId,
-      edgeId,
-      kind: kind === "contact" ? "contact-out" : "out",
-      text,
-      at: new Date().toISOString(),
-    });
+    if (kind === "note") {
+      // standing の端末転写 — 固定キーで最新だけが立つ（スレッドには並べない）
+      await talkLane.replace({
+        entryId: `tnote_${edgeId}`,
+        edgeId,
+        kind: "note-out",
+        text,
+        at: new Date().toISOString(),
+      });
+    } else {
+      await talkLane.put({
+        entryId: envelopeId,
+        edgeId,
+        kind: kind === "contact" ? "contact-out" : "out",
+        text,
+        at: new Date().toISOString(),
+      });
+    }
     await reload();
     return { ok: true, code: "" };
   };
 
   const sendTalkMessage = (edgeId: string, peerRef: string, text: string) =>
     sealAndSend(edgeId, peerRef, "message", text);
+  // 便6: ノートを立てる・直す（standing — 一人一枚・編集は再封）
+  const saveNote = async (edgeId: string, peerRef: string, text: string): Promise<{ ok: boolean; code: string }> =>
+    sealAndSend(edgeId, peerRef, "note", text);
 
   // 便6-3: 渡す（contact）は E2EE 封筒へ — 平文レーン（saveContactNote）は新規の
   // 書込に使わない（既存平文の読みはカットオーバーの二重読み窓まで残る）。
@@ -1044,6 +1058,7 @@ export function HomeView() {
         onTalkBack={talkBack}
         onClose={closeEdge}
         onSendMessage={sendTalkMessage}
+        onSaveNote={saveNote}
         onSaveContact={saveContact}
         onMakeFirstNote={makeFirstNote}
         onSaveFirstNote={saveFirstNote}

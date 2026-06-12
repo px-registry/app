@@ -227,6 +227,73 @@ function TalkFace({
   );
 }
 
+// ── 便6: ノート — edge に立つ一枚（standing・一人一枚・編集は再封・spec §10/§13）。
+// 自由文が床。読者の明示はゲート済の一行のみ — AI だけが読むように見せない。
+function NoteFace({
+  edgeId,
+  peerRef,
+  initial,
+  onSave,
+}: {
+  edgeId: string;
+  peerRef: string;
+  /** 自分が立てている現行ノート（端末転写・"" = まだ立てていない）。 */
+  initial: string;
+  onSave: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
+}) {
+  const [text, setText] = useState(initial);
+  const [state, setState] = useState<"idle" | "saved" | "failed">("idle");
+  const [failCode, setFailCode] = useState("");
+  const touched = useRef(false);
+
+  // standing 転写は async に届く — 手を入れるまでは最新を映す（c17 と同じ規律）
+  useEffect(() => {
+    if (!touched.current) setText(initial);
+  }, [initial]);
+
+  const save = () => {
+    void onSave(edgeId, peerRef, text.trim()).then((r) => {
+      setState(r.ok ? "saved" : "failed");
+      setFailCode(r.ok ? "" : r.code);
+    });
+  };
+
+  return (
+    <details className="m-notefold">
+      <summary>{MEET.home.talk.noteLabel}</summary>
+      <div style={{ marginTop: "0.5rem" }}>
+        <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
+          {MEET.home.talk.noteReaders}
+        </p>
+        <textarea
+          className="m-field"
+          rows={3}
+          value={text}
+          onChange={(e) => {
+            touched.current = true;
+            setText(e.target.value);
+            setState("idle");
+          }}
+        />
+        <button
+          type="button"
+          className="m-btn m-btn-quiet"
+          style={{ marginTop: "0.4rem" }}
+          disabled={text.trim() === ""}
+          onClick={save}
+        >
+          {state === "saved" ? MEET.profile.saved : MEET.memory.save}
+        </button>
+        {state === "failed" && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.receive.errors[failCode] ?? MEET.receive.errors.unknown}
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 // ── 便6: トーク — LINE/Slack の「形」を採り「圧」を採らない（spec §10）。
 // 時系列・自他の整列・日付区切り・下書きの保全。既読・入力中・presence・
 // 未読バッジは存在しない（このコンポーネントにその語彙がないことが pin）。
@@ -276,7 +343,7 @@ function TalkThread({
         return (
           <div key={e.entryId}>
             {divider && <p className="m-talk-day">{day}</p>}
-            {e.kind === "expired" ? (
+            {e.kind === "note-out" ? null : e.kind === "expired" ? (
               <p className="m-note" aria-live="polite">{MEET.home.talk.expired}</p>
             ) : e.kind === "keychange" ? (
               <p className="m-note">{MEET.home.talk.keyChanged}</p>
@@ -327,6 +394,7 @@ export function SignalsSection({
   onTalkBack,
   onClose,
   onSendMessage,
+  onSaveNote,
   onSaveContact,
   onMakeFirstNote,
   onSaveFirstNote,
@@ -349,6 +417,8 @@ export function SignalsSection({
   onClose: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
   /** 便6 — トークの投函（端末で施錠・失敗は一行で返る）。 */
   onSendMessage: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
+  /** 便6 — ノートを立てる・直す（standing・一人一枚・編集は再封）。 */
+  onSaveNote: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
   onSaveContact: (edgeId: string, peerRef: string, note: string) => Promise<boolean>;
   /** 便4: 下書きは edge 単位（保存キー=edgeId・素材=peer）。 */
   onMakeFirstNote: (edgeId: string, peerRef: string) => Promise<string | null>;
@@ -496,6 +566,13 @@ export function SignalsSection({
                       peerRef={sig.fromRef}
                       entries={threads[sig.edgeId] ?? []}
                       onSend={onSendMessage}
+                    />
+                    {/* 便6: 自分のノートを立てる・直す（standing の fold） */}
+                    <NoteFace
+                      edgeId={sig.edgeId}
+                      peerRef={sig.fromRef}
+                      initial={th.find((e) => e.kind === "note-out")?.text ?? ""}
+                      onSave={onSaveNote}
                     />
                     {/* c17: 連絡メモ交換は従属位置の fold へ — 便6-3 で E2EE 封筒に */}
                     <details className="m-contactfold">
@@ -654,6 +731,12 @@ export function SignalsSection({
                       peerRef={pair.toRef}
                       entries={threads[pair.edgeId] ?? []}
                       onSend={onSendMessage}
+                    />
+                    <NoteFace
+                      edgeId={pair.edgeId}
+                      peerRef={pair.toRef}
+                      initial={th.find((e) => e.kind === "note-out")?.text ?? ""}
+                      onSave={onSaveNote}
                     />
                     <details className="m-contactfold">
                       <summary>{MEET.firstNote.contactOpen}</summary>

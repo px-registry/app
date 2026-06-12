@@ -10,7 +10,15 @@
 
 import type { KeyedBackend } from "./backend.ts";
 
-export type TalkEntryKind = "in" | "out" | "expired" | "keychange" | "contact-in" | "contact-out";
+export type TalkEntryKind =
+  | "in"
+  | "out"
+  | "expired"
+  | "keychange"
+  | "contact-in"
+  | "contact-out"
+  /** 自分が立てたノートの端末転写（standing — スレッドには並べない）。 */
+  | "note-out";
 
 export type TalkEntryV1 = {
   /** 受信 = env id 由来（重複受信を冪等に）。送信・事実行 = 端末 mint。 */
@@ -33,6 +41,11 @@ export class TalkStore {
   async put(entry: TalkEntryV1): Promise<void> {
     const existing = await this.backend.get(entry.entryId);
     if (existing !== undefined) return;
+    await this.backend.put(entry);
+  }
+
+  /** Standing 転写の上書き（note-out: 固定キーで最新だけが立つ）。 */
+  async replace(entry: TalkEntryV1): Promise<void> {
     await this.backend.put(entry);
   }
 
