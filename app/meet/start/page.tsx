@@ -17,13 +17,16 @@ export default function MeetStart() {
         <h1 className="m-h1">{MEET.start.title}</h1>
         <p className="m-lede">{MEET.start.doors.lede}</p>
 
+        {/* 二態の対句（ゲート済）— 看板調は見出し・二扉ページ級のみ（register 規則） */}
         <div className="m-steps">
           <div className="m-card">
             <h2 className="m-h2">{MEET.start.doors.page.heading}</h2>
+            <p className="m-lede" style={{ margin: "0 0 0.6rem" }}>{MEET.start.doors.page.sign}</p>
             <p style={{ margin: 0, color: "var(--text)" }}>{MEET.start.doors.page.body}</p>
           </div>
           <div className="m-card">
             <h2 className="m-h2">{MEET.start.doors.ai.heading}</h2>
+            <p className="m-lede" style={{ margin: "0 0 0.6rem" }}>{MEET.start.doors.ai.sign}</p>
             <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>
               {MEET.start.doors.ai.body}
             </p>

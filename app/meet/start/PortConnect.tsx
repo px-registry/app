@@ -32,7 +32,8 @@ export function PortConnect() {
   const D = MEET.start.doors.ai;
   return (
     <div>
-      <p style={{ margin: "0 0 0.6rem", color: "var(--text)" }}>{D.setupNote}</p>
+      {/* 平易化（ゲート済）: 当たり前の導線が先・技術語（MCP）は最後に小さく降格 */}
+      <p style={{ margin: "0 0 0.6rem", color: "var(--text)" }}>{D.lead}</p>
       <p className="mono m-note" style={{ margin: "0 0 0.6rem", wordBreak: "break-all" }}>
         {masked}
       </p>
@@ -46,6 +47,9 @@ export function PortConnect() {
       )}
       <p className="m-note" style={{ marginTop: "0.6rem" }}>{D.caution}</p>
       <p className="m-note" style={{ marginTop: "0.4rem" }}>{D.hint}</p>
+      <p className="m-note" style={{ marginTop: "0.6rem", fontSize: "0.78rem", opacity: 0.8 }}>
+        {D.tech}
+      </p>
     </div>
   );
 }
