@@ -48,20 +48,20 @@ async function get(path) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
-const pubBody = (token, name, itemRef, text) => ({
+const pubBody = (token, name, itemRef, text, business = false) => ({
   ownerToken: token,
   displayName: name,
   intro: "",
-  items: [{ itemRef, kind: "have", title: "smoke", text, tags: [], position: 0 }],
+  items: [{ itemRef, kind: "have", title: "smoke", text, tags: [], position: 0, business }],
 });
 
 console.log(`r2-edge-smoke → ${BASE}`);
 
-// 1. publish A / B
+// 1. publish A / B（B はビジネス旗を立てる — 0012 の素通し検査用）
 const pubA = await post("/api/meet/publish", pubBody(TOKEN_A, "甲-smoke", REF_ITEM_A, "edge smoke A"));
 check("publish A (itemRef 必須形)", pubA.status === 201 && pubA.body?.ok === true, JSON.stringify(pubA));
 const refA = pubA.body?.participantRef;
-const pubB = await post("/api/meet/publish", pubBody(TOKEN_B, "乙-smoke", REF_ITEM_B, "edge smoke B"));
+const pubB = await post("/api/meet/publish", pubBody(TOKEN_B, "乙-smoke", REF_ITEM_B, "edge smoke B", true));
 check("publish B", pubB.status === 201 && pubB.body?.ok === true);
 const refB = pubB.body?.participantRef;
 
@@ -72,10 +72,14 @@ const noRef = await post("/api/meet/publish", {
 check("publish without itemRef → fail-closed", noRef.status === 400 && noRef.body?.reason === "item_0_ref");
 // (the refusal must not have wiped A's rows — re-assert below via pool)
 
-// 2. pool serves itemRef
+// 2. pool serves itemRef + business 旗の素通し
 const pool = await get(`/api/meet/pool?me=${refB}`);
 const servedA = (pool.body?.items ?? []).find((it) => it.participantRef === refA);
 check("pool serves itemRef", servedA?.itemRef === REF_ITEM_A, JSON.stringify(pool.body?.items));
+check("0012: 旗なしは false で届く", servedA?.business === false);
+const poolForA = await get(`/api/meet/pool?me=${refA}`);
+const servedB = (poolForA.body?.items ?? []).find((it) => it.participantRef === refB);
+check("0012: 立てた旗が素通しで届く（B=ビジネス）", servedB?.business === true, JSON.stringify(servedB));
 
 // 3. T1 A→B
 const EDGE = "edge_" + "0123456789abcdef";

@@ -17,8 +17,8 @@ import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
 import { useT } from "@/lib/i18n/context.tsx";
 import {
-  getHiddenSignalRefs,
-  addHiddenSignalRef,
+  getDismissedEdges,
+  addDismissedEdge,
   type InboxData,
   type InboxIncoming,
   type InboxOutgoing,
@@ -103,18 +103,21 @@ function ContactExchange({
 // editable textarea → コピー → the assist line. The textarea is the always-open
 // L0: hand-writing needs no AI, and a failed generation leaves it untouched.
 function TalkFace({
+  edgeId,
   peerRef,
   anchor,
   face,
   onMake,
   onSaveDraft,
 }: {
+  /** 便4: 下書きは edge に閉じる（鮮度原則）— 保存キーは edgeId、素材は peer。 */
+  edgeId: string;
   /** 便3: incoming（fromRef）にも outgoing pair（toRef）にも同じ顔で立つ。 */
   peerRef: string;
   anchor: string;
   face: FirstNoteFaceData;
-  onMake: (peerRef: string) => Promise<string | null>;
-  onSaveDraft: (peerRef: string, text: string) => Promise<void>;
+  onMake: (edgeId: string, peerRef: string) => Promise<string | null>;
+  onSaveDraft: (edgeId: string, text: string) => Promise<void>;
 }) {
   const [text, setText] = useState(face.draft);
   const [busy, setBusy] = useState(false);
@@ -131,7 +134,7 @@ function TalkFace({
   const make = () => {
     setBusy(true);
     setFailed(false);
-    void onMake(peerRef).then((draft) => {
+    void onMake(edgeId, peerRef).then((draft) => {
       setBusy(false);
       if (draft === null) {
         setFailed(true); // the textarea keeps the owner's words (L0 stays open)
@@ -143,7 +146,7 @@ function TalkFace({
   };
 
   const save = () => {
-    void onSaveDraft(peerRef, text);
+    void onSaveDraft(edgeId, text);
   };
 
   const copy = () => {
@@ -244,35 +247,35 @@ export function SignalsSection({
   /** 便3 T4/T5 — 閉じる（participant の行為のみ・結果は reload が運ぶ）。 */
   onClose: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
   onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
-  onMakeFirstNote: (peerRef: string) => Promise<string | null>;
-  onSaveFirstNote: (peerRef: string, text: string) => Promise<void>;
+  /** 便4: 下書きは edge 単位（保存キー=edgeId・素材=peer）。 */
+  onMakeFirstNote: (edgeId: string, peerRef: string) => Promise<string | null>;
+  onSaveFirstNote: (edgeId: string, text: string) => Promise<void>;
 }) {
   const t = useT();
   // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by edge).
   const [backNotes, setBackNotes] = useState<Record<string, string>>({});
-  // c18b — 片づけた合図 (device-local list; loaded after mount, SSR-safe).
-  // R2 note: このレーンはペア単位キーの過渡形 — T3/T4 がサーバの事実になる
-  // 便4 で退場する（0010 §6）。それまで従来どおり相手単位で伏せる。
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  // 便4 — 片づけた閉じ札 (edge 単位・device-local; loaded after mount, SSR-safe).
+  // c18b の hidden-signals（相手単位・不在のあいだだけ）は退場: 生きた残骸は
+  // T4「閉じる」がサーバの事実として置き換え、箒は閉じた札にだけ出る。
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
-    setHidden(new Set(getHiddenSignalRefs()));
+    setDismissed(new Set(getDismissedEdges()));
   }, []);
 
   // 押す前から無いと分かる — 確信があるときだけ (pool照合不能ではマークしない).
   const absentOf = (sig: InboxIncoming): boolean =>
     poolRefs !== null && !poolRefs.has(sig.fromRef);
-  // 片づけは「不在の残骸」だけを伏せる: 相手が pool に戻れば自動で再び見える
-  // (箒が生きた相手を隠さない)。mutual は常に見える。
   // 便3: 自分が sent 段階で閉じた edge は出さない（自分の行為 — 表示すら要らない）。
   // mutual から閉じたものは双方に「このトークは閉じられました。」が出る（裁定）。
+  // 便4: 片づけた閉じ札は伏せる — 箒は closed にだけ効く（生きた札は対象外＝構造）。
   const incoming = (inbox?.incoming ?? []).filter(
     (sig) =>
       !(sig.state === "closed" && sig.closedByMe && sig.closedFrom !== "mutual") &&
-      (sig.state === "mutual" || !(hidden.has(sig.fromRef) && absentOf(sig))),
+      !(sig.state === "closed" && dismissed.has(sig.edgeId)),
   );
 
-  const sweep = (ref: string) => {
-    setHidden(new Set(addHiddenSignalRef(ref)));
+  const sweep = (edgeId: string) => {
+    setDismissed(new Set(addDismissedEdge(edgeId)));
   };
   // 便3 — 閉じる の結末（沈黙の禁止: 失敗は一行で出る; 成功は reload が状態を変える）
   const [closeNotes, setCloseNotes] = useState<Record<string, string>>({});
@@ -319,11 +322,22 @@ export function SignalsSection({
                   )}
                 </div>
                 {/* 便3 — 閉じの一語（終わり方を語り分けない・理由なし）。
-                    mutual からの閉じは双方に、sent 段階の閉じは行為しなかった側に。 */}
+                    mutual からの閉じは双方に、sent 段階の閉じは行為しなかった側に。
+                    便4 — 箒は閉じた札にだけ（生きた札に箒は出ない＝構造）。 */}
                 {isClosed && (
-                  <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
-                    {sig.closedFrom === "mutual" ? MEET.home.edge.talkClosed : MEET.home.edge.stopped}
-                  </p>
+                  <>
+                    <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                      {sig.closedFrom === "mutual" ? MEET.home.edge.talkClosed : MEET.home.edge.stopped}
+                    </p>
+                    <button
+                      type="button"
+                      className="m-link"
+                      style={{ marginTop: "0.3rem" }}
+                      onClick={() => sweep(sig.edgeId)}
+                    >
+                      {MEET.home.signals.sweep}
+                    </button>
+                  </>
                 )}
                 {/* c17: in pair state the anchor moves INTO the face (接点の再掲,
                     same verbatim string) — shown here only pre-mutual. */}
@@ -353,9 +367,10 @@ export function SignalsSection({
                       </p>
                     )}
                     <TalkFace
+                      edgeId={sig.edgeId}
                       peerRef={sig.fromRef}
                       anchor={sig.anchor}
-                      face={firstNotes[sig.fromRef] ?? { basis: null, draft: "" }}
+                      face={firstNotes[sig.edgeId] ?? { basis: null, draft: "" }}
                       onMake={onMakeFirstNote}
                       onSaveDraft={onSaveFirstNote}
                     />
@@ -407,7 +422,8 @@ export function SignalsSection({
                       >
                         {MEET.home.signals.talkBack}
                       </button>
-                      {/* 便3 T4 — b の閉じ（自分の行為: 閉じた札は自分の列から消える） */}
+                      {/* 便3 T4 — b の閉じ（自分の行為: 閉じた札は自分の列から消える）。
+                          便4: 生きた残骸の箒はこれが代替 — サーバの事実で片づく。 */}
                       <button
                         type="button"
                         className="m-btn m-btn-quiet"
@@ -415,17 +431,6 @@ export function SignalsSection({
                       >
                         {MEET.home.edge.close}
                       </button>
-                      {absentOf(sig) && (
-                        // c18b: the broom — only on debris (a living card never
-                        // shows it). Device-local hide; the server row stays.
-                        <button
-                          type="button"
-                          className="m-btn m-btn-quiet"
-                          onClick={() => sweep(sig.fromRef)}
-                        >
-                          {MEET.home.signals.sweep}
-                        </button>
-                      )}
                     </div>
                     {closeLine(sig.edgeId)}
                     {(backNotes[sig.edgeId] ?? "") !== "" && (
@@ -455,7 +460,9 @@ export function SignalsSection({
           {/* ── 便3: a 側の pair 面 — 自分が開いた接点が相互になったもの。
               旧世界では逆向き signal が incoming に立ったが、edge 世界では
               T2 が同じ edge を mutual にするので、a の前室はここで建つ。 ── */}
-          {outgoingPairs.map((pair) => {
+          {outgoingPairs
+            .filter((pair) => !(pair.state === "closed" && dismissed.has(pair.edgeId)))
+            .map((pair) => {
             const name = pair.toName !== "" ? pair.toName : pair.toRef;
             const isClosed = pair.state === "closed";
             const theirNote =
@@ -469,10 +476,20 @@ export function SignalsSection({
                   <h4>{name}</h4>
                 </div>
                 {isClosed ? (
-                  // 便3 T5 — 双方に出る一語（理由なし）
-                  <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
-                    {MEET.home.edge.talkClosed}
-                  </p>
+                  // 便3 T5 — 双方に出る一語（理由なし）。便4 — 箒は閉じた札にだけ。
+                  <>
+                    <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                      {MEET.home.edge.talkClosed}
+                    </p>
+                    <button
+                      type="button"
+                      className="m-link"
+                      style={{ marginTop: "0.3rem" }}
+                      onClick={() => sweep(pair.edgeId)}
+                    >
+                      {MEET.home.signals.sweep}
+                    </button>
+                  </>
                 ) : (
                   <>
                     <p className="m-accent" style={{ margin: "0.3rem 0 0" }}>
@@ -490,9 +507,10 @@ export function SignalsSection({
                       </p>
                     )}
                     <TalkFace
+                      edgeId={pair.edgeId}
                       peerRef={pair.toRef}
                       anchor={pair.anchor}
-                      face={firstNotes[pair.toRef] ?? { basis: null, draft: "" }}
+                      face={firstNotes[pair.edgeId] ?? { basis: null, draft: "" }}
                       onMake={onMakeFirstNote}
                       onSaveDraft={onSaveFirstNote}
                     />

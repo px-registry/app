@@ -68,29 +68,28 @@ export function setThemePref(phase: ThemePhase): void {
 // Inline, dependency-free; injected verbatim into the meet layout.
 export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t='paper';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
 
-// ── c18b — 片づけた合図 (device-local hide list; server rows stay untouched) ───
+// ── 便4 — 片づけた閉じ札 (edge-keyed; CLOSED cards only) ───────────────────────
 //
-// 「片づける」 is the owner's broom for DEBRIS: a non-mutual signal whose
-// sender has left the pool. Hiding is a device-local list of peer refs — no
-// server delete (R2), no history rewrite (c15 裁定). The list only SUPPRESSES
-// a card while the peer is absent; a peer back in the pool shows again (the
-// broom must never hide a living counterpart).
+// c18b の hidden-signals（相手単位・不在のあいだだけ伏せる過渡形）は退場した:
+// 生きた残骸は T4「閉じる」がサーバの事実として置き換え、箒は **閉じた札だけ**
+// に出る（生きているものに箒を出さない原則は構造になった）。伏せるのは端末
+// だけ — サーバの行は歴史のまま（c15 裁定）。edge 単位キー（0010 §6 の退場形）。
 
-const HIDDEN_SIGNALS_KEY = "pxmeet:hidden-signals";
+const DISMISSED_EDGES_KEY = "pxmeet:dismissed-edges";
 
-export function getHiddenSignalRefs(): string[] {
+export function getDismissedEdges(): string[] {
   try {
-    const v: unknown = JSON.parse(localStorage.getItem(HIDDEN_SIGNALS_KEY) ?? "[]");
+    const v: unknown = JSON.parse(localStorage.getItem(DISMISSED_EDGES_KEY) ?? "[]");
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
   } catch {
     return [];
   }
 }
 
-export function addHiddenSignalRef(ref: string): string[] {
-  const list = getHiddenSignalRefs();
-  if (!list.includes(ref)) list.push(ref);
-  localStorage.setItem(HIDDEN_SIGNALS_KEY, JSON.stringify(list));
+export function addDismissedEdge(edgeId: string): string[] {
+  const list = getDismissedEdges();
+  if (!list.includes(edgeId)) list.push(edgeId);
+  localStorage.setItem(DISMISSED_EDGES_KEY, JSON.stringify(list));
   return list;
 }
 

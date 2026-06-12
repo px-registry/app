@@ -19,7 +19,7 @@ export {
   InMemoryKeyedBackend,
 } from "./backend.ts";
 export { ReceivedStore, type ReceivedProposalV1, type ReadingV1 } from "./received.ts";
-export { FirstNoteStore, firstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
+export { FirstNoteStore, firstNoteKey, legacyFirstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
 export { ItemAliasStore, mintItemRef, type ItemAliasV1 } from "./alias.ts";
 export { validateNewEntry, validateStoredEntry, type ValidationResult } from "./validate.ts";
 export {

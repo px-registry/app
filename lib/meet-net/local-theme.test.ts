@@ -18,7 +18,7 @@ const store = new Map<string, string>();
   removeItem: (k: string) => void store.delete(k),
 };
 
-const { getThemePref, setThemePref, THEME_INIT_SCRIPT, getHiddenSignalRefs, addHiddenSignalRef } =
+const { getThemePref, setThemePref, THEME_INIT_SCRIPT, getDismissedEdges, addDismissedEdge } =
   await import("./local.ts");
 
 test("LT-1: theme pref round-trips; junk reads as unset", () => {
@@ -49,18 +49,19 @@ test("LT-3: the theme key lives in the existing pxmeet: prefix (no new lane)", (
   assert.deepEqual([...store.keys()], ["pxmeet:theme"], "one key, existing prefix");
 });
 
-// ── LT-4 (c18b): 片づけた合図 — device-local hide list, fail-closed reads ───────
+// ── LT-4 (c18b→便4): 片づけた閉じ札 — edge 単位の device-local lane ─────────────
+// 期待の追従: hidden-signals（相手単位・過渡形）は退場。後継は dismissed-edges。
 
-test("LT-4: hidden signal refs round-trip, dedupe, and survive junk", () => {
+test("LT-4: dismissed edges round-trip, dedupe, and survive junk", () => {
   store.clear();
-  assert.deepEqual(getHiddenSignalRefs(), [], "unset device hides nothing");
-  addHiddenSignalRef("cccccccccccccccc");
-  addHiddenSignalRef("dddddddddddddddd");
-  addHiddenSignalRef("cccccccccccccccc"); // pressing twice is pressing once
-  assert.deepEqual(getHiddenSignalRefs(), ["cccccccccccccccc", "dddddddddddddddd"]);
-  assert.deepEqual([...store.keys()], ["pxmeet:hidden-signals"], "existing pxmeet: prefix");
-  store.set("pxmeet:hidden-signals", "{broken"); // junk reads as empty, never throws
-  assert.deepEqual(getHiddenSignalRefs(), []);
-  store.set("pxmeet:hidden-signals", JSON.stringify(["ok", 7, null])); // non-strings drop
-  assert.deepEqual(getHiddenSignalRefs(), ["ok"]);
+  assert.deepEqual(getDismissedEdges(), [], "unset device hides nothing");
+  addDismissedEdge("edge_cccccccccccccccc");
+  addDismissedEdge("edge_dddddddddddddddd");
+  addDismissedEdge("edge_cccccccccccccccc"); // pressing twice is pressing once
+  assert.deepEqual(getDismissedEdges(), ["edge_cccccccccccccccc", "edge_dddddddddddddddd"]);
+  assert.deepEqual([...store.keys()], ["pxmeet:dismissed-edges"], "existing pxmeet: prefix");
+  store.set("pxmeet:dismissed-edges", "{broken"); // junk reads as empty, never throws
+  assert.deepEqual(getDismissedEdges(), []);
+  store.set("pxmeet:dismissed-edges", JSON.stringify(["ok", 7, null])); // non-strings drop
+  assert.deepEqual(getDismissedEdges(), ["ok"]);
 });

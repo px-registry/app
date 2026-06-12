@@ -312,23 +312,25 @@ test("M-13: 片づける is gated verbatim; the absent line is ONE constant ever
   );
 });
 
-test("M-13b: the broom shows ONLY on debris; hiding never silences a living peer", () => {
+test("M-13b (便4): the broom shows ONLY on CLOSED cards; living cards are never silenced", () => {
   const src = read("app/meet/SignalsSection.tsx");
-  // sweep renders inside the absent conditional (a living card has no broom)
+  // 期待の追従: hidden-signals（相手単位・不在限定の過渡形）は退場 — 生きた残骸は
+  // T4「閉じる」がサーバの事実として片づけ、箒は閉じた札にだけ出る（構造）。
+  assert.ok(!src.includes("addHiddenSignalRef"), "the pair-keyed transitional lane is extinct");
+  assert.ok(src.includes("addDismissedEdge"), "dismissal goes through the audited edge-keyed lane");
+  // the dismissal filter suppresses CLOSED edges only — a live edge can never be hidden
   assert.match(
     src,
-    /absentOf\(sig\) && \([\s\S]{0,500}?MEET\.home\.signals\.sweep/,
-    "片づける is wrapped in the absent mark",
+    /sig\.state === "closed" && dismissed\.has\(sig\.edgeId\)/,
+    "dismissal is gated on closed state in the filter itself",
   );
-  // the hide filter: mutual always shows; hidden suppresses only while absent
-  // (R2 0010 期待の追従: mutual はペア flag から edge state の比較へ)
+  // the live respond block (talkBack/閉じる buttons) carries no broom
   assert.ok(
-    /sig\.state === "mutual" \|\| !\(hidden\.has\(sig\.fromRef\) && absentOf\(sig\)\)/.test(src),
-    "a hidden peer back in the pool (or mutual) is visible again",
+    !/m-respond[\s\S]{0,900}?signals\.sweep/.test(src),
+    "no broom inside the live respond block",
   );
   // no server delete — the hide is the device-local lane only
   assert.ok(!src.includes("fetch("), "no direct network in the UI lane (M-3 restated)");
-  assert.ok(src.includes("addHiddenSignalRef"), "hide goes through the audited local lane");
 });
 
 // ── M-9 (第7便 D): 相手の候補から is ONE item — never a browsable list ──────────

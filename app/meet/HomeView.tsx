@@ -176,18 +176,20 @@ export function HomeView() {
     setInbox(ib.ok ? ib : null);
     // c17: face data per mutual pair — basis from the owner-local shelf (the
     // same provenance gate the display uses), draft from the firstnote lane.
+    // 便4: 下書きは edge に閉じる（鮮度原則）— 顔データも edgeId キー。
+    // 旧 R1.5 の相手単位下書きは notesLane.get の lazy 移行が一度だけ拾う。
     const fn: Record<string, FirstNoteFaceData> = {};
     if (ib.ok) {
       for (const sig of ib.incoming) {
         if (sig.state !== "mutual") continue;
         const m = firstNoteMaterialFor(sig.fromRef, list, sig.anchor);
-        fn[sig.fromRef] = { basis: m.basis, draft: await notesLane.get(sig.fromRef) };
+        fn[sig.edgeId] = { basis: m.basis, draft: await notesLane.get(sig.edgeId, sig.fromRef) };
       }
       // 便3: a 側の pair 面（outgoing mutual）にも同じ顔データを用意する。
       for (const o of ib.outgoing) {
-        if (o.state !== "mutual" || o.toRef in fn) continue;
+        if (o.state !== "mutual" || o.edgeId in fn) continue;
         const m = firstNoteMaterialFor(o.toRef, list, o.anchor);
-        fn[o.toRef] = { basis: m.basis, draft: await notesLane.get(o.toRef) };
+        fn[o.edgeId] = { basis: m.basis, draft: await notesLane.get(o.edgeId, o.toRef) };
       }
     }
     setFirstNotes(fn);
@@ -557,8 +559,12 @@ export function HomeView() {
 
   // ── c17: 第一信 — owner の鍵・owner の端末でだけ生成し、端末にだけ残す ────────
   // The send is copy → outside channel; nothing here calls lib/meet-net.
-  const makeFirstNote = async (peerRef: string): Promise<string | null> => {
-    const anchor = inbox?.incoming.find((s) => s.fromRef === peerRef)?.anchor ?? "";
+  // 便4: 保存キーは edgeId（鮮度原則 — 同じ相手との別の接点は別の下書き）。
+  const makeFirstNote = async (edgeId: string, peerRef: string): Promise<string | null> => {
+    const anchor =
+      inbox?.incoming.find((s) => s.edgeId === edgeId)?.anchor ??
+      inbox?.outgoing.find((o) => o.edgeId === edgeId)?.anchor ??
+      "";
     const m = firstNoteMaterialFor(peerRef, received, anchor);
     const model = getModel();
     const r = await generateProposals({
@@ -570,16 +576,16 @@ export function HomeView() {
     if (!r.ok) return null;
     const text = parseFirstNoteReply(r.text);
     if (text === null) return null; // 空出力も正直なエラー一行へ（fail-close）
-    await notesLane.save(peerRef, text); // reload しても下書きが残る
-    setFirstNotes((prev) => ({ ...prev, [peerRef]: { basis: m.basis, draft: text } }));
+    await notesLane.save(edgeId, text); // reload しても下書きが残る
+    setFirstNotes((prev) => ({ ...prev, [edgeId]: { basis: m.basis, draft: text } }));
     return text;
   };
 
-  const saveFirstNote = async (peerRef: string, text: string): Promise<void> => {
-    await notesLane.save(peerRef, text);
+  const saveFirstNote = async (edgeId: string, text: string): Promise<void> => {
+    await notesLane.save(edgeId, text);
     setFirstNotes((prev) => ({
       ...prev,
-      [peerRef]: { basis: prev[peerRef]?.basis ?? null, draft: text },
+      [edgeId]: { basis: prev[edgeId]?.basis ?? null, draft: text },
     }));
   };
 
