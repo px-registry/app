@@ -19,6 +19,7 @@ import {
   openReceived,
   openFirstNotes,
   openItemAliases,
+  openEncKeys,
   PLACED_QUESTION_TAG,
   draftPlacedQuestionTitle,
   isPlacedQuestion,
@@ -65,6 +66,7 @@ import {
   firstNoteMaterialFor,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
+import { mintEncKeyPair, encPubToString } from "@/lib/meet-crypto/keys.ts";
 import { useT } from "@/lib/i18n/context.tsx";
 import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection, type FirstNoteFaceData } from "./SignalsSection.tsx";
@@ -134,6 +136,8 @@ export function HomeView() {
   const notesLane = useMemo(() => openFirstNotes(), []);
   // R2 0010: 端末側の item_ref alias 対応表（内部 entryId → 公開 alias）
   const aliasLane = useMemo(() => openItemAliases(), []);
+  // R2 0013: E2EE 鍵対（秘密鍵はこの端末の IndexedDB だけ・公開鍵を publish に同送）
+  const encLane = useMemo(() => openEncKeys(), []);
 
   const [question, setQuestion] = useState("");
   const [rigEntries, setRigEntries] = useState<RigEntry[]>([]);
@@ -350,10 +354,12 @@ export function HomeView() {
         business: e.item.business === true,
       })),
     );
+    const keys = await encLane.getOrMint(mintEncKeyPair);
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName,
       intro,
+      encPub: encPubToString(keys.pub),
       items,
     });
     if (r.ok) {

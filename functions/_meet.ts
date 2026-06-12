@@ -14,6 +14,7 @@
 // esbuild, no "@/*" alias) — same convention as functions/_board.ts.
 
 import { deriveParticipantRef, isOwnerToken, isParticipantRef } from "../lib/meet-net/ref.ts";
+import { parseEncPub } from "../lib/meet-crypto/keys.ts";
 
 export interface MeetEnv {
   /** Same D1 database as the board (wrangler.toml binding = "BOARD");
@@ -83,11 +84,19 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+export const MAX_ENC_PUB = 240;
+
 export type CleanPublish = {
   ownerToken: string;
   displayName: string;
   /** ひとこと紹介 — optional one-liner, same standing as displayName ("" = unset). */
   intro: string;
+  /**
+   * R2 0013 — E2EE 公開鍵（JWK 直列形・公開物）。optional: "" = 鍵を送らない
+   * （鍵レーン未対応の旧クライアント）。present なら形を fail-closed 検証 —
+   * private 成分 "d" を運ぶ JWK は publish ごと拒否する。
+   */
+  encPub: string;
   items: Array<{
     /** R2 0010: device-minted stable alias — REQUIRED, unique within the payload. */
     itemRef: string;
@@ -121,6 +130,15 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
   }
   const intro = typeof raw.intro === "string" ? raw.intro.trim() : "";
   if (intro.length > MAX_INTRO) return { ok: false, reason: "intro" };
+  // R2 0013: encPub — optional; present must be a valid PUBLIC P-256 JWK string
+  // (a smuggled private scalar "d" rejects the whole publish — boundary tripwire).
+  if (raw.encPub !== undefined && typeof raw.encPub !== "string") {
+    return { ok: false, reason: "enc_pub" };
+  }
+  const encPub = typeof raw.encPub === "string" ? raw.encPub.trim() : "";
+  if (encPub !== "" && (encPub.length > MAX_ENC_PUB || parseEncPub(encPub) === null)) {
+    return { ok: false, reason: "enc_pub" };
+  }
   if (!Array.isArray(raw.items) || raw.items.length > MAX_ITEMS) {
     return { ok: false, reason: "items" };
   }
@@ -169,7 +187,7 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
       business: it.business === true,
     });
   }
-  return { ok: true, value: { ownerToken: raw.ownerToken, displayName, intro, items } };
+  return { ok: true, value: { ownerToken: raw.ownerToken, displayName, intro, encPub, items } };
 }
 
 /** Same-origin write guard (lineage: functions/_ownerboard.ts). */

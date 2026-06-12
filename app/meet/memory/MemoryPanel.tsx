@@ -9,6 +9,7 @@ import { MEET } from "@/lib/meet/copy.ts";
 import {
   openMeetMemory,
   openItemAliases,
+  openEncKeys,
   toPublicView,
   hasPublicVariant,
   parseMaskWords,
@@ -43,6 +44,7 @@ import {
   snapshotHas,
 } from "@/lib/meet-net";
 import { RIG_MEMORY_KINDS, type RigMemoryKindV1 } from "@/lib/rig";
+import { mintEncKeyPair, encPubToString } from "@/lib/meet-crypto/keys.ts";
 import { BoundaryNote } from "../BoundaryNote.tsx";
 
 type RigEntry = { entryId: string; item: MeetRigItemV1 };
@@ -400,6 +402,8 @@ export function MemoryPanel() {
   const store = useMemo(() => openMeetMemory(), []);
   // R2 0010: 端末側の item_ref alias 対応表（公開項目の安定 identity）
   const aliasLane = useMemo(() => openItemAliases(), []);
+  // R2 0013: E2EE 鍵対（公開鍵を publish に同送・秘密鍵は端末のみ）
+  const encLane = useMemo(() => openEncKeys(), []);
   const [entries, setEntries] = useState<RigEntry[]>([]);
   const [aliases, setAliases] = useState<Map<string, string>>(new Map());
   useEffect(() => {
@@ -592,10 +596,12 @@ export function MemoryPanel() {
         business: e.item.business === true,
       })),
     );
+    const keys = await encLane.getOrMint(mintEncKeyPair);
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
       displayName: displayName.trim(),
       intro: intro.trim(),
+      encPub: encPubToString(keys.pub),
       items,
     });
     if (r.ok) {

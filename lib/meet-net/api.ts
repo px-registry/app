@@ -39,6 +39,8 @@ export async function publishProjection(input: {
   displayName: string;
   /** ひとこと紹介 — optional; "" publishes as unset. */
   intro: string;
+  /** R2 0013 — E2EE 公開鍵（JWK 直列形・公開物）。"" = 同送しない。 */
+  encPub: string;
   items: OutboundPoolItem[];
 }): Promise<NetResult<{ count: number; participantRef: string }>> {
   try {
@@ -316,6 +318,23 @@ export async function fetchHostView(
       signals: Array.isArray(body.signals) ? body.signals : [],
       pool: Array.isArray(body.pool) ? body.pool : [],
     };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+/** R2 0013 — a peer's E2EE public key (public material; survives pool departure). */
+export async function fetchEncKey(
+  ref: string,
+): Promise<NetResult<{ encPub: string; gen: number }>> {
+  try {
+    const res = await fetch(`/api/meet/enckey?ref=${encodeURIComponent(ref)}`);
+    const body: unknown = await res.json().catch(() => null);
+    if (!res.ok || !isRecord(body) || body.ok !== true || typeof body.encPub !== "string") {
+      const error = isRecord(body) && typeof body.error === "string" ? body.error : "enckey_failed";
+      return { ok: false, error };
+    }
+    return { ok: true, encPub: body.encPub, gen: typeof body.gen === "number" ? body.gen : 1 };
   } catch {
     return { ok: false, error: "network" };
   }

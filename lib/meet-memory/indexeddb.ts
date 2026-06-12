@@ -24,10 +24,11 @@ export const MEMORY_STORE = "memory";
 export const RECEIVED_STORE = "received";
 export const FIRSTNOTE_STORE = "firstnote";
 export const ALIAS_STORE = "aliasmap";
-// v3 (R2 0010): + aliasmap store. v2 (c17): + firstnote. onupgradeneeded creates
-// only what is missing, so older databases upgrade in place without touching
-// existing lanes.
-const VERSION = 3;
+export const ENCKEY_STORE = "enckey";
+// v4 (R2 0013): + enckey store. v3 (R2 0010): + aliasmap. v2 (c17): + firstnote.
+// onupgradeneeded creates only what is missing, so older databases upgrade in
+// place without touching existing lanes.
+const VERSION = 4;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -45,6 +46,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(ALIAS_STORE)) {
         db.createObjectStore(ALIAS_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(ENCKEY_STORE)) {
+        db.createObjectStore(ENCKEY_STORE, { keyPath: "entryId" });
       }
     };
     req.onsuccess = () => resolve(req.result);

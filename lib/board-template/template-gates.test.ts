@@ -187,6 +187,7 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
     "0010_r15_edge.sql",
     "0011_r15_edge_close_facts.sql",
     "0012_business_flag.sql",
+    "0014_e2ee_envelope.sql",
   ]);
 });
 

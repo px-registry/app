@@ -28,6 +28,7 @@ export {
 } from "./snapshot.ts";
 export {
   publishProjection,
+  fetchEncKey,
   fetchPool,
   sendSignal,
   sendTalkBack,

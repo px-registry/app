@@ -48,10 +48,14 @@ async function get(path) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
-const pubBody = (token, name, itemRef, text, business = false) => ({
+const ENC_PUB_1 = JSON.stringify({ kty: "EC", crv: "P-256", x: "A".repeat(43), y: "B".repeat(43) });
+const ENC_PUB_2 = JSON.stringify({ kty: "EC", crv: "P-256", x: "C".repeat(43), y: "D".repeat(43) });
+
+const pubBody = (token, name, itemRef, text, business = false, encPub = ENC_PUB_1) => ({
   ownerToken: token,
   displayName: name,
   intro: "",
+  encPub,
   items: [{ itemRef, kind: "have", title: "smoke", text, tags: [], position: 0, business }],
 });
 
@@ -71,6 +75,21 @@ const noRef = await post("/api/meet/publish", {
 });
 check("publish without itemRef → fail-closed", noRef.status === 400 && noRef.body?.reason === "item_0_ref");
 // (the refusal must not have wiped A's rows — re-assert below via pool)
+
+// 1b. 0013 鍵レーン: 公開鍵の配布・gen 繰り上げ・private 成分の拒否
+const k1 = await get(`/api/meet/enckey?ref=${refA}`);
+check("0013: 公開鍵が serve される", k1.status === 200 && k1.body?.encPub === ENC_PUB_1 && k1.body?.gen === 1, JSON.stringify(k1.body));
+await post("/api/meet/publish", pubBody(TOKEN_A, "甲-smoke", REF_ITEM_A, "edge smoke A", false, ENC_PUB_2));
+const k2 = await get(`/api/meet/enckey?ref=${refA}`);
+check("0013: 鍵が変わると gen が繰り上がる（事実カウンタ）", k2.body?.gen === 2, JSON.stringify(k2.body));
+await post("/api/meet/publish", pubBody(TOKEN_A, "甲-smoke", REF_ITEM_A, "edge smoke A", false, ENC_PUB_2));
+const k3 = await get(`/api/meet/enckey?ref=${refA}`);
+check("0013: 同じ鍵の再 publish では gen 不変", k3.body?.gen === 2);
+const smuggled = await post("/api/meet/publish", pubBody(TOKEN_A, "甲-smoke", REF_ITEM_A, "x", false,
+  JSON.stringify({ kty: "EC", crv: "P-256", x: "A".repeat(43), y: "B".repeat(43), d: "LEAK" })));
+check("0013: private 成分 d を運ぶ JWK は publish ごと拒否", smuggled.status === 400 && smuggled.body?.reason === "enc_pub");
+const noKey = await get(`/api/meet/enckey?ref=${"9".repeat(16)}`);
+check("0013: 鍵なし ref は正直に 404", noKey.status === 404 && noKey.body?.error === "no_key");
 
 // 2. pool serves itemRef + business 旗の素通し
 const pool = await get(`/api/meet/pool?me=${refB}`);
