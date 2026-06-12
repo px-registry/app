@@ -7,7 +7,7 @@
 - Phase 3 ✅ 空集合完了（平文 contact_note 0 件・新ビルドは E2EE のみ書く）→ **R8 hook arm 済**（px-guard.r8-armed）
 - Phase 4 ✅ deploy（px-r15・読み取り検証: 401/200・pool 27 行・itemRef/business serve・legacy alias='' は設計どおり）
 - typo ref 掃除 ✅（2026-06-12 Go・3ae9bd… の pool 12 行＋signal 1 行を削除 → pool 15 行=Hiroto 14＋岡山カフェ 1・signal 0。復元はバックアップから可能）
-- 残: **完了後のテスター告知（Hiroto・Ctrl+F5 一行＋「候補を更新する」を一度=alias と鍵が生える）**／旧 /api/meet/contact 書込端点の退場（設計役卓へ）／**push=次セッション冒頭プローブ直後（本番が未push commit 由来で動いている状態を長く置かない — Hiroto 指示）**
+- 残: **完了後のテスター告知（Hiroto・Ctrl+F5 一行＋「候補を更新する」を一度=alias と鍵が生える — 2026-06-12 時点で pool 15/15 行が alias 無しのまま・話してみるは basis 不在で押せない状態が続いている）**。旧 /api/meet/contact 書込端点の退場＝**済（2026-06-12 一括 GOAL 便・平文 notes serve も退場）**。push＝済（同便・stage-r2-complete 常設）。
 
 （以下、当初の設計図を記録として保存）
 前提: 台帳 = docs/r2/cutover-ledger.md（8件）。テスト継続中の切替（「本日の完成版を本テストとする」裁定）。

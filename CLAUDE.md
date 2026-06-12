@@ -69,6 +69,22 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   Wave4 前倒し可能分。**終了条件 = 1〜4 が本番で動き、テスターとチャット LLM の両方から同じ部屋に
   入れる状態**（この GOAL 内の本番 deploy は終了条件が裁可 — 赤に触れない形で）。
   R4（AI 相互読解・injection 硬化・縁の記録戸口）は設計メモのみ・実装は待て。
+  **→ 達成（2026-06-12 本便）**: px-r15 本番に deploy 済・実チャット LLM（claude -p + MCP）で
+  本番 port 一周を確認（law 読み→候補読み→「今日は無い」の正直）。R4 メモ= docs/r2/r4-design-notes.md。
+
+**チャットポート（/port/mcp・本便開設）**
+
+- MCP streamable HTTP・stateless・POST のみ（GET=405）。認証 = owner token（Bearer か ?k=）—
+  `_middleware` は `/port/mcp` ぴったりだけ Basic を免除し、port 自身が fail-closed 401。
+- 道具6: get_law_and_manifest / read_candidates / read_inbox / place_question / send_signal /
+  draft_talk_link。**平文のトーク本文を受ける tool は無い**（0013 invariant 1 — 下書きは
+  チャットが `#draft=` フラグメントに乗せ、封緘・送信は端末の既存動線）。
+- place_question は additive 挿入＋**reverse-import**（inbox.myItems → 端末が次回訪問で取り込み
+  alias を adopt — replace-publish で消えない）。
+- smoke: `scripts/r2-port-smoke.mjs`（API 24検査）・`scripts/r2-goal-ui-smoke.mjs`（UI 18検査・
+  実 Ollama の Dock L2 生成込み）。チャット実機は
+  `'<prompt>' | claude -p --mcp-config tmp-port-mcp.json --strict-mcp-config --allowedTools "mcp__px__*"`
+  （罠: prompt は stdin で渡す — 引数の位置によっては -p が食う）。
 
 **/auto 運転規約 — stage-r2-complete（Hiroto 裁定 2026-06-12・便1 から適用・歴史として保存）**
 
@@ -120,6 +136,16 @@ node scripts\r15-batch9-smoke.mjs                # 最新便の実機（実 Olla
 - スクショは `C:\Users\User\Desktop\スクショ\r15<x>-NN.png`（コミットしない）。
 
 ## 既知の罠（実地で踏んだもの）
+
+- **Pages secrets は次の deploy から効く** — `wrangler pages secret put` 直後の稼働中 deployment
+  には反映されない（px-r2-dev rotate で実測・再 deploy で解決）。
+- **scripts/r15-ui-smoke.mjs は pre-R2 で stale**（signal seed が edgeId/basisItemRef 無しの旧形 —
+  0010 以降は通らない）。現役 UI smoke は r2-goal-ui-smoke.mjs。改修か退役は次便で判断。
+- **legacy alias 残（本番）**: pool 15 行すべて item_ref 無し（2026-06-12 実測）。テスターが
+  「候補を更新する」を一度押すまで、その候補への 話してみる は basis 不在で押せない —
+  カットオーバー残のテスター告知（Hiroto）が前提。port の place_question 行は mint 済みで即可達。
+- **EV-2 の flake（修正済）**: base64 末尾グループの反転は padding 捨てビットで no-op になり得る
+  （~6%）— tamper 試験は先頭文字を反転する。
 
 - **prerender**: ページ直下の `useState(() => localStorage系)` は build を落とす（effect で初期化する）。
 - **forbidden scan は識別子も見る**: 変数名 `best` が "best" で MA-3 に引っかかった例あり。
