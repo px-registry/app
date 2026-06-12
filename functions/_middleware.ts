@@ -39,6 +39,14 @@ function safeEqual(a: string, b: string): boolean {
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env, next } = context;
+
+  // チャットポート（/port/mcp ぴったり）は Basic の招待門を通らない: チャット
+  // LLM のコネクタは Basic ヘッダを運べない実装が多い。素通しではなく門の交代 —
+  // ルート自身が owner token で fail-closed（token 無し/不正 = 401・読めるのは
+  // 本人の見えるものだけ）。サイト本体の門はこの一枚以外で従来どおり。
+  const path = new URL(request.url).pathname;
+  if (path === "/port/mcp" || path === "/port/mcp/") return next();
+
   const user = env.BETA_USER;
   const pass = env.BETA_PASS;
 
