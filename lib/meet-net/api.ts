@@ -26,6 +26,8 @@ export type PoolItemPublic = {
    * T1 refuses an empty/foreign basis.
    */
   itemRef: string;
+  /** R2 0012 — ビジネス旗（素通し・読むのは AI と「相手の候補から」の一語）。 */
+  business: boolean;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -77,6 +79,7 @@ function parsePoolItem(raw: unknown): PoolItemPublic | null {
     text: raw.text,
     tags,
     itemRef: typeof raw.itemRef === "string" ? raw.itemRef : "",
+    business: raw.business === true,
   };
 }
 

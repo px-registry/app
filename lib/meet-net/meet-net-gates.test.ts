@@ -88,8 +88,10 @@ test("MN-4: private items never leave the device; key set is closed", () => {
   assert.ok(!flat.includes("PRIVATE_SENTINEL"), "private text must not be projected");
   assert.ok(!flat.includes("内緒"), "private tags must not be projected");
   for (const o of out) {
-    assert.deepEqual(Object.keys(o).sort(), ["itemRef", "kind", "position", "tags", "text", "title"]);
+    assert.deepEqual(Object.keys(o).sort(), ["business", "itemRef", "kind", "position", "tags", "text", "title"]);
   }
+  // R2 0012: 旗は明示運搬のみ — 入力に無ければ false（ride-along しない）
+  assert.ok(out.every((o) => o.business === false), "absent flag projects as false");
   // R2 0010: a PRIVATE item's alias does not leave either — the pairing is
   // per-item, so the dropped item's ref simply never lands in a row.
   assert.ok(!flat.includes("2".repeat(16)), "the private item's alias never leaves");

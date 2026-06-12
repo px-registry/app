@@ -96,6 +96,8 @@ export type CleanPublish = {
     text: string;
     tags: string[];
     position: number;
+    /** R2 0012: ビジネス旗 — owner の自己申告（省略可・既定 false・素通し）。 */
+    business: boolean;
   }>;
 };
 
@@ -153,7 +155,19 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
       if (typeof t !== "string" || t.length > MAX_TAG) return { ok: false, reason: `item_${i}_tag` };
       tags.push(t);
     }
-    items.push({ itemRef: it.itemRef, kind: it.kind, title: it.title, text: it.text, tags, position: items.length });
+    // R2 0012: optional boolean — absent publishes as false; an odd value rejects.
+    if (it.business !== undefined && typeof it.business !== "boolean") {
+      return { ok: false, reason: `item_${i}_business` };
+    }
+    items.push({
+      itemRef: it.itemRef,
+      kind: it.kind,
+      title: it.title,
+      text: it.text,
+      tags,
+      position: items.length,
+      business: it.business === true,
+    });
   }
   return { ok: true, value: { ownerToken: raw.ownerToken, displayName, intro, items } };
 }

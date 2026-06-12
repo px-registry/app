@@ -20,6 +20,7 @@ const ROWS = [
     tags: '["手仕事"]',
     position: 0,
     item_ref: "1".repeat(16),
+    business: 1,
   },
   {
     participant_ref: "bbbbbbbbbbbbbbbb",
@@ -31,6 +32,7 @@ const ROWS = [
     tags: "not-json",
     position: 0,
     item_ref: "2".repeat(16),
+    business: 0,
   },
 ];
 
@@ -68,6 +70,7 @@ test("pool: serves the closed public shape; broken tags degrade to []", async ()
   // R2 0010 期待の追従: + ownerIntro（第7便 B・fixture が undefined で隠れていた）
   // と itemRef（公開項目の安定 alias）。これで closed set が pin として実効になる。
   assert.deepEqual(Object.keys(body.items[0]).sort(), [
+    "business",
     "itemRef",
     "kind",
     "ownerIntro",
@@ -78,6 +81,9 @@ test("pool: serves the closed public shape; broken tags degrade to []", async ()
     "title",
   ]);
   assert.equal(body.items[0].itemRef, "1".repeat(16), "stable alias served");
+  // R2 0012: 旗は素通し（1→true / 0→false）— 絞込も並べ替えもしない
+  assert.equal(body.items[0].business, true, "flag served as set");
+  assert.equal(body.items[1].business, false, "default off");
   assert.deepEqual(body.items[0].tags, ["手仕事"]);
   assert.deepEqual(body.items[1].tags, [], "non-JSON tags degrade to []");
 });

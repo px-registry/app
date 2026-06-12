@@ -75,7 +75,7 @@ import { Ring } from "./Ring.tsx";
 // indicator and the last-resort line (entry write itself failed) remain.
 type GenState = { phase: "idle" } | { phase: "busy" } | { phase: "error"; code: string };
 type RigEntry = { entryId: string; item: MeetRigItemV1 };
-type PlaceDraft = { title: string; text: string; private: boolean };
+type PlaceDraft = { title: string; text: string; private: boolean; business: boolean };
 
 function readingJson(entry: ReceivedProposalV1): string {
   return JSON.stringify({ echo: entry.echoFlag, cards: entry.readings });
@@ -269,7 +269,11 @@ export function HomeView() {
   // 第9便 C — 今日この問いを読んだ AI の実数 (server's dedup'd daily count).
   // Position = the item's index in the outbound projection (what publish sent).
   const projRows = buildOutboundProjection(
-    rigEntries.map((x) => ({ itemRef: aliases.get(x.entryId) ?? "", view: toPublicView(x.item) })),
+    rigEntries.map((x) => ({
+      itemRef: aliases.get(x.entryId) ?? "",
+      view: toPublicView(x.item),
+      business: x.item.business === true,
+    })),
   );
   const readsOf = (item: MeetRigItemV1): number | null => {
     const v = toPublicView(item);
@@ -287,7 +291,7 @@ export function HomeView() {
   const openPlace = () => {
     const q = question.trim();
     if (q === "") return;
-    setPlaceDraft({ title: draftPlacedQuestionTitle(q), text: q, private: false });
+    setPlaceDraft({ title: draftPlacedQuestionTitle(q), text: q, private: false, business: false });
   };
 
   const confirmPlace = async () => {
@@ -301,6 +305,8 @@ export function HomeView() {
         text: placeDraft.text.trim(),
         tags: [PLACED_QUESTION_TAG],
         private: placeDraft.private,
+        // 0012: ビジネス旗 — 項目に付く事実（boolean 一枚・既定オフ）
+        business: placeDraft.business,
       },
     });
     setPlaceDraft(null);
@@ -336,7 +342,11 @@ export function HomeView() {
     // 読み遅れで "" を送らない — server は itemRef 必須・fail-closed）。
     const aliasMap = await aliasLane.getOrMintAll(rigEntries.map((e) => e.entryId));
     const items = buildOutboundProjection(
-      rigEntries.map((e) => ({ itemRef: aliasMap.get(e.entryId) ?? "", view: toPublicView(e.item) })),
+      rigEntries.map((e) => ({
+        itemRef: aliasMap.get(e.entryId) ?? "",
+        view: toPublicView(e.item),
+        business: e.item.business === true,
+      })),
     );
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),
@@ -762,6 +772,18 @@ export function HomeView() {
                 value={placeDraft.text}
                 onChange={(e) => setPlaceDraft({ ...placeDraft, text: e.target.value })}
               />
+              {/* 0012: チェック一個・説明文なし（公開性はこのカード自体が語済み） */}
+              <label
+                className="m-note"
+                style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.5rem" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={placeDraft.business}
+                  onChange={(e) => setPlaceDraft({ ...placeDraft, business: e.target.checked })}
+                />
+                {MEET.home.place.business}
+              </label>
               <div className="m-item-head" style={{ marginTop: "0.5rem" }}>
                 <button
                   type="button"

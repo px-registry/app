@@ -63,6 +63,8 @@ export type BasisItem = {
    * edge; the act-time server check stays the floor).
    */
   itemRef?: string;
+  /** R2 0012 — ビジネス旗（「相手の候補から」の一語表示用・present = true のみ）。 */
+  business?: boolean;
 };
 export type BasisMap = Record<string, BasisItem>;
 
@@ -83,13 +85,16 @@ export function toRigPoolWithRefs(items: PoolItemPublic[]): {
     if (!KIND_SET.has(it.kind)) continue;
     n += 1;
     const id = `p${n}`;
-    // itemRef rides only when the serve carried one — pre-R2 entries keep their
-    // exact stored shape (deep-equal stable; act-time checks stay the floor).
+    // itemRef / business ride only when the serve carried them — pre-R2 entries
+    // keep their exact stored shape (deep-equal stable; act-time checks stay
+    // the floor). business は「相手の候補から」の一語表示用 — プロンプトの POOL
+    // 行には写さない（0012 v0: law/prompt sync 便まで生成層不触）。
     basis[id] = {
       ownerRef: it.ownerRef,
       title: it.title,
       text: it.text,
       ...(typeof it.itemRef === "string" && it.itemRef !== "" ? { itemRef: it.itemRef } : {}),
+      ...(it.business === true ? { business: true } : {}),
     };
     pool.push({
       ownerRef: it.ownerRef,

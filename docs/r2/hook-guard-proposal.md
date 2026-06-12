@@ -29,6 +29,11 @@ $env:PX_GUARD_OVERRIDE = ""           # 使い終わったら消す
 黙って素通りしない: override が効いたことも一行で表示される。恒久的な許可は
 allowlist（sort は `scripts/hooks/px-guard.mjs` の SORT_ALLOW）への追記で行い、コミットに残す。
 
+**運用ノート（設計審査 2026-06-12）: override は道ではなく例外。** 正当な新 sort が必要に
+なったら、override 一回 →「allowlist に◯◯を足す — 異議あるか」の**一行対話 → allowlist 追記
+（コミット）**、の順で恒久化する。override の常用は allowlist の腐敗経路 — 二度目の override
+を打つ前に必ず allowlist 対話へ。
+
 ## 設置 diff（Hiroto が settings.json に置く想定・global でなく px-app project 推奨）
 
 ```jsonc

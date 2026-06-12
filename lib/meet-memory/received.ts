@@ -33,7 +33,10 @@ export type ReceivedProposalV1 = {
    * R2 0010: itemRef = the served item's stable public alias (absent on pre-R2
    * entries) — what T1 sends as the edge's basis_item_ref.
    */
-  basisItems?: Record<string, { ownerRef: string; title: string; text: string; itemRef?: string }>;
+  basisItems?: Record<
+    string,
+    { ownerRef: string; title: string; text: string; itemRef?: string; business?: boolean }
+  >;
   /** ownerRef → ひとこと紹介 at generation time (may be ""). 第7便 B. */
   intros?: Record<string, string>;
   /**

@@ -36,6 +36,13 @@ export type MeetEntryKind = (typeof MEET_ENTRY_KINDS)[number];
 export type MeetRigItemV1 = RigMemoryItemV1 & {
   publicTitle?: string;
   publicText?: string;
+  /**
+   * R2 0012 — ビジネス旗（owner の自己申告の事実・boolean 一枚で打ち止め）。
+   * 旗は項目に付く — 人に付かない。射影と一緒にそのまま運ばれ、PX は判定にも
+   * 絞込にも使わない。rig core 型は不触（meet-memory 層のみ・explicit-pick の
+   * 外なので unprojected に乗ることはなく、projection が明示的に運ぶ）。
+   */
+  business?: boolean;
 };
 
 export type QuestionValue = { text: string };

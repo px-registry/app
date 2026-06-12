@@ -52,6 +52,11 @@ export function validateNewEntry(input: unknown): ValidationResult {
       if (value.publicText !== undefined && typeof value.publicText !== "string") {
         return { ok: false, error: "rig_item: publicText must be a string when present" };
       }
+      // R2 0012: ビジネス旗 — optional, but when present must be a plain boolean
+      // (boolean 一枚で打ち止め; an odd value must not survive into the projection).
+      if (value.business !== undefined && typeof value.business !== "boolean") {
+        return { ok: false, error: "rig_item: business must be a boolean when present" };
+      }
       return { ok: true };
     }
     case "question": {

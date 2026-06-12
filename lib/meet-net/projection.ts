@@ -20,12 +20,16 @@ export type OutboundPoolItem = {
   text: string;
   tags: string[];
   position: number;
+  /** R2 0012: ビジネス旗 — owner の自己申告（boolean 一枚・素通し）。 */
+  business: boolean;
 };
 
-/** One projectable entry: the PUBLIC VIEW of an item + its minted alias. */
+/** One projectable entry: the PUBLIC VIEW of an item + its minted alias + 旗. */
 export type ProjectableEntry = {
   itemRef: string;
   view: RigMemoryItemV1;
+  /** R2 0012 — meet-memory 層の旗（rig core の外・明示的に運ぶ）。省略 = false。 */
+  business?: boolean;
 };
 
 const SELF = "self";
@@ -37,7 +41,7 @@ const SELF = "self";
  */
 export function buildOutboundProjection(entries: ProjectableEntry[]): OutboundPoolItem[] {
   const out: OutboundPoolItem[] = [];
-  for (const { itemRef, view } of entries) {
+  for (const { itemRef, view, business } of entries) {
     const pool = buildPublicPool([{ ownerId: SELF, items: [view] }], {
       ownerRefById: new Map([[SELF, SELF]]),
     });
@@ -50,6 +54,7 @@ export function buildOutboundProjection(entries: ProjectableEntry[]): OutboundPo
       text: p.text,
       tags: [...p.tags],
       position: out.length,
+      business: business === true,
     });
   }
   return out;

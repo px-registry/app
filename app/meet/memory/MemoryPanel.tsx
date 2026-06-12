@@ -570,7 +570,11 @@ export function MemoryPanel() {
   // actually pushed from this device (symmetric difference, by item identity).
   // toPublicView first: what leaves is the 公開用の書き方 when one is set.
   const projection = buildOutboundProjection(
-    entries.map((e) => ({ itemRef: aliases.get(e.entryId) ?? "", view: toPublicView(e.item) })),
+    entries.map((e) => ({
+      itemRef: aliases.get(e.entryId) ?? "",
+      view: toPublicView(e.item),
+      business: e.item.business === true,
+    })),
   );
   const pendingCount = snapshotPendingCount(snapshot, projection);
 
@@ -582,7 +586,11 @@ export function MemoryPanel() {
     // R2 0010: alias は publish 時に取り直す（"" を送らない — server は必須）。
     const aliasMap = await aliasLane.getOrMintAll(entries.map((e) => e.entryId));
     const items = buildOutboundProjection(
-      entries.map((e) => ({ itemRef: aliasMap.get(e.entryId) ?? "", view: toPublicView(e.item) })),
+      entries.map((e) => ({
+        itemRef: aliasMap.get(e.entryId) ?? "",
+        view: toPublicView(e.item),
+        business: e.item.business === true,
+      })),
     );
     const r = await publishProjection({
       ownerToken: getOrMintOwnerToken(),

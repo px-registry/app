@@ -291,6 +291,12 @@ export function ProposalEntry({
                     // whole list (the AI-only pool stays human-unbrowsable).
                     <details className="m-basis">
                       <summary>{MEET.proposal.basisShow}</summary>
+                      {basisItem.business === true && (
+                        // 0012 表示点: 立てられた旗の一語（事実の転載・判定なし）
+                        <p className="m-item-tags" style={{ margin: "0.3rem 0 0" }}>
+                          {MEET.home.place.business}
+                        </p>
+                      )}
                       <p className="m-item-text">
                         {basisItem.title.trim() !== ""
                           ? `${basisItem.title} — ${basisItem.text}`

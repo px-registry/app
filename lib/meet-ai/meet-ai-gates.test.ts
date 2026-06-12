@@ -177,9 +177,9 @@ test("MA-4e: 公開用の書き方 — the OTHER side's prompt gets the public p
 
 test("MA-4d: toRigPool is fail-closed on kind and keeps arrival order", () => {
   const served: PoolItemPublic[] = [
-    { participantRef: "a".repeat(16), ownerRef: "甲", ownerIntro: "", kind: "have", title: "t", text: "x", tags: [], itemRef: "" },
-    { participantRef: "b".repeat(16), ownerRef: "乙", ownerIntro: "", kind: "weird", title: "t", text: "y", tags: [], itemRef: "" },
-    { participantRef: "c".repeat(16), ownerRef: "丙", ownerIntro: "", kind: "want", title: "t", text: "z", tags: [], itemRef: "" },
+    { participantRef: "a".repeat(16), ownerRef: "甲", ownerIntro: "", kind: "have", title: "t", text: "x", tags: [], itemRef: "", business: false },
+    { participantRef: "b".repeat(16), ownerRef: "乙", ownerIntro: "", kind: "weird", title: "t", text: "y", tags: [], itemRef: "", business: false },
+    { participantRef: "c".repeat(16), ownerRef: "丙", ownerIntro: "", kind: "want", title: "t", text: "z", tags: [], itemRef: "", business: false },
   ];
   const rig = toRigPool(served);
   assert.deepEqual(rig.map((r) => r.text), ["x", "z"]);
