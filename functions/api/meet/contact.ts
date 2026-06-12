@@ -29,12 +29,13 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
   if (me === raw.peerRef) return json({ ok: false, error: "self" }, 400);
 
   try {
-    // Mutual-only custody: refuse to store before both signals exist.
+    // Mutual-only custody (R2 0010 精密化②): the act is person-level — storable
+    // iff A MUTUAL EDGE exists between the two, either orientation. No pair
+    // table, no person-level disclosure state: the edge IS the predicate.
     const mutual = await env.BOARD
       .prepare(
-        "SELECT " +
-          "EXISTS(SELECT 1 FROM r15_signal a WHERE a.from_ref = ?1 AND a.to_ref = ?2) AND " +
-          "EXISTS(SELECT 1 FROM r15_signal b WHERE b.from_ref = ?2 AND b.to_ref = ?1) AS m",
+        "SELECT EXISTS(SELECT 1 FROM r15_edge e WHERE e.state = 'mutual' AND " +
+          "((e.a_ref = ?1 AND e.b_ref = ?2) OR (e.a_ref = ?2 AND e.b_ref = ?1))) AS m",
       )
       .bind(me, raw.peerRef)
       .all<{ m: number }>();

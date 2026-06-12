@@ -34,12 +34,15 @@ function fakeD1() {
 }
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
+// R2 0010: every item carries its device-minted stable alias (itemRef).
+const REF_A = "1".repeat(16);
+const REF_B = "2".repeat(16);
 const GOOD = {
   ownerToken: TOKEN,
   displayName: "あや",
   items: [
-    { kind: "have", title: "工房", text: "活版印刷ができる", tags: ["手仕事"], position: 0 },
-    { kind: "want", title: "場", text: "親子の時間をつくりたい", tags: [], position: 1 },
+    { itemRef: REF_A, kind: "have", title: "工房", text: "活版印刷ができる", tags: ["手仕事"], position: 0 },
+    { itemRef: REF_B, kind: "want", title: "場", text: "親子の時間をつくりたい", tags: [], position: 1 },
   ],
 };
 
@@ -103,6 +106,10 @@ test("publish: caps and shapes are fail-closed", async () => {
     [{ ...GOOD, displayName: "あ".repeat(31) }, "display_name"],
     [{ ...GOOD, items: [{ ...GOOD.items[0], kind: "score" }] }, "item_0_kind"],
     [{ ...GOOD, items: [{ ...GOOD.items[0], text: "" }] }, "item_0_text"],
+    // R2 0010: itemRef is REQUIRED, shape-checked, unique within the payload
+    [{ ...GOOD, items: [{ ...GOOD.items[0], itemRef: undefined }] }, "item_0_ref"],
+    [{ ...GOOD, items: [{ ...GOOD.items[0], itemRef: "raw-internal-id" }] }, "item_0_ref"],
+    [{ ...GOOD, items: [GOOD.items[0], { ...GOOD.items[1], itemRef: REF_A }] }, "item_1_ref_dup"],
     [
       { ...GOOD, items: Array.from({ length: 61 }, () => GOOD.items[0]) },
       "items",

@@ -9,7 +9,7 @@
 import { json, type MeetEnv } from "../../_meet.ts";
 import { isParticipantRef } from "../../../lib/meet-net/ref.ts";
 
-const PUBLIC_COLUMNS = "participant_ref, display_name, intro, kind, title, text, tags, position";
+const PUBLIC_COLUMNS = "participant_ref, display_name, intro, kind, title, text, tags, position, item_ref";
 
 interface RawRow {
   participant_ref: string;
@@ -20,6 +20,7 @@ interface RawRow {
   text: string;
   tags: string;
   position: number;
+  item_ref: string;
 }
 
 function parseTags(s: string): string[] {
@@ -59,6 +60,9 @@ export const onRequestGet: PagesFunction<MeetEnv> = async ({ request, env }) => 
       title: r.title,
       text: r.text,
       tags: parseTags(r.tags),
+      // R2 0010: the item's stable public alias — what an edge's basis_item_ref
+      // points at. Device-minted; never a raw internal id (invariant 5).
+      itemRef: r.item_ref,
     }));
 
     // 気配 (第9便 C): a placed question (tag 問い) was just served to another

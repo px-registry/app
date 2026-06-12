@@ -25,6 +25,19 @@ export { deriveParticipantRef, isOwnerToken, isParticipantRef };
 
 export const MEET_KINDS = new Set(["have", "want", "avoid", "memory"]);
 
+// ── R2 0010: item_ref / edge_id の形 ───────────────────────────────────────────
+// item_ref = 端末が mint する公開項目の alias（raw internal id は決して来ない —
+// 0010 invariant 5。乱数 16 hex なので形だけ検証できる）。
+export function isItemRef(s: unknown): s is string {
+  return typeof s === "string" && /^[0-9a-f]{16}$/.test(s);
+}
+
+// edge_id = 端末 mint（edge_ 接頭辞）。r15pair_ は backfill 予約名前空間 —
+// クライアントが backfill を装えないよう、形そのもので拒否する（ゲート条件2）。
+export function isClientEdgeId(s: unknown): s is string {
+  return typeof s === "string" && /^edge_[0-9a-f]{16,32}$/.test(s);
+}
+
 // Payload caps — reject before any DB write.
 export const MAX_ITEMS = 60;
 export const MAX_TITLE = 120;
@@ -55,7 +68,15 @@ export type CleanPublish = {
   displayName: string;
   /** ひとこと紹介 — optional one-liner, same standing as displayName ("" = unset). */
   intro: string;
-  items: Array<{ kind: string; title: string; text: string; tags: string[]; position: number }>;
+  items: Array<{
+    /** R2 0010: device-minted stable alias — REQUIRED, unique within the payload. */
+    itemRef: string;
+    kind: string;
+    title: string;
+    text: string;
+    tags: string[];
+    position: number;
+  }>;
 };
 
 /**
@@ -82,12 +103,19 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
     return { ok: false, reason: "items" };
   }
   const items: CleanPublish["items"] = [];
+  const seenRefs = new Set<string>();
   for (const [i, it] of raw.items.entries()) {
     if (!isRecord(it)) return { ok: false, reason: `item_${i}` };
     if ("private" in it || "ownerId" in it || "ownerToken" in it) {
       // Boundary tripwire: raw memory shapes never cross this line.
       return { ok: false, reason: "private_shape" };
     }
+    // R2 0010: every published item carries its device-minted alias. Fail-closed:
+    // absent, off-shape, or duplicated within the payload rejects the whole publish
+    // (a duplicate would also hit the partial UNIQUE index — the floor below).
+    if (!isItemRef(it.itemRef)) return { ok: false, reason: `item_${i}_ref` };
+    if (seenRefs.has(it.itemRef)) return { ok: false, reason: `item_${i}_ref_dup` };
+    seenRefs.add(it.itemRef);
     if (typeof it.kind !== "string" || !MEET_KINDS.has(it.kind)) {
       return { ok: false, reason: `item_${i}_kind` };
     }
@@ -105,7 +133,7 @@ export function validatePublish(raw: unknown): { ok: true; value: CleanPublish }
       if (typeof t !== "string" || t.length > MAX_TAG) return { ok: false, reason: `item_${i}_tag` };
       tags.push(t);
     }
-    items.push({ kind: it.kind, title: it.title, text: it.text, tags, position: items.length });
+    items.push({ itemRef: it.itemRef, kind: it.kind, title: it.title, text: it.text, tags, position: items.length });
   }
   return { ok: true, value: { ownerToken: raw.ownerToken, displayName, intro, items } };
 }

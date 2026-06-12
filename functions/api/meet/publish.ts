@@ -8,6 +8,14 @@
 // one batch). Publishing again replaces — unpublishing everything is publishing
 // an empty list.
 //
+// R2 0010: every item carries its device-minted stable alias (item_ref). The
+// gated SEMANTICS — alias continuity across republish, so edges' basis_item_ref
+// stays resolvable — is carried by the DEVICE resending the same alias, not by
+// physical row survival. Atomic replace is kept on purpose: a true (ref,item_ref)
+// upsert would fight the legacy (ref,position) PRIMARY KEY when items reorder
+// (transient PK collisions inside the batch). Edges reference item_ref VALUES,
+// never rowids, so replace-with-stable-aliases is observably identical.
+//
 // POST only; same-origin guarded. No score, no rank, no auto-publish: every row
 // here exists because the owner pressed 公開する.
 
@@ -38,10 +46,10 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
         env.BOARD
           .prepare(
             "INSERT INTO r15_pool_item " +
-              "(participant_ref, display_name, intro, kind, title, text, tags, position, updated_at) " +
-              "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+              "(participant_ref, display_name, intro, kind, title, text, tags, position, updated_at, item_ref) " +
+              "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
           )
-          .bind(ref, v.value.displayName, v.value.intro, it.kind, it.title, it.text, JSON.stringify(it.tags), it.position, at),
+          .bind(ref, v.value.displayName, v.value.intro, it.kind, it.title, it.text, JSON.stringify(it.tags), it.position, at, it.itemRef),
       ),
     ];
     await env.BOARD.batch(stmts);

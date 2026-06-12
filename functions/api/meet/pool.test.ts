@@ -13,20 +13,24 @@ const ROWS = [
   {
     participant_ref: "aaaaaaaaaaaaaaaa",
     display_name: "あや",
+    intro: "手を動かす場づくりが好き",
     kind: "have",
     title: "工房",
     text: "活版印刷ができる",
     tags: '["手仕事"]',
     position: 0,
+    item_ref: "1".repeat(16),
   },
   {
     participant_ref: "bbbbbbbbbbbbbbbb",
     display_name: "カフェの人",
+    intro: "",
     kind: "want",
     title: "夜の使い手",
     text: "夜の時間に店を活かしたい",
     tags: "not-json",
     position: 0,
+    item_ref: "2".repeat(16),
   },
 ];
 
@@ -61,14 +65,19 @@ test("pool: serves the closed public shape; broken tags degrade to []", async ()
   const body = await r.json();
   assert.equal(body.ok, true);
   assert.equal(body.items.length, 2);
+  // R2 0010 期待の追従: + ownerIntro（第7便 B・fixture が undefined で隠れていた）
+  // と itemRef（公開項目の安定 alias）。これで closed set が pin として実効になる。
   assert.deepEqual(Object.keys(body.items[0]).sort(), [
+    "itemRef",
     "kind",
+    "ownerIntro",
     "ownerRef",
     "participantRef",
     "tags",
     "text",
     "title",
   ]);
+  assert.equal(body.items[0].itemRef, "1".repeat(16), "stable alias served");
   assert.deepEqual(body.items[0].tags, ["手仕事"]);
   assert.deepEqual(body.items[1].tags, [], "non-JSON tags degrade to []");
 });

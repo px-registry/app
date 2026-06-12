@@ -1,13 +1,16 @@
-// POST /api/meet/inbox — what this owner may see about signals and contact.
+// POST /api/meet/inbox — what this owner may see about edges and contact.
 //
 // POST (not GET) so the owner token travels in the body, never in a URL.
-// Returns, for the CALLER only:
-//   incoming — signals addressed to me (sender pseudonym, anchor, mutual?)
-//   outgoing — refs I have signalled (so the UI shows sent-state)
-//   notes    — a peer's contact note ONLY where the signal is MUTUAL (the
-//              disclosure rule lives here, in SQL: the join requires both
-//              directions to exist before a note row is served)
+// R2 0010: signals are EDGE rows now. Returns, for the CALLER only:
+//   incoming — edges addressed to me (sender pseudonym, anchor, basis, state)
+//   outgoing — edges I opened (so the UI shows sent-state PER CARD, not per peer)
+//   notes    — a peer's contact note ONLY where a MUTUAL EDGE exists between us
+//              (the disclosure rule lives here, in SQL — either orientation;
+//              0010 精密化②: 渡せるか＝∃mutual edge, no person-level state table)
 //   myNotes  — what I have written, so the owner can review/replace it
+//
+// Closed edges are served too — the honest fact, shown before pressing (c18b
+// lineage); the UI words it, the server never hides it.
 
 import {
   json,
@@ -17,17 +20,22 @@ import {
   type MeetEnv,
 } from "../../_meet.ts";
 
-interface SignalRow {
-  from_ref: string;
+interface InEdgeRow {
+  edge_id: string;
+  a_ref: string;
   from_name: string;
   from_intro: string;
+  basis_item_ref: string;
   anchor: string;
+  state: string;
   created_at: string;
-  mutual: number;
 }
-interface OutRow {
-  to_ref: string;
-  mutual: number;
+interface OutEdgeRow {
+  edge_id: string;
+  b_ref: string;
+  basis_item_ref: string;
+  state: string;
+  created_at: string;
 }
 interface NoteRow {
   writer_ref: string;
@@ -37,6 +45,12 @@ interface MyNoteRow {
   peer_ref: string;
   note: string;
 }
+
+// ∃ mutual edge between the two refs, either orientation — the ONLY contact
+// disclosure predicate (no pair table, no person-level state).
+const MUTUAL_EDGE =
+  "EXISTS(SELECT 1 FROM r15_edge m WHERE m.state = 'mutual' AND " +
+  "((m.a_ref = ?1 AND m.b_ref = n.writer_ref) OR (m.a_ref = n.writer_ref AND m.b_ref = ?1)))";
 
 export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) => {
   if (!isAllowedWriteOrigin(request)) return json({ ok: false, error: "bad_origin" }, 403);
@@ -48,32 +62,25 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
   try {
     const incoming = await env.BOARD
       .prepare(
-        "SELECT s.from_ref, s.from_name, s.anchor, s.created_at, " +
-          // sender's CURRENT published ひとこと紹介 (公開射影の一部; '' = unset)
-          "COALESCE((SELECT p.intro FROM r15_pool_item p WHERE p.participant_ref = s.from_ref ORDER BY p.position LIMIT 1), '') AS from_intro, " +
-          "EXISTS(SELECT 1 FROM r15_signal b WHERE b.from_ref = s.to_ref AND b.to_ref = s.from_ref) AS mutual " +
-          "FROM r15_signal s WHERE s.to_ref = ?1 ORDER BY s.created_at",
+        "SELECT e.edge_id, e.a_ref, e.from_name, e.basis_item_ref, e.anchor, e.state, e.created_at, " +
+          // sender's CURRENT published ひとこと紹介 (公開射影の一部; '' = unset/departed)
+          "COALESCE((SELECT p.intro FROM r15_pool_item p WHERE p.participant_ref = e.a_ref ORDER BY p.position LIMIT 1), '') AS from_intro " +
+          "FROM r15_edge e WHERE e.b_ref = ?1 ORDER BY e.created_at",
       )
       .bind(me)
-      .all<SignalRow>();
+      .all<InEdgeRow>();
 
     const outgoing = await env.BOARD
       .prepare(
-        "SELECT s.to_ref, " +
-          "EXISTS(SELECT 1 FROM r15_signal b WHERE b.from_ref = s.to_ref AND b.to_ref = s.from_ref) AS mutual " +
-          "FROM r15_signal s WHERE s.from_ref = ?1",
+        "SELECT edge_id, b_ref, basis_item_ref, state, created_at " +
+          "FROM r15_edge WHERE a_ref = ?1 ORDER BY created_at",
       )
       .bind(me)
-      .all<OutRow>();
+      .all<OutEdgeRow>();
 
-    // The disclosure rule, in SQL: a peer's note is served ONLY when the
-    // mutual signal pair exists.
     const notes = await env.BOARD
       .prepare(
-        "SELECT n.writer_ref, n.note FROM r15_contact_note n " +
-          "WHERE n.peer_ref = ?1 " +
-          "AND EXISTS(SELECT 1 FROM r15_signal a WHERE a.from_ref = ?1 AND a.to_ref = n.writer_ref) " +
-          "AND EXISTS(SELECT 1 FROM r15_signal b WHERE b.from_ref = n.writer_ref AND b.to_ref = ?1)",
+        `SELECT n.writer_ref, n.note FROM r15_contact_note n WHERE n.peer_ref = ?1 AND ${MUTUAL_EDGE}`,
       )
       .bind(me)
       .all<NoteRow>();
@@ -96,14 +103,22 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
     return json({
       ok: true,
       incoming: (incoming.results ?? []).map((r) => ({
-        fromRef: r.from_ref,
+        edgeId: r.edge_id,
+        fromRef: r.a_ref,
         fromName: r.from_name,
         fromIntro: r.from_intro,
+        basisItemRef: r.basis_item_ref,
         anchor: r.anchor,
+        state: r.state,
         createdAt: r.created_at,
-        mutual: r.mutual === 1,
       })),
-      outgoing: (outgoing.results ?? []).map((r) => ({ toRef: r.to_ref, mutual: r.mutual === 1 })),
+      outgoing: (outgoing.results ?? []).map((r) => ({
+        edgeId: r.edge_id,
+        toRef: r.b_ref,
+        basisItemRef: r.basis_item_ref,
+        state: r.state,
+        createdAt: r.created_at,
+      })),
       notes: (notes.results ?? []).map((r) => ({ fromRef: r.writer_ref, note: r.note })),
       myNotes: (myNotes.results ?? []).map((r) => ({ peerRef: r.peer_ref, note: r.note })),
       questionReads: (reads.results ?? []).map((r) => ({ position: r.position, count: r.n })),

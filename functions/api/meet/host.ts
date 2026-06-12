@@ -35,9 +35,13 @@ interface LogRow {
   updated_at: string;
 }
 interface SigRow {
+  edge_id: string;
   from_name: string;
-  from_ref: string;
-  to_ref: string;
+  a_ref: string;
+  b_ref: string;
+  basis_item_ref: string;
+  anchor: string;
+  state: string;
   created_at: string;
 }
 interface PoolRow {
@@ -64,8 +68,13 @@ export const onRequestPost: PagesFunction<HostEnv> = async ({ request, env }) =>
           "FROM r15_log ORDER BY display_name, created_at",
       )
       .all<LogRow>();
+    // R2 0010: the signals overview is edge rows now (state included — the
+    // facilitator sees sent/mutual/closed as facts, never a ranking).
     const signals = await env.BOARD
-      .prepare("SELECT from_name, from_ref, to_ref, created_at FROM r15_signal ORDER BY created_at")
+      .prepare(
+        "SELECT edge_id, from_name, a_ref, b_ref, basis_item_ref, anchor, state, created_at " +
+          "FROM r15_edge ORDER BY created_at",
+      )
       .all<SigRow>();
     const pool = await env.BOARD
       .prepare(
@@ -86,9 +95,13 @@ export const onRequestPost: PagesFunction<HostEnv> = async ({ request, env }) =>
         updatedAt: r.updated_at,
       })),
       signals: (signals.results ?? []).map((r) => ({
+        edgeId: r.edge_id,
         fromName: r.from_name,
-        fromRef: r.from_ref,
-        toRef: r.to_ref,
+        fromRef: r.a_ref,
+        toRef: r.b_ref,
+        basisItemRef: r.basis_item_ref,
+        anchor: r.anchor,
+        state: r.state,
         createdAt: r.created_at,
       })),
       pool: (pool.results ?? []).map((r) => {
