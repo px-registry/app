@@ -242,6 +242,56 @@ try {
   check("c18: 他カード（あや mutual の c17 面）無変化", (await page.locator(".m-signal", { hasText: "あや" }).locator(".m-talkface").count()) === 1);
   await shot("07c-c18-not-in-pool");
 
+  // 6c. c18b — 押す前から正直に（受動マーキング）・一手で片づく
+  const refB = await deriveRef(TOK_B);
+  // 提案側 fixture: カフェの人宛てカードを受信棚へ注入（生成なしの決定論）
+  await page.evaluate(async ({ refB }) => {
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open("px-meet", 2);
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction("received", "readwrite");
+        tx.objectStore("received").put({
+          entryId: "recv_c18b_fixture",
+          createdAt: new Date().toISOString(),
+          question: "",
+          modelLabel: "fixture",
+          raw: "[]",
+          cards: [{ to: "カフェの人", line1: "夜の店を一緒に試す相手です。", line2: "", line3: "", basisItemId: "p1" }],
+          refs: { "カフェの人": refB },
+          basisItems: { p1: { ownerRef: "カフェの人", title: "昼だけのカフェ", text: "平日昼に間借りで開けている" } },
+          echoFlag: false,
+          readings: {},
+        });
+        tx.oncomplete = () => { db.close(); resolve(undefined); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }, { refB });
+  await page.reload({ waitUntil: "networkidle" });
+  // 合図カード: 押す前から不在一行＋静かなボタン＋片づける
+  await waitCheck("c18b: 合図カードが押す前から不在一行", cafeCard.getByText("この相手は、いまは候補に出ていません。"));
+  check("c18b: 行為ボタンは静かな見た目 (m-btn-dim)", (await cafeCard.locator("button.m-btn-dim").count()) === 1);
+  check("c18b: 片づける は不在カードにだけ出る", (await cafeCard.getByRole("button", { name: "片づける" }).count()) === 1 && (await page.locator(".m-signal", { hasText: "あや" }).getByRole("button", { name: "片づける" }).count()) === 0);
+  // 提案カード: 同じ一行＋静かなボタン（既存「この回を消す」が箒・新設なし）
+  const fixtureEntry = page.locator(".m-entry", { hasText: "夜の店を一緒に試す相手です。" });
+  await waitCheck("c18b: 提案カードも押す前から不在一行", fixtureEntry.getByText("この相手は、いまは候補に出ていません。"));
+  check("c18b: 提案側の話してみるも静か", (await fixtureEntry.locator("button.m-btn-dim").count()) === 1);
+  check("c18b: 提案側の箒は既存「この回を消す」", (await fixtureEntry.getByRole("button", { name: "この回を消す" }).count()) === 1);
+  await shot("07d-c18b-marked");
+  // 片づける → 消える → reload 後も非表示 → サーバ行は残存
+  await cafeCard.getByRole("button", { name: "片づける" }).click();
+  await page.locator(".m-signal", { hasText: "カフェの人" }).waitFor({ state: "detached" });
+  check("c18b: 片づける → カードが消える", (await page.locator(".m-signal", { hasText: "カフェの人" }).count()) === 0);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator(".m-signal", { hasText: "あや" }).waitFor();
+  check("c18b: reload 後も非表示が持続", (await page.locator(".m-signal", { hasText: "カフェの人" }).count()) === 0);
+  check("c18b: あや（生きている mutual）は出続ける", (await page.locator(".m-signal", { hasText: "あや" }).count()) === 1);
+  const inboxMine = await api("/api/meet/inbox", { ownerToken: myToken });
+  check("c18b: サーバ行は残存（履歴不触）", inboxMine.body?.incoming?.some((s) => s.fromRef === refB) === true);
+  await shot("07e-c18b-swept");
+
   // 7. receive attempt (fake key) — honest typed error, 第9便: as a DATED
   // ENTRY at the top of AIが見つけた提案
   await page.getByRole("button", { name: "探しに行く" }).click();
