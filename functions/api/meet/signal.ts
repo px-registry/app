@@ -44,6 +44,9 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
   if (fromName.length === 0 || fromName.length > MAX_NAME) {
     return json({ ok: false, error: "from_name" }, 400);
   }
+  // 0011: the addressee's public pseudonym AT SEND TIME (same data class as
+  // from_name) — a's pair face keeps the name even if b later leaves the pool.
+  const toName = typeof raw.toName === "string" ? raw.toName.trim().slice(0, MAX_NAME) : "";
   const anchor =
     typeof raw.anchor === "string" ? raw.anchor.trim().slice(0, MAX_ANCHOR) : "";
   // Opaque pointer into the sender's own device shelf (recv entry+card) — no
@@ -92,10 +95,10 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
     await env.BOARD
       .prepare(
         "INSERT INTO r15_edge " +
-          "(edge_id, a_ref, b_ref, basis_item_ref, proposal_ptr, anchor, from_name, state, created_at, last_act_a_at) " +
-          "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'sent', ?8, ?8)",
+          "(edge_id, a_ref, b_ref, basis_item_ref, proposal_ptr, anchor, from_name, to_name, state, created_at, last_act_a_at) " +
+          "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'sent', ?9, ?9)",
       )
-      .bind(raw.edgeId, fromRef, raw.toRef, raw.basisItemRef, proposalPtr, anchor, fromName, now)
+      .bind(raw.edgeId, fromRef, raw.toRef, raw.basisItemRef, proposalPtr, anchor, fromName, toName, now)
       .run();
     return json({ ok: true, edgeId: raw.edgeId, state: "sent", existing: false }, 201);
   } catch {

@@ -118,16 +118,20 @@ function ReadingEditor({
 
 export function ProposalEntry({
   entry,
-  sentEdgeKeys,
+  cardEdges,
   poolRefs,
   onTalk,
+  onWithdraw,
   onReading,
   onRemove,
 }: {
   entry: ReceivedProposalV1;
-  /** R2 0010: live edges this owner opened — keys are `${toRef}:${basisItemRef}`
-   *  (sent は接点単位; 同じ相手でも別の接点はまだ押せる). */
-  sentEdgeKeys: ReadonlySet<string>;
+  /** R2 0010/便3: このカード（接点）の edge — キーは `${toRef}:${basisItemRef}`。
+   *  live（sent/mutual）が勝ち、closed は「相手が sent 段階で止めた」場合だけ載る。 */
+  cardEdges: ReadonlyMap<
+    string,
+    { edgeId: string; state: "sent" | "mutual" | "closed"; dormant: boolean }
+  >;
   /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell.
    *  Marking is advisory — c18's act-time check stays the second guard. */
   poolRefs: ReadonlySet<string> | null;
@@ -144,6 +148,8 @@ export function ProposalEntry({
     line2: string,
     to: string,
   ) => Promise<{ ok: boolean; code: string }>;
+  /** 便3 T3 — a の取り下げ（sent の edge にだけ出る）。 */
+  onWithdraw: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
   onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<boolean>;
   onRemove: (entryId: string) => Promise<void>;
 }) {
@@ -217,7 +223,10 @@ export function ProposalEntry({
               // pre-R2 entries ("" alias) never match a key; their act fails
               // honestly at the server (basis_not_in_pool).
               const basisRef = basisItem?.itemRef ?? "";
-              const sent = sentEdgeKeys.has(`${toRef}:${basisRef}`);
+              const edge = cardEdges.get(`${toRef}:${basisRef}`);
+              const sent = edge !== undefined && edge.state !== "closed";
+              // 便3: 相手が sent 段階で止めた接点 — 一語の事実（語り分けない）。
+              const stopped = edge !== undefined && edge.state === "closed";
               // c18b 受動マーキング: 押す前から無いと分かる。確信があるとき
               // だけ（pool照合不能=null では偽の不在も嘘なのでマークしない）。
               const absent = poolRefs !== null && !poolRefs.has(toRef);
@@ -229,7 +238,34 @@ export function ProposalEntry({
                     <Ring state="sent" size={22} />
                     <h3>{card.to}</h3>
                     {sent && <span className="m-statechip">{MEET.proposal.talkSent}</span>}
+                    {edge !== undefined && edge.state === "sent" && (
+                      // 便3 T3 — 取り下げる: sent のあいだだけ（mutual は pair 面で閉じる）
+                      <button
+                        type="button"
+                        className="m-link"
+                        onClick={() =>
+                          void onWithdraw(edge.edgeId).then((r) =>
+                            setTalkNotes((prev) => ({ ...prev, [index]: r.ok ? "" : r.code })),
+                          )
+                        }
+                      >
+                        {MEET.home.edge.withdraw}
+                      </button>
+                    )}
                   </div>
+                  {stopped && (
+                    // 便3 — 相手が止めた事実の一語（終わり方を語り分けない）。
+                    // ボタンは下に残る: 再び押すのは新しい edge（T6）。
+                    <p className="m-note" aria-live="polite" style={{ margin: "0.3rem 0 0" }}>
+                      {MEET.home.edge.stopped}
+                    </p>
+                  )}
+                  {edge !== undefined && edge.dormant && edge.state !== "closed" && (
+                    // 便3 — dormant は読み時導出の事実（状態ではない）
+                    <p className="m-note" style={{ margin: "0.3rem 0 0" }}>
+                      {MEET.home.edge.dormant}
+                    </p>
+                  )}
                   {absent && (
                     // c18b/c18c: the same line c18 answers with, BEFORE any
                     // press — and directly under the sent chip too (a sent

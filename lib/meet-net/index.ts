@@ -31,6 +31,7 @@ export {
   fetchPool,
   sendSignal,
   sendTalkBack,
+  sendClose,
   fetchInbox,
   saveContactNote,
   submitLog,

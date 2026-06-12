@@ -12,10 +12,12 @@ import assert from "node:assert/strict";
 
 import { onRequestPost as signalPost } from "./signal.ts";
 import { onRequestPost as talkbackPost } from "./talkback.ts";
+import { onRequestPost as closePost } from "./close.ts";
 import { onRequestPost as contactPost } from "./contact.ts";
 import { onRequestPost as inboxPost } from "./inbox.ts";
 import { onRequestPost as logPost } from "./log.ts";
 import { onRequestPost as hostPost } from "./host.ts";
+import { deriveDormant, DORMANT_TTL_DAYS } from "../../_meet.ts";
 import { deriveParticipantRef } from "../../../lib/meet-net/ref.ts";
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
@@ -195,6 +197,65 @@ test("T2: mutual is idempotent; closed refuses honestly (T6: no reopen)", async 
   const missing = fakeD1(() => []);
   const r3 = await post(talkbackPost, "talkback", { ownerToken: TOKEN, edgeId: EDGE }, missing).res;
   assert.equal(r3.status, 404);
+});
+
+// ── close = T3/T4/T5 (live→closed, participants only) ──────────────────────────
+
+test("T3/T4/T5: a participant closes a live edge — closed_from records the SOURCE state", async () => {
+  const me = await deriveParticipantRef(TOKEN);
+  for (const from of ["sent", "mutual"]) {
+    const db = fakeD1((sql) => (sql.includes("SELECT a_ref") ? [edgeRow(from, me)] : []));
+    const { res } = post(closePost, "close", { ownerToken: TOKEN, edgeId: EDGE }, db);
+    const r = await res;
+    assert.equal(r.status, 201);
+    assert.equal((await r.json()).state, "closed");
+    const upd = db.calls.find((c) => c.sql.includes("UPDATE r15_edge"));
+    assert.ok(upd, "update issued");
+    assert.match(upd!.sql, /state = 'closed'/);
+    assert.match(upd!.sql, /closed_from = /, "transition source recorded (0011)");
+    assert.ok(upd!.args.includes(from), `closed_from binds the source state (${from})`);
+    assert.ok(upd!.args.includes(me), "closed_by binds the actor");
+    assert.ok(!/reason/i.test(upd!.sql), "no reason column — invariant 4");
+  }
+});
+
+test("close: b's act moves b's clock (and only b's)", async () => {
+  const me = await deriveParticipantRef(TOKEN);
+  const db = fakeD1((sql) => (sql.includes("SELECT a_ref") ? [edgeRow("sent", me)] : []));
+  await post(closePost, "close", { ownerToken: TOKEN, edgeId: EDGE }, db).res;
+  const upd = db.calls.find((c) => c.sql.includes("UPDATE r15_edge"));
+  assert.match(upd!.sql, /last_act_b_at/, "addressee's close is b's act");
+  assert.ok(!upd!.sql.includes("last_act_a_at"), "a's clock untouched");
+});
+
+test("close: a stranger gets 403; closed is idempotent (T6 — closed_by never overwritten)", async () => {
+  const stranger = fakeD1((sql) =>
+    sql.includes("SELECT a_ref") ? [{ a_ref: "x".repeat(16), b_ref: "y".repeat(16), state: "sent" }] : [],
+  );
+  const r1 = await post(closePost, "close", { ownerToken: TOKEN, edgeId: EDGE }, stranger).res;
+  assert.equal(r1.status, 403);
+  assert.equal((await r1.json()).error, "not_participant");
+  assert.ok(!stranger.calls.some((c) => c.sql.includes("UPDATE")));
+
+  const me = await deriveParticipantRef(TOKEN);
+  const already = fakeD1((sql) => (sql.includes("SELECT a_ref") ? [edgeRow("closed", me)] : []));
+  const r2 = await post(closePost, "close", { ownerToken: TOKEN, edgeId: EDGE }, already).res;
+  assert.equal(r2.status, 200);
+  assert.equal((await r2.json()).already, true);
+  assert.ok(!already.calls.some((c) => c.sql.includes("UPDATE")), "first actor's record stands");
+});
+
+// ── dormant derivation (読み時導出 — 状態ではない) ──────────────────────────────
+
+test("dormant: derived at read; acts wake it; closed never sleeps", () => {
+  const now = new Date("2026-06-12T00:00:00Z");
+  const old = "2026-01-01T00:00:00Z"; // > 90 days before now
+  const fresh = "2026-06-01T00:00:00Z";
+  assert.equal(deriveDormant("sent", old, old, "", now), true, "old sent edge sleeps");
+  assert.equal(deriveDormant("sent", old, old, fresh, now), false, "a recent act wakes it");
+  assert.equal(deriveDormant("mutual", old, fresh, "", now), false, "either side's act counts");
+  assert.equal(deriveDormant("closed", old, old, "", now), false, "閉じは閉じ — 眠りではない");
+  assert.ok(DORMANT_TTL_DAYS === 90, "TTL 仮90日 (命名・調整は後続)");
 });
 
 // ── contact ─────────────────────────────────────────────────────────────────────

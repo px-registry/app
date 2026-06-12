@@ -17,6 +17,7 @@ import {
   deriveParticipantRef,
   isOwnerToken,
   isAllowedWriteOrigin,
+  deriveDormant,
   type MeetEnv,
 } from "../../_meet.ts";
 
@@ -28,14 +29,24 @@ interface InEdgeRow {
   basis_item_ref: string;
   anchor: string;
   state: string;
+  closed_by: string;
+  closed_from: string;
   created_at: string;
+  last_act_a_at: string;
+  last_act_b_at: string;
 }
 interface OutEdgeRow {
   edge_id: string;
   b_ref: string;
+  to_name: string;
   basis_item_ref: string;
+  anchor: string;
   state: string;
+  closed_by: string;
+  closed_from: string;
   created_at: string;
+  last_act_a_at: string;
+  last_act_b_at: string;
 }
 interface NoteRow {
   writer_ref: string;
@@ -62,7 +73,8 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
   try {
     const incoming = await env.BOARD
       .prepare(
-        "SELECT e.edge_id, e.a_ref, e.from_name, e.basis_item_ref, e.anchor, e.state, e.created_at, " +
+        "SELECT e.edge_id, e.a_ref, e.from_name, e.basis_item_ref, e.anchor, e.state, " +
+          "e.closed_by, e.closed_from, e.created_at, e.last_act_a_at, e.last_act_b_at, " +
           // sender's CURRENT published ひとこと紹介 (公開射影の一部; '' = unset/departed)
           "COALESCE((SELECT p.intro FROM r15_pool_item p WHERE p.participant_ref = e.a_ref ORDER BY p.position LIMIT 1), '') AS from_intro " +
           "FROM r15_edge e WHERE e.b_ref = ?1 ORDER BY e.created_at",
@@ -70,9 +82,12 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       .bind(me)
       .all<InEdgeRow>();
 
+    // 便3: a 側の pair 面（mutual 後の前室）は outgoing で建つ — to_name と anchor
+    // を一緒に serve する（to_name は送信時点固定・from_name と同格）。
     const outgoing = await env.BOARD
       .prepare(
-        "SELECT edge_id, b_ref, basis_item_ref, state, created_at " +
+        "SELECT edge_id, b_ref, to_name, basis_item_ref, anchor, state, closed_by, " +
+          "closed_from, created_at, last_act_a_at, last_act_b_at " +
           "FROM r15_edge WHERE a_ref = ?1 ORDER BY created_at",
       )
       .bind(me)
@@ -100,6 +115,10 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
       .bind(me, day)
       .all<{ position: number; n: number }>();
 
+    // 便3 — dormant は読み時導出（状態ではない・invariant 1/2）。closed の出自は
+    // closedByMe の真偽だけ serve する: 自分の行為は自分が知っている、相手側には
+    // 一語の事実だけ — 終わり方を語り分けない（invariant 4 の表示版）。
+    const now = new Date();
     return json({
       ok: true,
       incoming: (incoming.results ?? []).map((r) => ({
@@ -110,13 +129,21 @@ export const onRequestPost: PagesFunction<MeetEnv> = async ({ request, env }) =>
         basisItemRef: r.basis_item_ref,
         anchor: r.anchor,
         state: r.state,
+        closedByMe: r.state === "closed" && r.closed_by === me,
+        closedFrom: r.closed_from,
+        dormant: deriveDormant(r.state, r.created_at, r.last_act_a_at, r.last_act_b_at, now),
         createdAt: r.created_at,
       })),
       outgoing: (outgoing.results ?? []).map((r) => ({
         edgeId: r.edge_id,
         toRef: r.b_ref,
+        toName: r.to_name,
         basisItemRef: r.basis_item_ref,
+        anchor: r.anchor,
         state: r.state,
+        closedByMe: r.state === "closed" && r.closed_by === me,
+        closedFrom: r.closed_from,
+        dormant: deriveDormant(r.state, r.created_at, r.last_act_a_at, r.last_act_b_at, now),
         createdAt: r.created_at,
       })),
       notes: (notes.results ?? []).map((r) => ({ fromRef: r.writer_ref, note: r.note })),

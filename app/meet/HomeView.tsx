@@ -35,6 +35,7 @@ import {
   fetchInbox,
   sendSignal,
   sendTalkBack,
+  sendClose,
   saveContactNote,
   submitLog,
   buildOutboundProjection,
@@ -182,6 +183,12 @@ export function HomeView() {
         const m = firstNoteMaterialFor(sig.fromRef, list, sig.anchor);
         fn[sig.fromRef] = { basis: m.basis, draft: await notesLane.get(sig.fromRef) };
       }
+      // 便3: a 側の pair 面（outgoing mutual）にも同じ顔データを用意する。
+      for (const o of ib.outgoing) {
+        if (o.state !== "mutual" || o.toRef in fn) continue;
+        const m = firstNoteMaterialFor(o.toRef, list, o.anchor);
+        fn[o.toRef] = { basis: m.basis, draft: await notesLane.get(o.toRef) };
+      }
     }
     setFirstNotes(fn);
     setLastPatrolAt(getPatrolLastRun());
@@ -215,14 +222,30 @@ export function HomeView() {
 
   const hasItems = rigEntries.length > 0;
   const ready = connected && hasItems && displayName !== "";
-  // R2 0010: sent は edge 単位 — キーは `${toRef}:${basisItemRef}`（カードの接点）。
-  // closed は数えない（取り下げた接点は再び押せる — T6: 再会は新 edge）。
-  const sentEdgeKeys = useMemo(
+  // R2 0010/便3: カード（接点）単位の edge 地図 — キーは `${toRef}:${basisItemRef}`。
+  // live（sent/mutual）が常に勝つ。closed は「相手が sent 段階で止めた」場合だけ
+  // 載せる（stopped の一語表示）。自分の取り下げは載せない（自分の行為 — カードは
+  // 押せる状態に戻る）。mutual からの閉じは pair 面（合図欄）が語る。
+  const cardEdges = useMemo(() => {
+    const m = new Map<
+      string,
+      { edgeId: string; state: "sent" | "mutual" | "closed"; dormant: boolean }
+    >();
+    for (const o of inbox?.outgoing ?? []) {
+      const key = `${o.toRef}:${o.basisItemRef}`;
+      if (o.state !== "closed") {
+        m.set(key, { edgeId: o.edgeId, state: o.state, dormant: o.dormant });
+      } else if (!m.has(key) && !o.closedByMe && o.closedFrom === "sent") {
+        m.set(key, { edgeId: o.edgeId, state: "closed", dormant: false });
+      }
+    }
+    return m;
+  }, [inbox]);
+  // 便3: a 側の pair 面（mutual の前室と、トークが閉じられた事実）は outgoing で建つ。
+  const outgoingPairs = useMemo(
     () =>
-      new Set(
-        (inbox?.outgoing ?? [])
-          .filter((o) => o.state !== "closed")
-          .map((o) => `${o.toRef}:${o.basisItemRef}`),
+      (inbox?.outgoing ?? []).filter(
+        (o) => o.state === "mutual" || (o.state === "closed" && o.closedFrom === "mutual"),
       ),
     [inbox],
   );
@@ -491,6 +514,7 @@ export function HomeView() {
       ownerToken: getOrMintOwnerToken(),
       toRef,
       fromName: displayName,
+      toName: to,
       anchor,
       edgeId: mintEdgeId(),
       basisItemRef,
@@ -504,6 +528,13 @@ export function HomeView() {
   // 立てない（mutual は同じ接点で揃う）。
   const talkBack = async (edgeId: string): Promise<{ ok: boolean; code: string }> => {
     const r = await sendTalkBack({ ownerToken: getOrMintOwnerToken(), edgeId });
+    await reload();
+    return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
+  };
+
+  // 便3 T3/T4/T5: 取り下げる／閉じる — participant の行為だけが遷移を書く。
+  const closeEdge = async (edgeId: string): Promise<{ ok: boolean; code: string }> => {
+    const r = await sendClose({ ownerToken: getOrMintOwnerToken(), edgeId });
     await reload();
     return r.ok ? { ok: true, code: "" } : { ok: false, code: r.error };
   };
@@ -622,7 +653,7 @@ export function HomeView() {
       <section className="m-section">
         <p className="m-eyebrow">{MEET.home.place.eyebrowAsk}</p>
         <div className="m-secrow">
-          <h2 className="m-h2">{MEET.home.place.confirmHeading}</h2>
+          <h2 className="m-h2">{MEET.home.place.heading}</h2>
         </div>
         <textarea
           className="m-field"
@@ -879,9 +910,11 @@ export function HomeView() {
 
       <SignalsSection
         inbox={inbox}
+        outgoingPairs={outgoingPairs}
         firstNotes={firstNotes}
         poolRefs={poolRefs}
         onTalkBack={talkBack}
+        onClose={closeEdge}
         onSaveContact={saveContact}
         onMakeFirstNote={makeFirstNote}
         onSaveFirstNote={saveFirstNote}
@@ -937,9 +970,10 @@ export function HomeView() {
                 <ProposalEntry
                   key={entry.entryId}
                   entry={entry}
-                  sentEdgeKeys={sentEdgeKeys}
+                  cardEdges={cardEdges}
                   poolRefs={poolRefs}
                   onTalk={talk}
+                  onWithdraw={closeEdge}
                   onReading={reading}
                   onRemove={removeEntry}
                 />

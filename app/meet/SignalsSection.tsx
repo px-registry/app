@@ -21,6 +21,7 @@ import {
   addHiddenSignalRef,
   type InboxData,
   type InboxIncoming,
+  type InboxOutgoing,
 } from "@/lib/meet-net";
 import { Ring } from "./Ring.tsx";
 
@@ -102,12 +103,15 @@ function ContactExchange({
 // editable textarea → コピー → the assist line. The textarea is the always-open
 // L0: hand-writing needs no AI, and a failed generation leaves it untouched.
 function TalkFace({
-  sig,
+  peerRef,
+  anchor,
   face,
   onMake,
   onSaveDraft,
 }: {
-  sig: InboxIncoming;
+  /** 便3: incoming（fromRef）にも outgoing pair（toRef）にも同じ顔で立つ。 */
+  peerRef: string;
+  anchor: string;
   face: FirstNoteFaceData;
   onMake: (peerRef: string) => Promise<string | null>;
   onSaveDraft: (peerRef: string, text: string) => Promise<void>;
@@ -127,7 +131,7 @@ function TalkFace({
   const make = () => {
     setBusy(true);
     setFailed(false);
-    void onMake(sig.fromRef).then((draft) => {
+    void onMake(peerRef).then((draft) => {
       setBusy(false);
       if (draft === null) {
         setFailed(true); // the textarea keeps the owner's words (L0 stays open)
@@ -139,7 +143,7 @@ function TalkFace({
   };
 
   const save = () => {
-    void onSaveDraft(sig.fromRef, text);
+    void onSaveDraft(peerRef, text);
   };
 
   const copy = () => {
@@ -157,7 +161,7 @@ function TalkFace({
   return (
     <div className="m-talkface">
       <p className="m-eyebrow">{MEET.firstNote.eyebrow}</p>
-      {sig.anchor !== "" && <p className="m-pairline">{sig.anchor}</p>}
+      {anchor !== "" && <p className="m-pairline">{anchor}</p>}
       {face.basis !== null && (
         <details className="m-basis">
           <summary>{MEET.proposal.basisShow}</summary>
@@ -218,14 +222,18 @@ function TalkFace({
 
 export function SignalsSection({
   inbox,
+  outgoingPairs,
   firstNotes,
   poolRefs,
   onTalkBack,
+  onClose,
   onSaveContact,
   onMakeFirstNote,
   onSaveFirstNote,
 }: {
   inbox: InboxData | null;
+  /** 便3: a 側の pair 面 — 自分が開いた edge が mutual（または mutual から閉じ）になったもの。 */
+  outgoingPairs: InboxOutgoing[];
   /** c17: per-peer face data (basis + saved draft), owner-local only. */
   firstNotes: Record<string, FirstNoteFaceData>;
   /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell. */
@@ -233,6 +241,8 @@ export function SignalsSection({
   /** c18: the send result comes back — a refusal renders an honest line.
    *  R2 0010 T2: the answer addresses the EDGE that arrived (no reverse edge). */
   onTalkBack: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
+  /** 便3 T4/T5 — 閉じる（participant の行為のみ・結果は reload が運ぶ）。 */
+  onClose: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
   onSaveContact: (peerRef: string, note: string) => Promise<boolean>;
   onMakeFirstNote: (peerRef: string) => Promise<string | null>;
   onSaveFirstNote: (peerRef: string, text: string) => Promise<void>;
@@ -253,24 +263,40 @@ export function SignalsSection({
     poolRefs !== null && !poolRefs.has(sig.fromRef);
   // 片づけは「不在の残骸」だけを伏せる: 相手が pool に戻れば自動で再び見える
   // (箒が生きた相手を隠さない)。mutual は常に見える。
+  // 便3: 自分が sent 段階で閉じた edge は出さない（自分の行為 — 表示すら要らない）。
+  // mutual から閉じたものは双方に「このトークは閉じられました。」が出る（裁定）。
   const incoming = (inbox?.incoming ?? []).filter(
-    (sig) => sig.state === "mutual" || !(hidden.has(sig.fromRef) && absentOf(sig)),
+    (sig) =>
+      !(sig.state === "closed" && sig.closedByMe && sig.closedFrom !== "mutual") &&
+      (sig.state === "mutual" || !(hidden.has(sig.fromRef) && absentOf(sig))),
   );
 
   const sweep = (ref: string) => {
     setHidden(new Set(addHiddenSignalRef(ref)));
   };
+  // 便3 — 閉じる の結末（沈黙の禁止: 失敗は一行で出る; 成功は reload が状態を変える）
+  const [closeNotes, setCloseNotes] = useState<Record<string, string>>({});
+  const close = (edgeId: string) =>
+    void onClose(edgeId).then((r) =>
+      setCloseNotes((prev) => ({ ...prev, [edgeId]: r.ok ? "" : r.code })),
+    );
+  const closeLine = (edgeId: string) =>
+    (closeNotes[edgeId] ?? "") !== "" && (
+      <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+        {MEET.receive.errors[closeNotes[edgeId]] ?? MEET.receive.errors.unknown}
+      </p>
+    );
   return (
     <section className="m-section">
       <p className="m-eyebrow">{MEET.home.signals.eyebrow}</p>
       <div className="m-secrow">
         <h2 className="m-h2">{MEET.home.signals.heading}</h2>
-        <span className="m-badge">{incoming.length}</span>
+        <span className="m-badge">{incoming.length + outgoingPairs.length}</span>
       </div>
       <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
         {MEET.home.signals.subnote}
       </p>
-      {incoming.length === 0 ? (
+      {incoming.length === 0 && outgoingPairs.length === 0 ? (
         <div className="m-empty">{MEET.home.signals.empty}</div>
       ) : (
         <ul className="m-itemlist">
@@ -279,24 +305,44 @@ export function SignalsSection({
               inbox?.notes.find((n) => n.fromRef === sig.fromRef)?.note ?? null;
             const myNote = inbox?.myNotes.find((n) => n.peerRef === sig.fromRef)?.note ?? "";
             const isMutual = sig.state === "mutual";
+            const isClosed = sig.state === "closed";
             return (
               <li key={sig.edgeId} className={`m-signal${isMutual ? "" : " is-in"}`}>
                 <div className="m-sighead">
-                  {/* 輪が語る: open=相手は挙げた・あなたはまだ / pair=相互。
-                      こちらも押すと弧が閉じて pair へ（~300ms; Ring.tsx）。
-                      c9-5: 印なしの輪は状態記号サイズ=26。印あり=52 は R2 用の規約
-                      （G-1=B: 今回の配布に印データは存在しない＝常に小輪）。 */}
-                  <Ring state={isMutual ? "pair" : "open"} size={26} />
-                  <h4>{MEET.home.signals.incoming(sig.fromName)}</h4>
+                  {/* 輪が語る: open=相手は挙げた・あなたはまだ / pair=相互 /
+                      resting=閉じ。c9-5: 印なしの輪は状態記号サイズ=26。 */}
+                  <Ring state={isClosed ? "resting" : isMutual ? "pair" : "open"} size={26} />
+                  {isClosed ? (
+                    <h4>{sig.fromName}</h4>
+                  ) : (
+                    <h4>{MEET.home.signals.incoming(sig.fromName)}</h4>
+                  )}
                 </div>
+                {/* 便3 — 閉じの一語（終わり方を語り分けない・理由なし）。
+                    mutual からの閉じは双方に、sent 段階の閉じは行為しなかった側に。 */}
+                {isClosed && (
+                  <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                    {sig.closedFrom === "mutual" ? MEET.home.edge.talkClosed : MEET.home.edge.stopped}
+                  </p>
+                )}
                 {/* c17: in pair state the anchor moves INTO the face (接点の再掲,
                     same verbatim string) — shown here only pre-mutual. */}
-                {!isMutual && sig.anchor !== "" && <p className="m-pairline">{sig.anchor}</p>}
+                {!isMutual && !isClosed && sig.anchor !== "" && (
+                  <p className="m-pairline">{sig.anchor}</p>
+                )}
+                {/* 便3 — dormant は読み時導出の事実（live のときだけ意味を持つ） */}
+                {!isClosed && sig.dormant && (
+                  <p className="m-note" style={{ margin: "0.4rem 0 0" }}>
+                    {MEET.home.edge.dormant}
+                  </p>
+                )}
                 {/* c10: 判断材料 — 相手のひとこと紹介（owner自書き・公開済みの転載）。
                     式の下に引用の体で、ラベルなし・加工ゼロ（表示値=保存値）。
                     空なら行ごと出さない。 */}
-                {sig.fromIntro.trim() !== "" && <p className="m-introline">{sig.fromIntro}</p>}
-                {isMutual ? (
+                {!isClosed && sig.fromIntro.trim() !== "" && (
+                  <p className="m-introline">{sig.fromIntro}</p>
+                )}
+                {isClosed ? null : isMutual ? (
                   <>
                     {absentOf(sig) && (
                       // c18c: a pair whose peer left the pool says so here too
@@ -307,7 +353,8 @@ export function SignalsSection({
                       </p>
                     )}
                     <TalkFace
-                      sig={sig}
+                      peerRef={sig.fromRef}
+                      anchor={sig.anchor}
                       face={firstNotes[sig.fromRef] ?? { basis: null, draft: "" }}
                       onMake={onMakeFirstNote}
                       onSaveDraft={onSaveFirstNote}
@@ -323,6 +370,16 @@ export function SignalsSection({
                         onSave={onSaveContact}
                       />
                     </details>
+                    {/* 便3 T5 — 双方が閉じられる（理由なし・一語の事実へ収束） */}
+                    <button
+                      type="button"
+                      className="m-link"
+                      style={{ marginTop: "0.5rem" }}
+                      onClick={() => close(sig.edgeId)}
+                    >
+                      {MEET.home.edge.close}
+                    </button>
+                    {closeLine(sig.edgeId)}
                   </>
                 ) : (
                   <>
@@ -350,6 +407,14 @@ export function SignalsSection({
                       >
                         {MEET.home.signals.talkBack}
                       </button>
+                      {/* 便3 T4 — b の閉じ（自分の行為: 閉じた札は自分の列から消える） */}
+                      <button
+                        type="button"
+                        className="m-btn m-btn-quiet"
+                        onClick={() => close(sig.edgeId)}
+                      >
+                        {MEET.home.edge.close}
+                      </button>
                       {absentOf(sig) && (
                         // c18b: the broom — only on debris (a living card never
                         // shows it). Device-local hide; the server row stays.
@@ -362,6 +427,7 @@ export function SignalsSection({
                         </button>
                       )}
                     </div>
+                    {closeLine(sig.edgeId)}
                     {(backNotes[sig.edgeId] ?? "") !== "" && (
                       // c18: refusal lines — dead edge / missing name / honest error
                       <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
@@ -381,6 +447,74 @@ export function SignalsSection({
                       </p>
                     )}
                     <p className="m-note">{MEET.proposal.mutualNote}</p>
+                  </>
+                )}
+              </li>
+            );
+          })}
+          {/* ── 便3: a 側の pair 面 — 自分が開いた接点が相互になったもの。
+              旧世界では逆向き signal が incoming に立ったが、edge 世界では
+              T2 が同じ edge を mutual にするので、a の前室はここで建つ。 ── */}
+          {outgoingPairs.map((pair) => {
+            const name = pair.toName !== "" ? pair.toName : pair.toRef;
+            const isClosed = pair.state === "closed";
+            const theirNote =
+              inbox?.notes.find((n) => n.fromRef === pair.toRef)?.note ?? null;
+            const myNote = inbox?.myNotes.find((n) => n.peerRef === pair.toRef)?.note ?? "";
+            const absent = poolRefs !== null && !poolRefs.has(pair.toRef);
+            return (
+              <li key={pair.edgeId} className="m-signal">
+                <div className="m-sighead">
+                  <Ring state={isClosed ? "resting" : "pair"} size={26} />
+                  <h4>{name}</h4>
+                </div>
+                {isClosed ? (
+                  // 便3 T5 — 双方に出る一語（理由なし）
+                  <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                    {MEET.home.edge.talkClosed}
+                  </p>
+                ) : (
+                  <>
+                    <p className="m-accent" style={{ margin: "0.3rem 0 0" }}>
+                      {MEET.home.signals.mutual}
+                    </p>
+                    {pair.dormant && (
+                      <p className="m-note" style={{ margin: "0.4rem 0 0" }}>
+                        {MEET.home.edge.dormant}
+                      </p>
+                    )}
+                    {absent && (
+                      // c18c 系譜: 相手がプールを離れていても前室は可達（同一定数）
+                      <p className="m-note" aria-live="polite" style={{ margin: "0.4rem 0 0" }}>
+                        {MEET.home.signals.notInPool}
+                      </p>
+                    )}
+                    <TalkFace
+                      peerRef={pair.toRef}
+                      anchor={pair.anchor}
+                      face={firstNotes[pair.toRef] ?? { basis: null, draft: "" }}
+                      onMake={onMakeFirstNote}
+                      onSaveDraft={onSaveFirstNote}
+                    />
+                    <details className="m-contactfold">
+                      <summary>{MEET.firstNote.contactOpen}</summary>
+                      <ContactExchange
+                        peerRef={pair.toRef}
+                        peerName={name}
+                        myNote={myNote}
+                        theirNote={theirNote}
+                        onSave={onSaveContact}
+                      />
+                    </details>
+                    <button
+                      type="button"
+                      className="m-link"
+                      style={{ marginTop: "0.5rem" }}
+                      onClick={() => close(pair.edgeId)}
+                    >
+                      {MEET.home.edge.close}
+                    </button>
+                    {closeLine(pair.edgeId)}
                   </>
                 )}
               </li>

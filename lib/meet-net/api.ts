@@ -96,13 +96,26 @@ export type InboxIncoming = {
   anchor: string;
   createdAt: string;
   state: EdgeState;
+  /** 便3 — true なら自分が閉じた（自分の行為は一語の表示すら要らない）。 */
+  closedByMe: boolean;
+  /** 便3 (0011) — 遷移元の事実: "sent" | "mutual" | ""（live 中は ""）。 */
+  closedFrom: string;
+  /** 便3 — 読み時導出（状態ではない）。「しばらく動きがありません。」の根拠。 */
+  dormant: boolean;
 };
 export type InboxOutgoing = {
   edgeId: string;
   toRef: string;
+  /** 0011 — 宛先の公開 pseudonym（送信時点固定・from_name と同格）。 */
+  toName: string;
   basisItemRef: string;
+  /** a 側 pair 面の接点の再掲に使う（送信時に固定した一行）。 */
+  anchor: string;
   state: EdgeState;
   createdAt: string;
+  closedByMe: boolean;
+  closedFrom: string;
+  dormant: boolean;
 };
 export type InboxData = {
   incoming: InboxIncoming[];
@@ -131,6 +144,8 @@ export async function sendSignal(input: {
   ownerToken: string;
   toRef: string;
   fromName: string;
+  /** 0011 — 宛先の公開 pseudonym（カードの宛名・送信時点で固定）。 */
+  toName: string;
   anchor: string;
   edgeId: string;
   basisItemRef: string;
@@ -147,6 +162,24 @@ export async function sendSignal(input: {
       return { ok: false, error: "signal_failed" };
     }
     return { ok: true, edgeId: body.edgeId, state, existing: body.existing === true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+/** T3/T4/T5 — a participant closes a live edge (取り下げる／閉じる). Idempotent. */
+export async function sendClose(input: {
+  ownerToken: string;
+  edgeId: string;
+}): Promise<NetResult<{ state: EdgeState; already: boolean }>> {
+  try {
+    const { body } = await postJson("/api/meet/close", input);
+    if (!isRecord(body) || body.ok !== true) {
+      return { ok: false, error: isRecord(body) && typeof body.error === "string" ? body.error : "close_failed" };
+    }
+    const state = parseEdgeState(body.state);
+    if (state === null) return { ok: false, error: "close_failed" };
+    return { ok: true, state, already: body.already === true };
   } catch {
     return { ok: false, error: "network" };
   }
@@ -190,6 +223,9 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
               anchor: typeof r.anchor === "string" ? r.anchor : "",
               createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
               state,
+              closedByMe: r.closedByMe === true,
+              closedFrom: typeof r.closedFrom === "string" ? r.closedFrom : "",
+              dormant: r.dormant === true,
             }]
           : [];
       }),
@@ -199,9 +235,14 @@ export async function fetchInbox(ownerToken: string): Promise<NetResult<InboxDat
           ? [{
               edgeId: r.edgeId,
               toRef: r.toRef,
+              toName: typeof r.toName === "string" ? r.toName : "",
               basisItemRef: typeof r.basisItemRef === "string" ? r.basisItemRef : "",
+              anchor: typeof r.anchor === "string" ? r.anchor : "",
               state,
               createdAt: typeof r.createdAt === "string" ? r.createdAt : "",
+              closedByMe: r.closedByMe === true,
+              closedFrom: typeof r.closedFrom === "string" ? r.closedFrom : "",
+              dormant: r.dormant === true,
             }]
           : [];
       }),

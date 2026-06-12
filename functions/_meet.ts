@@ -38,6 +38,26 @@ export function isClientEdgeId(s: unknown): s is string {
   return typeof s === "string" && /^edge_[0-9a-f]{16,32}$/.test(s);
 }
 
+// ── R2 便3: dormant の読み時導出（0010 §3 — 状態ではない・書き込み不在）──────
+// TTL は仮90日（命名・調整は後続）。行為のみが last_act を動かす（invariant 2）
+// ので、この導出が presence/既読の裏口になることはない。
+export const DORMANT_TTL_DAYS = 90;
+
+export function deriveDormant(
+  state: string,
+  createdAt: string,
+  lastActA: string,
+  lastActB: string,
+  now: Date,
+): boolean {
+  if (state === "closed") return false; // 閉じは閉じ — 眠りではない
+  const last = [createdAt, lastActA, lastActB].filter((s) => s !== "").sort().at(-1) ?? "";
+  if (last === "") return false;
+  const t = Date.parse(last);
+  if (Number.isNaN(t)) return false;
+  return now.getTime() - t > DORMANT_TTL_DAYS * 24 * 60 * 60 * 1000;
+}
+
 // Payload caps — reject before any DB write.
 export const MAX_ITEMS = 60;
 export const MAX_TITLE = 120;

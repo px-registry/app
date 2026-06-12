@@ -135,16 +135,18 @@ test("M-6c: the candidate wording replaced 公開 in the meet copy", () => {
   assert.ok(copy.includes("人間の一覧には出ません"), "the AI-only fact is stated");
 });
 
-// ── M-7 (naming final): 主動詞の対は「探しに行く」／「置いておく」 ────────────────
+// ── M-7 (naming final): 主動詞の対は「探しに行く」／「アンテナを立てる」 ──────────
 //
 // Hiroto 確定: 結果を約束せず行為だけを名指す。探すのであって、つながるとは
 // 言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
+// 便3 改名（Hiroto ゲート済・期待の追従）: 置いておく → アンテナを立てる。
 
 test("M-7: the generate verb is 探しに行く; the 聞く-era wording is extinct", () => {
   assert.equal(MEET.home.receive, "探しに行く", "the generate button names the act");
-  assert.equal(MEET.home.place.action, "置いておく", "the waiting verb stays");
+  assert.equal(MEET.home.place.action, "アンテナを立てる", "the waiting verb (便3 改名)");
+  assert.equal(MEET.home.place.heading, "今日のアンテナ", "the box heading (便3 改名)");
   assert.ok(
-    MEET.home.question.twoTenses.startsWith("いま探しに行くか、置いて待つか。"),
+    MEET.home.question.twoTenses.startsWith("いま探しに行くか、アンテナを立てて待つか。"),
     "the two-tense line uses the same verb pair",
   );
   for (const s of allMeetCopyStrings()) {
@@ -298,10 +300,10 @@ test("M-13: 片づける is gated verbatim; the absent line is ONE constant ever
     pe.indexOf("MEET.home.signals.notInPool") < pe.indexOf("{!sent && ("),
     "ProposalEntry: the absent line renders before (outside) the !sent gate — sent cards keep it",
   );
-  // R2 0010 期待の追従: ペアの mutual flag は edge state へ（isMutual = state === "mutual"）
+  // R2 0010/便3 期待の追従: ペアの mutual flag は edge state へ、閉じ分岐が前置。
   const sec = read("app/meet/SignalsSection.tsx");
   const mutualBranch = sec.slice(
-    sec.indexOf("{isMutual ? ("),
+    sec.indexOf("{isClosed ? null : isMutual ? ("),
     sec.indexOf('className="m-contactfold"'),
   );
   assert.ok(

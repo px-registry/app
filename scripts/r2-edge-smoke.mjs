@@ -131,9 +131,55 @@ const ibA = await post("/api/meet/inbox", { ownerToken: TOKEN_A });
 const outA = ibA.body?.outgoing ?? [];
 check("A outgoing = edge 単位 1 行 mutual", outA.some((o) => o.edgeId === EDGE && o.state === "mutual"), JSON.stringify(outA));
 check("A incoming に逆向き sent", (ibA.body?.incoming ?? []).some((s) => s.edgeId === EDGE2 && s.state === "sent"));
+check("dormant は新鮮な edge では false（読み時導出）", outA.every((o) => o.dormant === false));
 const ibB = await post("/api/meet/inbox", { ownerToken: TOKEN_B });
 check("B incoming に mutual edge＋basisItemRef", (ibB.body?.incoming ?? []).some((s) => s.edgeId === EDGE && s.state === "mutual" && s.basisItemRef === REF_ITEM_B));
 check("B notes に A の連絡メモ（mutual join 開示）", (ibB.body?.notes ?? []).some((n) => n.note === "smoke-contact"), JSON.stringify(ibB.body?.notes));
+
+// ── 便3: T3/T4/T5 — 取り下げ・閉じ・トークの閉じ ────────────────────────────────
+
+// 11. T3: B（EDGE2 の a 側）が取り下げる → A 側には sent 段階の閉じが見える
+const t3 = await post("/api/meet/close", { ownerToken: TOKEN_B, edgeId: EDGE2 });
+check("T3: a の取り下げ = closed", t3.status === 201 && t3.body?.state === "closed", JSON.stringify(t3));
+const ibA2 = await post("/api/meet/inbox", { ownerToken: TOKEN_A });
+const e2row = (ibA2.body?.incoming ?? []).find((s) => s.edgeId === EDGE2);
+check("相手の取り下げ: closedByMe=false / closedFrom=sent（一語の事実の根拠）",
+  e2row?.state === "closed" && e2row?.closedByMe === false && e2row?.closedFrom === "sent", JSON.stringify(e2row));
+const ibB2 = await post("/api/meet/inbox", { ownerToken: TOKEN_B });
+const e2own = (ibB2.body?.outgoing ?? []).find((o) => o.edgeId === EDGE2);
+check("自分の取り下げ: closedByMe=true（自分の列から伏せる根拠）", e2own?.closedByMe === true);
+
+// 12. T6: closed が同三つ組を解放 — 再会は新 edge
+const EDGE3 = "edge_" + "5555666677778888";
+const re = await post("/api/meet/signal", {
+  ownerToken: TOKEN_B, toRef: refA, fromName: "乙-smoke", toName: "甲-smoke", anchor: "再会",
+  edgeId: EDGE3, basisItemRef: REF_ITEM_A, proposalPtr: "",
+});
+check("T6: 閉じた三つ組に新 edge が立つ（再会）", re.status === 201 && re.body?.state === "sent", JSON.stringify(re));
+const ibB3 = await post("/api/meet/inbox", { ownerToken: TOKEN_B });
+check("toName が outgoing に乗る（0011・a 側 pair 面の名前）",
+  (ibB3.body?.outgoing ?? []).some((o) => o.edgeId === EDGE3 && o.toName === "甲-smoke"));
+
+// 13. T4: A（EDGE3 の b 側）が閉じる
+const t4 = await post("/api/meet/close", { ownerToken: TOKEN_A, edgeId: EDGE3 });
+check("T4: b の閉じ = closed", t4.status === 201 && t4.body?.state === "closed");
+
+// 14. T5: mutual の EDGE を A が閉じる → 双方 closedFrom=mutual・talkback は正直に断る
+const t5 = await post("/api/meet/close", { ownerToken: TOKEN_A, edgeId: EDGE });
+check("T5: トークの閉じ = closed", t5.status === 201 && t5.body?.state === "closed");
+const ibB4 = await post("/api/meet/inbox", { ownerToken: TOKEN_B });
+const eRowB = (ibB4.body?.incoming ?? []).find((s) => s.edgeId === EDGE);
+check("T5 の事実: closedFrom=mutual（「このトークは閉じられました。」の根拠・双方表示）",
+  eRowB?.state === "closed" && eRowB?.closedFrom === "mutual" && eRowB?.closedByMe === false, JSON.stringify(eRowB));
+const deadTalk = await post("/api/meet/talkback", { ownerToken: TOKEN_B, edgeId: EDGE });
+check("閉じた edge への talkback は正直に断る（T6: 再開なし）", deadTalk.status === 409 && deadTalk.body?.error === "edge_closed");
+
+// 15. close の冪等と部外者
+const t5again = await post("/api/meet/close", { ownerToken: TOKEN_B, edgeId: EDGE });
+check("close 冪等（closed_by は最初の actor のまま）", t5again.status === 200 && t5again.body?.already === true);
+const TOKEN_C = "c3".repeat(16);
+const stranger = await post("/api/meet/close", { ownerToken: TOKEN_C, edgeId: EDGE3 });
+check("部外者の close は 403 not_participant", stranger.status === 403 && stranger.body?.error === "not_participant");
 
 console.log(failures === 0 ? "ALL GREEN" : `${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
