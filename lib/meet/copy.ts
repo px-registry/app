@@ -152,6 +152,16 @@ export const MEET = {
       noteReaders: "相手と、相手のAIが読めます。",
     },
     /**
+     * Wave 2 — Dock Lite（spec §12・全句ゲート済の引用）。
+     * 「あなたのAI」=確定呼称。preview の二文は記憶の住所の正直条項・送信単位版。
+     * draft only: 返事は表示だけ — ここから実行される操作は存在しない。PX no-log。
+     */
+    dock: {
+      ask: "あなたのAIに聞く",
+      previewLead: "あなたのAIに渡す内容:",
+      previewNote: "PXには送られません。接続先のAIには送られます。",
+    },
+    /**
      * 便3 — 閉じ系・休眠の表示（Hiroto ゲート済・確定）。
      * 原則: 「縁」「接点」は UI に出さない。終わり方を UI で語り分けない
      * （closed_by の理由分類を表示に持ち込まない — 0010 invariant 4 の表示版）。

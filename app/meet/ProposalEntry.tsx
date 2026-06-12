@@ -11,10 +11,84 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MEET } from "@/lib/meet/copy.ts";
-import { gateCardsByProvenance, faceOfEntry } from "@/lib/meet-ai";
+import { gateCardsByProvenance, faceOfEntry, buildDockPreview, buildDockPrompt, type DockMaterial } from "@/lib/meet-ai";
 import type { ReceivedProposalV1, ReadingV1 } from "@/lib/meet-memory";
 import { RIG_PRIVATE_ECHO_NOTE } from "@/lib/rig";
 import { Ring } from "./Ring.tsx";
+
+// ── Wave 2: Dock Lite — あなたのAIに聞く（spec §12・browser直・draft only・PX no-log）。
+// プレビュー＝送られるものそのもの（buildDockPrompt は instructions+preview の合成）。
+// 返事は表示するだけ — ここから実行される操作は存在しない。このファイルは
+// テスト開示レーンに一切触れない（DK-2 が文字列レベルで見張る）。
+function DockFace({
+  material,
+  onAsk,
+}: {
+  material: DockMaterial;
+  onAsk: (prompt: string) => Promise<{ ok: boolean; text: string; code: string }>;
+}) {
+  const [phase, setPhase] = useState<"closed" | "preview" | "busy" | "done" | "failed">("closed");
+  const [reply, setReply] = useState("");
+  const [failCode, setFailCode] = useState("");
+
+  const preview = buildDockPreview(material);
+  const ask = () => {
+    setPhase("busy");
+    void onAsk(buildDockPrompt(preview)).then((r) => {
+      if (r.ok) {
+        setReply(r.text);
+        setPhase("done");
+      } else {
+        setFailCode(r.code);
+        setPhase("failed");
+      }
+    });
+  };
+
+  if (phase === "closed") {
+    return (
+      <button type="button" className="m-link" onClick={() => setPhase("preview")}>
+        {MEET.home.dock.ask}
+      </button>
+    );
+  }
+  if (phase === "preview" || phase === "failed") {
+    return (
+      <div className="m-card" style={{ marginTop: "0.5rem" }}>
+        <p className="m-note" style={{ margin: 0 }}>{MEET.home.dock.previewLead}</p>
+        <p className="m-item-text" style={{ whiteSpace: "pre-wrap", maxHeight: "12rem", overflowY: "auto" }}>
+          {preview}
+        </p>
+        <p className="m-note">{MEET.home.dock.previewNote}</p>
+        {phase === "failed" && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.receive.errors[failCode] ?? MEET.receive.errors.unknown}
+          </p>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
+          <button type="button" className="m-btn m-btn-primary" onClick={ask}>
+            {MEET.home.dock.ask}
+          </button>
+          <button type="button" className="m-btn m-btn-quiet" onClick={() => setPhase("closed")}>
+            {MEET.home.place.cancel}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (phase === "busy") {
+    return <p className="m-note">{MEET.receive.busy}</p>;
+  }
+  return (
+    <div className="m-card" style={{ marginTop: "0.5rem" }}>
+      {/* draft only — そのままの返事（verbatim・M-10 の系譜）。操作は生まれない */}
+      <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>{reply}</p>
+      <button type="button" className="m-link" onClick={() => setPhase("preview")}>
+        {MEET.home.dock.ask}
+      </button>
+    </div>
+  );
+}
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
@@ -122,6 +196,8 @@ export function ProposalEntry({
   poolRefs,
   onTalk,
   onWithdraw,
+  onAskAi,
+  selfItems,
   onReading,
   onRemove,
 }: {
@@ -150,6 +226,10 @@ export function ProposalEntry({
   ) => Promise<{ ok: boolean; code: string }>;
   /** 便3 T3 — a の取り下げ（sent の edge にだけ出る）。 */
   onWithdraw: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
+  /** Wave 2 — あなたのAIに聞く（browser直・接続中のみ非null・PX no-log）。 */
+  onAskAi: ((prompt: string) => Promise<{ ok: boolean; text: string; code: string }>) | null;
+  /** Wave 2 — 読み手自身の記憶（SELF — 生成時と同じ階級・自分のAIへだけ）。 */
+  selfItems: Array<{ kind: string; title: string; text: string }>;
   onReading: (entryId: string, cardIndex: number, reading: ReadingV1) => Promise<boolean>;
   onRemove: (entryId: string) => Promise<void>;
 }) {
@@ -324,6 +404,22 @@ export function ProposalEntry({
                     >
                       {MEET.proposal.talk}
                     </button>
+                  )}
+                  {onAskAi !== null && (
+                    // Wave 2: Dock Lite — 提案カードから自分のAIへ（draft only・PX no-log）
+                    <div style={{ marginTop: "0.5rem" }}>
+                      <DockFace
+                        material={{
+                          card,
+                          basis: basisItem !== undefined
+                            ? { title: basisItem.title, text: basisItem.text }
+                            : null,
+                          partnerIntro,
+                          selfItems,
+                        }}
+                        onAsk={onAskAi}
+                      />
+                    </div>
                   )}
                   {(talkNotes[index] ?? "") !== "" && (
                     // c18: refusal lines — dead edge / missing name / honest error.

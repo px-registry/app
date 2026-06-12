@@ -658,6 +658,20 @@ export function HomeView() {
 
   const sendTalkMessage = (edgeId: string, peerRef: string, text: string) =>
     sealAndSend(edgeId, peerRef, "message", text);
+
+  // ── Wave 2: Dock Lite — あなたのAIに聞く（browser直・owner の鍵・PX no-log）。
+  // submitLog（テスト開示レーン）はこの経路に存在しない — 返事はどこにも残らない
+  // （draft only・表示だけ）。
+  const askYourAi = async (prompt: string): Promise<{ ok: boolean; text: string; code: string }> => {
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt,
+    });
+    return r.ok ? { ok: true, text: r.text, code: "" } : { ok: false, text: "", code: r.error };
+  };
   // 便6: ノートを立てる・直す（standing — 一人一枚・編集は再封）
   const saveNote = async (edgeId: string, peerRef: string, text: string): Promise<{ ok: boolean; code: string }> =>
     sealAndSend(edgeId, peerRef, "note", text);
@@ -1118,6 +1132,12 @@ export function HomeView() {
                   poolRefs={poolRefs}
                   onTalk={talk}
                   onWithdraw={closeEdge}
+                  onAskAi={connected ? askYourAi : null}
+                  selfItems={rigEntries.map((e) => ({
+                    kind: e.item.kind,
+                    title: e.item.title,
+                    text: e.item.text,
+                  }))}
                   onReading={reading}
                   onRemove={removeEntry}
                 />

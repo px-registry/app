@@ -39,6 +39,7 @@ export {
   type BasisMap,
 } from "./prompt.ts";
 export { anchorForRecipient, MAX_ANCHOR } from "./anchor.ts";
+export { buildDockPreview, buildDockPrompt, type DockMaterial } from "./dock.ts";
 export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";
 export { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
 export {

@@ -203,6 +203,36 @@ test("MA-4d: toRigPool is fail-closed on kind and keeps arrival order", () => {
   assert.ok(!("itemRef" in withAlias.basis.p2), "empty alias → key absent (stable shape)");
 });
 
+// ── DK (Wave 2): Dock Lite — あなたのAIに聞く ───────────────────────────────────
+
+test("DK-1: プレビュー＝送られるものそのもの（構成的な正直）", async () => {
+  const { buildDockPreview, buildDockPrompt } = await import("./dock.ts");
+  const m = {
+    card: { to: "あや", line1: "言い切り", line2: "式", line3: "手がかり", basisItemId: "p1" },
+    basis: { title: "工房", text: "活版印刷ができる" },
+    partnerIntro: "手を動かす場づくりが好き",
+    selfItems: [{ kind: "want", title: "場", text: "PRIVATE_SELF_TEXT" }],
+  };
+  const preview = buildDockPreview(m);
+  const prompt = buildDockPrompt(preview);
+  assert.ok(prompt.includes(preview), "the preview rides verbatim — nothing unseen");
+  assert.ok(preview.includes("PRIVATE_SELF_TEXT"), "SELF は見せた上で渡る（隠れて乗らない）");
+  assert.ok(prompt.includes("点数や順位はつけない。比べて選ばない。"), "非rankingの一行を携行");
+});
+
+test("DK-2: dock レーンは PX に触れない（no-log・非中継の構造）", () => {
+  const src = read("lib/meet-ai/dock.ts")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/\bfetch\s*\(/.test(src), "dock.ts は fetch しない（送るのは generate.ts の鍵直行だけ）");
+  assert.ok(!src.includes("meet-net"), "meet-net を import しない");
+  assert.ok(!src.includes("submitLog"), "テスト開示レーンに乗らない（PX no-log）");
+  assert.ok(!src.includes("ownerToken"), "token はこのレーンに存在しない");
+  // UI 側も: ProposalEntry（dock の住処）はテスト開示レーンを知らない
+  const pe = read("app/meet/ProposalEntry.tsx");
+  assert.ok(!pe.includes("submitLog"), "ProposalEntry は submitLog を import しない（恒久 pin）");
+});
+
 // ── MA-5: reply parsing ─────────────────────────────────────────────────────────
 
 test("MA-5: fenced / prose-wrapped / bare JSON replies parse into cards", () => {
