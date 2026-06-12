@@ -39,6 +39,19 @@ export function isClientEdgeId(s: unknown): s is string {
   return typeof s === "string" && /^edge_[0-9a-f]{16,32}$/.test(s);
 }
 
+// ── R2 0013: 封筒の形 ──────────────────────────────────────────────────────────
+export const ENVELOPE_KINDS = new Set(["message", "note", "contact"]);
+export const MAX_CIPHERTEXT_B64 = 22000; // ≒ 16KB の base64（物理 cap）
+export const MAX_IV_B64 = 64;
+/** held queue cap per (edge, sender) — 物理律速（課金・優先は永久にない）。 */
+export const MAX_HELD_PER_EDGE_SENDER = 50;
+/** 不達 TTL（仮14日）— 期限切れは read 時に expired tombstone へ（cron なし）。 */
+export const ENVELOPE_TTL_DAYS = 14;
+
+export function isEnvelopeId(s: unknown): s is string {
+  return typeof s === "string" && /^env_[0-9a-f]{16,32}$/.test(s);
+}
+
 // ── R2 便3: dormant の読み時導出（0010 §3 — 状態ではない・書き込み不在）──────
 // TTL は仮90日（命名・調整は後続）。行為のみが last_act を動かす（invariant 2）
 // ので、この導出が presence/既読の裏口になることはない。

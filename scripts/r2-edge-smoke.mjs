@@ -51,6 +51,36 @@ async function get(path) {
 const ENC_PUB_1 = JSON.stringify({ kty: "EC", crv: "P-256", x: "A".repeat(43), y: "B".repeat(43) });
 const ENC_PUB_2 = JSON.stringify({ kty: "EC", crv: "P-256", x: "C".repeat(43), y: "D".repeat(43) });
 
+// ── 0013 実鍵ミニ実装（smoke 用の最小複製 — 本体は lib/meet-crypto） ────────────
+const ECDH = { name: "ECDH", namedCurve: "P-256" };
+const toB64 = (buf) => Buffer.from(buf).toString("base64");
+const fromB64 = (s) => Buffer.from(s, "base64");
+async function mintPair() {
+  const kp = await crypto.subtle.generateKey(ECDH, true, ["deriveKey"]);
+  return { pub: await crypto.subtle.exportKey("jwk", kp.publicKey), privKey: kp.privateKey };
+}
+async function seal(recipientPubJwk, plaintext) {
+  const eph = await crypto.subtle.generateKey(ECDH, true, ["deriveKey"]);
+  const pub = await crypto.subtle.importKey("jwk", recipientPubJwk, ECDH, false, []);
+  const aes = await crypto.subtle.deriveKey({ name: "ECDH", public: pub }, eph.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aes, new TextEncoder().encode(plaintext));
+  const ephPub = await crypto.subtle.exportKey("jwk", eph.publicKey);
+  return { ephPub: JSON.stringify({ kty: ephPub.kty, crv: ephPub.crv, x: ephPub.x, y: ephPub.y }), iv: toB64(iv), ciphertext: toB64(ct) };
+}
+async function open(privKey, sealed) {
+  try {
+    const pub = await crypto.subtle.importKey("jwk", JSON.parse(sealed.ephPub), ECDH, false, []);
+    const aes = await crypto.subtle.deriveKey({ name: "ECDH", public: pub }, privKey, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(sealed.iv) }, aes, fromB64(sealed.ciphertext));
+    return new TextDecoder().decode(pt);
+  } catch {
+    return null;
+  }
+}
+const B_KEYS = await mintPair();
+const ENC_PUB_B = JSON.stringify({ kty: B_KEYS.pub.kty, crv: B_KEYS.pub.crv, x: B_KEYS.pub.x, y: B_KEYS.pub.y });
+
 const pubBody = (token, name, itemRef, text, business = false, encPub = ENC_PUB_1) => ({
   ownerToken: token,
   displayName: name,
@@ -65,7 +95,7 @@ console.log(`r2-edge-smoke → ${BASE}`);
 const pubA = await post("/api/meet/publish", pubBody(TOKEN_A, "甲-smoke", REF_ITEM_A, "edge smoke A"));
 check("publish A (itemRef 必須形)", pubA.status === 201 && pubA.body?.ok === true, JSON.stringify(pubA));
 const refA = pubA.body?.participantRef;
-const pubB = await post("/api/meet/publish", pubBody(TOKEN_B, "乙-smoke", REF_ITEM_B, "edge smoke B", true));
+const pubB = await post("/api/meet/publish", pubBody(TOKEN_B, "乙-smoke", REF_ITEM_B, "edge smoke B", true, ENC_PUB_B));
 check("publish B", pubB.status === 201 && pubB.body?.ok === true);
 const refB = pubB.body?.participantRef;
 
@@ -159,6 +189,59 @@ const ibB = await post("/api/meet/inbox", { ownerToken: TOKEN_B });
 check("B incoming に mutual edge＋basisItemRef", (ibB.body?.incoming ?? []).some((s) => s.edgeId === EDGE && s.state === "mutual" && s.basisItemRef === REF_ITEM_B));
 check("B notes に A の連絡メモ（mutual join 開示）", (ibB.body?.notes ?? []).some((n) => n.note === "smoke-contact"), JSON.stringify(ibB.body?.notes));
 
+// ── 便6: E2EE 封筒 — 実鍵の往復（EDGE は mutual の状態でここに来る） ─────────────
+
+// E1. B の公開鍵をサーバ経由で取り、A が実鍵で施錠して投函
+const kB = await get(`/api/meet/enckey?ref=${refB}`);
+const sealed = await seal(JSON.parse(kB.body.encPub), "smoke-letter こんにちは");
+const ENV1 = "env_" + "1234123412341234";
+const sent1 = await post("/api/meet/envelope", {
+  ownerToken: TOKEN_A, envelopeId: ENV1, edgeId: EDGE, kind: "message", ...sealed,
+});
+check("封筒: mutual edge へ投函できる", sent1.status === 201, JSON.stringify(sent1));
+
+// E2. 平文 tripwire / 非mutual / 部外者
+const pt = await post("/api/meet/envelope", {
+  ownerToken: TOKEN_A, envelopeId: "env_" + "9".repeat(16), edgeId: EDGE, kind: "message", ...sealed, text: "平文",
+});
+check("封筒: 平文キー混入は封筒ごと拒否（invariant1）", pt.status === 400 && pt.body?.error === "plaintext_shape");
+const notMutual = await post("/api/meet/envelope", {
+  ownerToken: TOKEN_B, envelopeId: "env_" + "8".repeat(16), edgeId: EDGE2, kind: "message", ...sealed,
+});
+check("封筒: sent 段階の edge には投函できない（前室は mutual で開く）", notMutual.status === 403 && notMutual.body?.error === "not_mutual");
+
+// E3. B が fetch → 実鍵で開封 → 平文一致
+const f1 = await post("/api/meet/envelope-fetch", { ownerToken: TOKEN_B });
+const got = (f1.body?.incoming ?? []).find((v) => v.envelopeId === ENV1);
+check("封筒: 宛先の fetch に届く（ciphertext のまま）", got !== undefined && got.kind === "message");
+check("封筒: PX が運んだのは ciphertext だけ", got !== undefined && !JSON.stringify(got).includes("こんにちは"));
+const opened = got !== undefined ? await open(B_KEYS.privKey, got) : null;
+check("封筒: 受け手の秘密鍵で開封 → 平文一致", opened === "smoke-letter こんにちは", String(opened));
+const fA = await post("/api/meet/envelope-fetch", { ownerToken: TOKEN_A });
+check("封筒: 自分の held は自分に返らない", !(fA.body?.incoming ?? []).some((v) => v.envelopeId === ENV1));
+
+// E4. ack（受信完了の内部信号）→ 行が消える
+const ack1 = await post("/api/meet/envelope-ack", { ownerToken: TOKEN_B, envelopeIds: [ENV1] });
+check("封筒: ack で行削除（配達後非保持）", ack1.status === 200);
+const f2 = await post("/api/meet/envelope-fetch", { ownerToken: TOKEN_B });
+check("封筒: ack 後の fetch は空", !(f2.body?.incoming ?? []).some((v) => v.envelopeId === ENV1));
+
+// E5. ノート: 一人一枚・編集は上書き・ack では消えない
+const note1 = await post("/api/meet/envelope", {
+  ownerToken: TOKEN_A, envelopeId: "env_" + "a1a1a1a1a1a1a1a1", edgeId: EDGE, kind: "note",
+  ...(await seal(JSON.parse(kB.body.encPub), "ノート初版")),
+});
+const note2 = await post("/api/meet/envelope", {
+  ownerToken: TOKEN_A, envelopeId: "env_" + "a2a2a2a2a2a2a2a2", edgeId: EDGE, kind: "note",
+  ...(await seal(JSON.parse(kB.body.encPub), "ノート改版")),
+});
+check("ノート: 投函と編集（再封）が通る", note1.status === 201 && note2.status === 201);
+const f3 = await post("/api/meet/envelope-fetch", { ownerToken: TOKEN_B });
+const notes = (f3.body?.incoming ?? []).filter((v) => v.kind === "note" && v.edgeId === EDGE);
+check("ノート: 一人一枚（編集は上書き）", notes.length === 1, JSON.stringify(notes.map((n) => n.envelopeId)));
+const noteText = notes.length === 1 ? await open(B_KEYS.privKey, notes[0]) : null;
+check("ノート: 開封 → 改版が立っている", noteText === "ノート改版", String(noteText));
+
 // ── 便3: T3/T4/T5 — 取り下げ・閉じ・トークの閉じ ────────────────────────────────
 
 // 11. T3: B（EDGE2 の a 側）が取り下げる → A 側には sent 段階の閉じが見える
@@ -196,6 +279,9 @@ check("T5 の事実: closedFrom=mutual（「このトークは閉じられまし
   eRowB?.state === "closed" && eRowB?.closedFrom === "mutual" && eRowB?.closedByMe === false, JSON.stringify(eRowB));
 const deadTalk = await post("/api/meet/talkback", { ownerToken: TOKEN_B, edgeId: EDGE });
 check("閉じた edge への talkback は正直に断る（T6: 再開なし）", deadTalk.status === 409 && deadTalk.body?.error === "edge_closed");
+// 便6: 縁が閉じれば立て札も畳まれる（次の fetch の掃除でノートが消える）
+const f4 = await post("/api/meet/envelope-fetch", { ownerToken: TOKEN_B });
+check("ノート: 縁が閉じれば立て札も畳まれる（invariant3）", !(f4.body?.incoming ?? []).some((v) => v.kind === "note" && v.edgeId === EDGE));
 
 // 15. close の冪等と部外者
 const t5again = await post("/api/meet/close", { ownerToken: TOKEN_B, edgeId: EDGE });

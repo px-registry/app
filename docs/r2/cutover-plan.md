@@ -25,7 +25,12 @@
 
 ## Phase 2 — backfill（テスター mutual の継承・デモの掃除）
 
-裁定: **テスターの mutual は残す・デモ edge は消す（出自で分別）。**
+**→ no-op 確定（2026-06-12・dry-run 実測を Hiroto 目視 OK）**: 本番の相互ペア=0・片方向 signal 1本
+（Hiroto 自身のテスト）・smoke seed 不在・contact_note 0件 — **継承する縁も消すデモも存在しない**。
+backfill スクリプトは書かない。カットオーバー直前に同じ dry-run を再実施し、mutual が生まれていたら
+このフェーズを復活させる（手順は下記を温存）。
+
+（温存）裁定: **テスターの mutual は残す・デモ edge は消す（出自で分別）。**
 
 1. **dry-run（読み取りのみ・Go 前に実施可）**: 既存 r15_signal の相互ペア一覧と、各 ref の
    display_name を列挙 → **Hiroto が「テスター／デモ」を目視で確定**（あや・カフェの人等の
