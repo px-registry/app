@@ -32,6 +32,8 @@ import {
   parseDetectReply,
   buildIntroPrompt,
   parseIntroReply,
+  buildPublicPhrasingPrompt,
+  parsePublicPhrasingReply,
 } from "@/lib/meet-ai";
 import {
   getOrMintOwnerToken,
@@ -139,6 +141,31 @@ function ItemForm({
     setPick(null);
   };
 
+  // R2 GOAL — Dock L3 候補化: この一枚の「公開の書き方」を AI が下書きする
+  // （c14 同原理 — 他人に読める形へ、取り出すその場で一度）。欄に入るだけで、
+  // 公開は従来どおり owner の「出す」＋公開する。下書き後は伏せ字検出を再走。
+  const [phrasing, setPhrasing] = useState<"idle" | "busy" | "failed">("idle");
+  const draftPhrasing = async () => {
+    if (!connected || phrasing === "busy" || draft.text.trim() === "") return;
+    setPhrasing("busy");
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildPublicPhrasingPrompt({ title: draft.title, text: draft.text }),
+    });
+    const parsed = r.ok ? parsePublicPhrasingReply(r.text) : null;
+    if (parsed === null) {
+      setPhrasing("failed"); // 手書きの書き方は残る（fail-closed・沈黙の禁止）
+      return;
+    }
+    setDraft((d) => ({ ...d, publicTitle: parsed.title, publicText: parsed.text }));
+    lastDetectKey.current = ""; // 新しい公開文で伏せ字検出を引き直す
+    setPhrasing("idle");
+    void runDetect({ ...draft, publicTitle: parsed.title, publicText: parsed.text });
+  };
+
   // [→ 伏せる] on the leak warning: that word only, mask from the AI's offer
   // when one exists, else the plain ●● default.
   const maskOne = (word: string) => {
@@ -208,6 +235,22 @@ function ItemForm({
           value={draft.publicText ?? ""}
           onChange={(e) => setDraft((d) => ({ ...d, publicText: e.target.value }))}
         />
+        {connected && (
+          <button
+            type="button"
+            className="m-link"
+            style={{ marginTop: "0.4rem" }}
+            disabled={phrasing === "busy" || draft.text.trim() === ""}
+            onClick={() => void draftPhrasing()}
+          >
+            {phrasing === "busy" ? MEET.profile.introBusy : MEET.home.dock.draftAsk}
+          </button>
+        )}
+        {phrasing === "failed" && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.firstNote.failed}
+          </p>
+        )}
         {!connected && (
           <p className="m-note" style={{ marginTop: "0.4rem" }}>
             {MEET.maskWords.connectHint}

@@ -64,6 +64,7 @@ import {
   getEndpoint,
   isConnected,
   buildMeetPrompt,
+  buildDockSearchPrompt,
   toRigPoolWithRefs,
   parseProposalReply,
   generateProposals,
@@ -72,6 +73,11 @@ import {
   buildFirstNotePrompt,
   parseFirstNoteReply,
   firstNoteMaterialFor,
+  gateCardsByProvenance,
+  buildNoteDraftPrompt,
+  buildContactDraftPrompt,
+  contactDraftKeepsPlaceholder,
+  type BasisMap,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { mintEncKeyPair, encPubToString, parseEncPub } from "@/lib/meet-crypto/keys.ts";
@@ -461,10 +467,49 @@ export function HomeView() {
   // error) lands as a DATED ENTRY at the top of AIが見つけた提案. 第8便's
   // 沈黙の禁止 continues: should even the entry write fail, the thrown error
   // surfaces as the last-resort line under the button.
+  // R2 GOAL — Dock L2: プロンプト合成を一枚に（構成的正直の土台）。プレビューが
+  // 見せる文字列と generate に渡る文字列が同じ GenBundle から出る — 見せたものが
+  // 送られるものそのもの。receivedLines を渡すと検索版（届いた提案ブロック入り）。
+  type GenBundle = {
+    prompt: string;
+    refs: Record<string, string>;
+    intros: Record<string, string>;
+    basis: BasisMap;
+    self: RigOwnerV1;
+  };
+  const assembleGen = async (
+    q: string,
+    receivedLines?: string[],
+  ): Promise<{ ok: true; bundle: GenBundle } | { ok: false; code: "pool" | "pool-empty" }> => {
+    const items = (await memory.listRigItems()).map((e) => e.item);
+    const self: RigOwnerV1 = { ownerId: "self", items };
+    const me = await deriveParticipantRef(getOrMintOwnerToken());
+    const poolRes = await fetchPool(me);
+    if (!poolRes.ok) return { ok: false, code: "pool" };
+    // 第3便 A: an empty pool means there is nobody to propose — don't run
+    // the model at all (a weak model invents partners; rule 7 is backed).
+    if (poolRes.items.length === 0) return { ok: false, code: "pool-empty" };
+    const refs: Record<string, string> = {};
+    const intros: Record<string, string> = {};
+    for (const it of poolRes.items) {
+      if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
+      if (!(it.ownerRef in intros)) intros[it.ownerRef] = it.ownerIntro;
+    }
+    // 第7便 C: stable [p◯] refs ride the prompt; the same map is captured on
+    // the entry so the gate + 「相手の候補から」 can resolve basisItemId.
+    const { pool, basis } = toRigPoolWithRefs(poolRes.items);
+    const prompt =
+      receivedLines !== undefined
+        ? buildDockSearchPrompt(self, pool, q, receivedLines)
+        : buildMeetPrompt(self, pool, q);
+    return { ok: true, bundle: { prompt, refs, intros, basis, self } };
+  };
+
   const runGeneration = async (
     q: string,
     via: "manual" | "patrol",
     patrolMeta?: { title: string },
+    prebuilt?: GenBundle,
   ) => {
     const base = {
       question: q.trim(),
@@ -477,30 +522,20 @@ export function HomeView() {
       ...(via === "patrol" ? { patrolQuestion: patrolMeta?.title ?? "" } : {}),
     };
     try {
-      const items = (await memory.listRigItems()).map((e) => e.item);
-      const self: RigOwnerV1 = { ownerId: "self", items };
-      const me = await deriveParticipantRef(getOrMintOwnerToken());
-      const poolRes = await fetchPool(me);
-      if (!poolRes.ok) {
-        await shelf.add({ ...base, outcome: "error", errorCode: "pool" });
-        return;
+      let bundle = prebuilt;
+      if (bundle === undefined) {
+        const a = await assembleGen(q);
+        if (!a.ok) {
+          await shelf.add(
+            a.code === "pool"
+              ? { ...base, outcome: "error", errorCode: "pool" }
+              : { ...base, outcome: "pool-empty" },
+          );
+          return;
+        }
+        bundle = a.bundle;
       }
-      // 第3便 A: an empty pool means there is nobody to propose — don't run
-      // the model at all (a weak model invents partners; rule 7 is backed).
-      if (poolRes.items.length === 0) {
-        await shelf.add({ ...base, outcome: "pool-empty" });
-        return;
-      }
-      const refs: Record<string, string> = {};
-      const intros: Record<string, string> = {};
-      for (const it of poolRes.items) {
-        if (!(it.ownerRef in refs)) refs[it.ownerRef] = it.participantRef;
-        if (!(it.ownerRef in intros)) intros[it.ownerRef] = it.ownerIntro;
-      }
-      // 第7便 C: stable [p◯] refs ride the prompt; the same map is captured on
-      // the entry so the gate + 「相手の候補から」 can resolve basisItemId.
-      const { pool, basis } = toRigPoolWithRefs(poolRes.items);
-      const prompt = buildMeetPrompt(self, pool, q);
+      const { prompt, refs, intros, basis, self } = bundle;
       const model = getModel();
       const r = await generateProposals({
         model,
@@ -553,6 +588,96 @@ export function HomeView() {
       setGen({ phase: "error", code: "unknown" });
     }
     await reload();
+  };
+
+  // ── R2 GOAL — Dock L2: あなたのAIに探してもらう（owner 向け検索）────────────────
+  // 検索の問いは standing の問いと別系（保存しない）。bundle は SELF＋プール＋
+  // 届いている提案（gate 通過カードの digest）。プレビューを開いたら、その同じ
+  // bundle が generate に渡る（構成的正直 — pool が動いても見せたものを送る）。
+  const [dockAsk, setDockAsk] = useState("");
+  const [dockBusy, setDockBusy] = useState(false);
+  const [dockNote, setDockNote] = useState("");
+  const [dockPreview, setDockPreview] = useState<{ ask: string; bundle: GenBundle } | null>(null);
+
+  const receivedDigest = (): string[] => {
+    const lines: string[] = [];
+    for (const entry of received) {
+      const { kept } = gateCardsByProvenance(entry.cards, entry.refs, entry.basisItems);
+      for (const { card } of kept) {
+        lines.push(`${card.to}: ${card.line1}`);
+        if (lines.length >= 8) return lines;
+      }
+    }
+    return lines;
+  };
+
+  const dockBuildPreview = async () => {
+    const ask = dockAsk.trim();
+    if (ask === "" || (dockPreview !== null && dockPreview.ask === ask)) return;
+    const a = await assembleGen(ask, receivedDigest());
+    if (a.ok) setDockPreview({ ask, bundle: a.bundle });
+    else setDockNote(a.code === "pool" ? MEET.receive.errors.pool : MEET.home.dockSearch.poolEmpty);
+  };
+
+  const dockRun = async () => {
+    const ask = dockAsk.trim();
+    if (ask === "" || dockBusy) return;
+    setDockBusy(true);
+    setDockNote("");
+    try {
+      // プレビュー済みなら、その bundle そのもの（見せたもの＝送るもの）
+      const bundle =
+        dockPreview !== null && dockPreview.ask === ask ? dockPreview.bundle : undefined;
+      if (bundle !== undefined) {
+        await runGeneration(ask, "manual", undefined, bundle);
+      } else {
+        const a = await assembleGen(ask, receivedDigest());
+        if (a.ok) await runGeneration(ask, "manual", undefined, a.bundle);
+        else await runGeneration(ask, "manual"); // 正直なエラー entry は本線が書く
+      }
+      setDockNote(MEET.home.dockSearch.lands);
+      setDockAsk("");
+      setDockPreview(null);
+    } catch {
+      setDockNote(MEET.firstNote.failed);
+    }
+    setDockBusy(false);
+    await reload();
+  };
+
+  // ── R2 GOAL — Dock L3: 操作の下書き（ノート・渡す文面 — 実行は既存確認動線）──
+  // 材料は画面に見えているものだけ（SELF 記憶は同梱しない — private が乗らない
+  // ので、プレビューは画面そのものが担う。drafts.ts の階級コメント参照）。
+  const draftNote = async (edgeId: string, peerRef: string): Promise<string | null> => {
+    const anchor =
+      inbox?.incoming.find((s) => s.edgeId === edgeId)?.anchor ??
+      inbox?.outgoing.find((o) => o.edgeId === edgeId)?.anchor ??
+      "";
+    const m = firstNoteMaterialFor(peerRef, received, anchor);
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildNoteDraftPrompt({ lines: m.lines, basis: m.basis, ownerName: displayName }),
+    });
+    if (!r.ok) return null;
+    return parseFirstNoteReply(r.text);
+  };
+
+  const draftContact = async (peerName: string): Promise<string | null> => {
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildContactDraftPrompt({ peerName, ownerName: displayName }),
+    });
+    if (!r.ok) return null;
+    const text = parseFirstNoteReply(r.text);
+    // fail-closed: 差し込み印の無い文面は採らない（発明された宛先を疑う）
+    if (text === null || !contactDraftKeepsPlaceholder(text)) return null;
+    return text;
   };
 
   // ── 第9便 B — 見回り: once per page open, at most every 6h, oldest placed
@@ -1124,10 +1249,77 @@ export function HomeView() {
         onSaveContact={saveContact}
         onMakeFirstNote={makeFirstNote}
         onSaveFirstNote={saveFirstNote}
+        onDraftNote={draftNote}
+        onDraftContact={draftContact}
       />
         </div>
 
         <div className="m-home-right">
+      {/* R2 GOAL — Dock L2: owner 向け検索。AIが読み、人間には提案と根拠で返す
+          （人間向け他者一覧は出さない — 結果は既存の提案レーンに gate 済みで立つ）。 */}
+      <section className="m-section">
+        <p className="m-eyebrow">{MEET.home.dockSearch.eyebrow}</p>
+        <h2 className="m-h2">{MEET.home.dockSearch.heading}</h2>
+        <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
+          {MEET.home.dockSearch.note}
+        </p>
+        {connected ? (
+          <>
+            <textarea
+              className="m-field"
+              rows={2}
+              value={dockAsk}
+              onChange={(e) => {
+                setDockAsk(e.target.value);
+                setDockNote("");
+              }}
+              placeholder={MEET.home.dockSearch.placeholder}
+            />
+            {dockAsk.trim() !== "" && (
+              <details
+                style={{ marginTop: "0.4rem" }}
+                onToggle={(e) => {
+                  if ((e.target as HTMLDetailsElement).open) void dockBuildPreview();
+                }}
+              >
+                <summary className="m-note" style={{ cursor: "pointer" }}>
+                  {MEET.home.dockSearch.previewFold}
+                </summary>
+                {dockPreview !== null && dockPreview.ask === dockAsk.trim() ? (
+                  <>
+                    <pre
+                      className="m-item-text"
+                      style={{ whiteSpace: "pre-wrap", maxHeight: "14rem", overflow: "auto" }}
+                    >
+                      {dockPreview.bundle.prompt}
+                    </pre>
+                    <p className="m-note">{MEET.home.dock.previewNote}</p>
+                  </>
+                ) : (
+                  <p className="m-note">{MEET.home.dock.previewLead}</p>
+                )}
+              </details>
+            )}
+            <button
+              type="button"
+              className="m-btn m-btn-primary"
+              style={{ marginTop: "0.5rem" }}
+              disabled={dockAsk.trim() === "" || dockBusy}
+              onClick={() => void dockRun()}
+            >
+              {dockBusy ? MEET.home.dockSearch.busy : MEET.home.dockSearch.run}
+            </button>
+            {dockNote !== "" && (
+              <p className="m-note" aria-live="polite" style={{ marginTop: "0.4rem" }}>
+                {dockNote}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="m-note">{MEET.home.dockSearch.offline}</p>
+        )}
+      </section>
+
       <section className="m-section">
         <p className="m-eyebrow">{MEET.home.proposals.eyebrow}</p>
         <div className="m-secrow">

@@ -39,6 +39,7 @@ function ContactExchange({
   myNote,
   theirNote,
   onSave,
+  onDraft,
 }: {
   /** 便6-3: 渡すは E2EE 封筒 — この edge を通って届く。 */
   edgeId: string;
@@ -47,9 +48,27 @@ function ContactExchange({
   myNote: string;
   theirNote: string | null;
   onSave: (edgeId: string, peerRef: string, note: string) => Promise<boolean>;
+  /** R2 GOAL — Dock L3: 渡す文面の下書き（差し込み印つき・実行は owner の保存）。 */
+  onDraft: (peerName: string) => Promise<string | null>;
 }) {
   const [note, setNote] = useState(myNote);
   const [state, setState] = useState<"idle" | "saved" | "failed">("idle");
+  const [drafting, setDrafting] = useState(false);
+  const [draftFailed, setDraftFailed] = useState(false);
+
+  const draft = () => {
+    setDrafting(true);
+    setDraftFailed(false);
+    void onDraft(peerName).then((text) => {
+      setDrafting(false);
+      if (text === null) {
+        setDraftFailed(true); // 欄の手書きは残る（L0 は常に生きている）
+        return;
+      }
+      setNote(text);
+      setState("idle");
+    });
+  };
 
   return (
     <div style={{ marginTop: "0.6rem" }}>
@@ -94,6 +113,20 @@ function ContactExchange({
       {state === "failed" && (
         <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
           {MEET.receive.errors.network}
+        </p>
+      )}
+      <button
+        type="button"
+        className="m-link"
+        style={{ marginTop: "0.4rem" }}
+        disabled={drafting}
+        onClick={draft}
+      >
+        {drafting ? MEET.profile.introBusy : MEET.home.dock.draftAsk}
+      </button>
+      {draftFailed && (
+        <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+          {MEET.firstNote.failed}
         </p>
       )}
     </div>
@@ -234,16 +267,21 @@ function NoteFace({
   peerRef,
   initial,
   onSave,
+  onDraft,
 }: {
   edgeId: string;
   peerRef: string;
   /** 自分が立てている現行ノート（端末転写・"" = まだ立てていない）。 */
   initial: string;
   onSave: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
+  /** R2 GOAL — Dock L3: ノートの下書き（欄に入るだけ — 立てるのは owner の保存）。 */
+  onDraft: (edgeId: string, peerRef: string) => Promise<string | null>;
 }) {
   const [text, setText] = useState(initial);
   const [state, setState] = useState<"idle" | "saved" | "failed">("idle");
   const [failCode, setFailCode] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [draftFailed, setDraftFailed] = useState(false);
   const touched = useRef(false);
 
   // standing 転写は async に届く — 手を入れるまでは最新を映す（c17 と同じ規律）
@@ -255,6 +293,21 @@ function NoteFace({
     void onSave(edgeId, peerRef, text.trim()).then((r) => {
       setState(r.ok ? "saved" : "failed");
       setFailCode(r.ok ? "" : r.code);
+    });
+  };
+
+  const draft = () => {
+    setDrafting(true);
+    setDraftFailed(false);
+    void onDraft(edgeId, peerRef).then((d) => {
+      setDrafting(false);
+      if (d === null) {
+        setDraftFailed(true); // 欄の手書きは残る（L0 は常に生きている）
+        return;
+      }
+      touched.current = true;
+      setText(d);
+      setState("idle");
     });
   };
 
@@ -284,6 +337,20 @@ function NoteFace({
         >
           {state === "saved" ? MEET.profile.saved : MEET.memory.save}
         </button>
+        <button
+          type="button"
+          className="m-link"
+          style={{ marginTop: "0.4rem", marginLeft: "0.6rem" }}
+          disabled={drafting}
+          onClick={draft}
+        >
+          {drafting ? MEET.profile.introBusy : MEET.home.dock.draftAsk}
+        </button>
+        {draftFailed && (
+          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
+            {MEET.firstNote.failed}
+          </p>
+        )}
         {state === "failed" && (
           <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
             {MEET.receive.errors[failCode] ?? MEET.receive.errors.unknown}
@@ -409,6 +476,8 @@ export function SignalsSection({
   onSaveContact,
   onMakeFirstNote,
   onSaveFirstNote,
+  onDraftNote,
+  onDraftContact,
 }: {
   inbox: InboxData | null;
   /** 便3: a 側の pair 面 — 自分が開いた edge が mutual（または mutual から閉じ）になったもの。 */
@@ -436,6 +505,9 @@ export function SignalsSection({
   /** 便4: 下書きは edge 単位（保存キー=edgeId・素材=peer）。 */
   onMakeFirstNote: (edgeId: string, peerRef: string) => Promise<string | null>;
   onSaveFirstNote: (edgeId: string, text: string) => Promise<void>;
+  /** R2 GOAL — Dock L3: ノート・渡す文面の下書き（browser 直・実行は owner）。 */
+  onDraftNote: (edgeId: string, peerRef: string) => Promise<string | null>;
+  onDraftContact: (peerName: string) => Promise<string | null>;
 }) {
   const t = useT();
   // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by edge).
@@ -587,6 +659,7 @@ export function SignalsSection({
                       peerRef={sig.fromRef}
                       initial={th.find((e) => e.kind === "note-out")?.text ?? ""}
                       onSave={onSaveNote}
+                      onDraft={onDraftNote}
                     />
                     {/* c17: 連絡メモ交換は従属位置の fold へ — 便6-3 で E2EE 封筒に */}
                     <details className="m-contactfold">
@@ -598,6 +671,7 @@ export function SignalsSection({
                         myNote={myNote}
                         theirNote={theirNote}
                         onSave={onSaveContact}
+                        onDraft={onDraftContact}
                       />
                     </details>
                     {/* 便3 T5 — 双方が閉じられる（理由なし・一語の事実へ収束） */}
@@ -752,6 +826,7 @@ export function SignalsSection({
                       peerRef={pair.toRef}
                       initial={th.find((e) => e.kind === "note-out")?.text ?? ""}
                       onSave={onSaveNote}
+                      onDraft={onDraftNote}
                     />
                     <details className="m-contactfold">
                       <summary>{MEET.firstNote.contactOpen}</summary>
@@ -762,6 +837,7 @@ export function SignalsSection({
                         myNote={myNote}
                         theirNote={theirNote}
                         onSave={onSaveContact}
+                        onDraft={onDraftContact}
                       />
                     </details>
                     <button

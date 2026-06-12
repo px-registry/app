@@ -29,6 +29,7 @@ export {
 } from "./keys.ts";
 export {
   buildMeetPrompt,
+  buildDockSearchPrompt,
   toRigPool,
   toRigPoolWithRefs,
   parseProposalReply,
@@ -38,6 +39,18 @@ export {
   type BasisItem,
   type BasisMap,
 } from "./prompt.ts";
+export {
+  NOTE_DRAFT_PROMPT,
+  buildNoteDraftPrompt,
+  CONTACT_DRAFT_PROMPT,
+  CONTACT_PLACEHOLDER,
+  buildContactDraftPrompt,
+  contactDraftKeepsPlaceholder,
+  PUBLIC_PHRASING_PROMPT,
+  buildPublicPhrasingPrompt,
+  parsePublicPhrasingReply,
+  type NoteDraftMaterial,
+} from "./drafts.ts";
 export { anchorForRecipient, MAX_ANCHOR } from "./anchor.ts";
 export { buildDockPreview, buildDockPrompt, type DockMaterial } from "./dock.ts";
 export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";

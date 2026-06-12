@@ -127,6 +127,28 @@ export function buildMeetPrompt(
   return `${withQuestion}\n\n${FORMAT_BLOCK}`;
 }
 
+// ── R2 GOAL — Dock L2: owner 向け検索のプロンプト ────────────────────────────────
+// buildMeetPrompt と同じ法構造のまま、【届いている提案】を問いの前に挟む —
+// law はそれも読んだ上で立つ（question の splice と同じ流儀）。検索の問いは
+// owner のその場の言葉（standing の問いと別系・保存しない）。
+
+const RECEIVED_HEADING = "【届いている提案（あなた宛て・参考）】";
+
+export function buildDockSearchPrompt(
+  self: RigOwnerV1,
+  pool: RigPublicPoolItemV1[],
+  ask: string,
+  receivedLines: string[],
+): string {
+  const base = buildMeetPrompt(self, pool, ask);
+  if (receivedLines.length === 0) return base;
+  const block = `${RECEIVED_HEADING}\n${receivedLines.map((l) => `- ${l}`).join("\n")}\n\n`;
+  // 問いブロックの前（= law よりさらに前）に置く。問いが無ければ law の前。
+  const qIdx = base.indexOf(QUESTION_HEADING);
+  const at = qIdx >= 0 ? qIdx : base.indexOf(LAW_HEADING);
+  return at >= 0 ? base.slice(0, at) + block + base.slice(at) : `${base}\n\n${block}`;
+}
+
 // ── Parsing the model's reply (fail-closed; raw text is kept either way) ───────
 
 export type ProposalCard = {
