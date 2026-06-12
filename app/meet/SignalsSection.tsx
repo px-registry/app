@@ -306,17 +306,27 @@ function TalkThread({
   edgeId,
   peerRef,
   entries,
+  prefill,
   onSend,
 }: {
   edgeId: string;
   peerRef: string;
   entries: TalkEntryV1[];
+  /** R2 GOAL — チャットポートの下書きリンク（#draft=）から来た下書き。
+   *  欄に入るだけ — 封緘も送信も owner の手（既存確認動線）。 */
+  prefill?: string;
   onSend: (edgeId: string, peerRef: string, text: string) => Promise<{ ok: boolean; code: string }>;
 }) {
   // 下書きの保全: 送信が失敗しても書いた文は欄に残る（沈黙の禁止＋床は紙）
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(prefill ?? "");
   const [busy, setBusy] = useState(false);
   const [failCode, setFailCode] = useState("");
+  // prefill が後から届いても、owner が書きかけた文は決して潰さない
+  useEffect(() => {
+    if (prefill !== undefined && prefill !== "") {
+      setDraft((d) => (d === "" ? prefill : d));
+    }
+  }, [prefill]);
 
   const send = () => {
     const text = draft.trim();
@@ -391,6 +401,7 @@ export function SignalsSection({
   threads,
   peerNotes,
   poolRefs,
+  portDraft,
   onTalkBack,
   onClose,
   onSendMessage,
@@ -410,6 +421,8 @@ export function SignalsSection({
   peerNotes: Record<string, string>;
   /** c18b: refs currently in the pool (the 気配 fetch); null = couldn't tell. */
   poolRefs: ReadonlySet<string> | null;
+  /** R2 GOAL — チャットポートの下書きリンク（one-shot・宛先 edge とその本文）。 */
+  portDraft: { edgeId: string; text: string } | null;
   /** c18: the send result comes back — a refusal renders an honest line.
    *  R2 0010 T2: the answer addresses the EDGE that arrived (no reverse edge). */
   onTalkBack: (edgeId: string) => Promise<{ ok: boolean; code: string }>;
@@ -490,7 +503,7 @@ export function SignalsSection({
             const isMutual = sig.state === "mutual";
             const isClosed = sig.state === "closed";
             return (
-              <li key={sig.edgeId} className={`m-signal${isMutual ? "" : " is-in"}`}>
+              <li key={sig.edgeId} id={`room-${sig.edgeId}`} className={`m-signal${isMutual ? "" : " is-in"}`}>
                 <div className="m-sighead">
                   {/* 輪が語る: open=相手は挙げた・あなたはまだ / pair=相互 /
                       resting=閉じ。c9-5: 印なしの輪は状態記号サイズ=26。 */}
@@ -565,6 +578,7 @@ export function SignalsSection({
                       edgeId={sig.edgeId}
                       peerRef={sig.fromRef}
                       entries={threads[sig.edgeId] ?? []}
+                      prefill={portDraft?.edgeId === sig.edgeId ? portDraft.text : undefined}
                       onSend={onSendMessage}
                     />
                     {/* 便6: 自分のノートを立てる・直す（standing の fold） */}
@@ -677,7 +691,7 @@ export function SignalsSection({
               "";
             const absent = poolRefs !== null && !poolRefs.has(pair.toRef);
             return (
-              <li key={pair.edgeId} className="m-signal">
+              <li key={pair.edgeId} id={`room-${pair.edgeId}`} className="m-signal">
                 <div className="m-sighead">
                   <Ring state={isClosed ? "resting" : "pair"} size={26} />
                   <h4>{name}</h4>
@@ -730,6 +744,7 @@ export function SignalsSection({
                       edgeId={pair.edgeId}
                       peerRef={pair.toRef}
                       entries={threads[pair.edgeId] ?? []}
+                      prefill={portDraft?.edgeId === pair.edgeId ? portDraft.text : undefined}
                       onSend={onSendMessage}
                     />
                     <NoteFace

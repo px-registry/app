@@ -26,6 +26,7 @@ import {
   draftPlacedQuestionTitle,
   isPlacedQuestion,
   toPublicView,
+  adoptPortItems,
   type MeetRigItemV1,
   type ReceivedProposalV1,
   type ReadingV1,
@@ -175,6 +176,31 @@ export function HomeView() {
   // 便6 — edge ごとのトーク（開封済み・時刻順）と、相手の立てたノート（standing）
   const [threads, setThreads] = useState<Record<string, TalkEntryV1[]>>({});
   const [peerNotes, setPeerNotes] = useState<Record<string, string>>({});
+  // R2 GOAL — チャットポートからの下書きリンク（/meet/?room=<edgeId>#draft=<text>）。
+  // # 以降はブラウザがサーバに送らない — 平文非読は URL の構造が担う。one-shot:
+  // 読んだら URL から消す（書かれた下書き自体はトーク欄が保全する）。
+  const [portDraft, setPortDraft] = useState<{ edgeId: string; text: string } | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get("room") ?? "";
+    const hash = window.location.hash;
+    if (room === "" || !hash.startsWith("#draft=")) return;
+    const rawText = hash.slice("#draft=".length);
+    let text = "";
+    try {
+      text = decodeURIComponent(rawText);
+    } catch {
+      text = rawText; // 雑なエンコードでも下書きを失わない（fail-open は表示のみ）
+    }
+    if (text.trim() === "") return;
+    setPortDraft({ edgeId: room, text });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  // 下書きの宛先トークルームへ静かに寄る（motion なし・一度だけ）
+  useEffect(() => {
+    if (portDraft === null || inbox === null) return;
+    document.getElementById(`room-${portDraft.edgeId}`)?.scrollIntoView({ block: "center" });
+  }, [portDraft, inbox]);
 
   const reload = useCallback(async () => {
     setQuestion(await memory.getQuestion());
@@ -192,6 +218,17 @@ export function HomeView() {
     setReceived(list);
     const ib = await fetchInbox(getOrMintOwnerToken());
     setInbox(ib.ok ? ib : null);
+    // R2 GOAL — チャットポートの reverse-import: port（あなたのAI・owner 確認つき）
+    // が additive に立てた公開行を、端末の記憶へ取り込み alias を結ぶ。以後は端末が
+    // 正本を持ち、publish の atomic replace で消えない（0010 alias 継続）。
+    if (ib.ok && ib.myItems.length > 0) {
+      const adopted = await adoptPortItems(memory, aliasLane, ib.myItems);
+      if (adopted > 0) {
+        const rig2 = await memory.listRigItems();
+        setRigEntries(rig2);
+        setAliases(await aliasLane.getOrMintAll(rig2.map((e) => e.entryId)));
+      }
+    }
     // c17: face data per mutual pair — basis from the owner-local shelf (the
     // same provenance gate the display uses), draft from the firstnote lane.
     // 便4: 下書きは edge に閉じる（鮮度原則）— 顔データも edgeId キー。
@@ -1062,6 +1099,16 @@ export function HomeView() {
         </section>
       )}
 
+      {/* R2 GOAL — 沈黙の禁止: 下書きリンクの宛先が見つからないとき、その事実を言う */}
+      {portDraft !== null &&
+        inbox !== null &&
+        ![...inbox.incoming, ...inbox.outgoing].some(
+          (e) => e.edgeId === portDraft.edgeId && e.state === "mutual",
+        ) && (
+          <p className="m-note" aria-live="polite">
+            {MEET.home.talk.portDraftMiss}
+          </p>
+        )}
       <SignalsSection
         inbox={inbox}
         outgoingPairs={outgoingPairs}
@@ -1069,6 +1116,7 @@ export function HomeView() {
         threads={threads}
         peerNotes={peerNotes}
         poolRefs={poolRefs}
+        portDraft={portDraft}
         onTalkBack={talkBack}
         onClose={closeEdge}
         onSendMessage={sendTalkMessage}
