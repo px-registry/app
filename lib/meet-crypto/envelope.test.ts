@@ -18,7 +18,9 @@ test("EV-1: seal→open round-trip; only the recipient's private key opens it", 
 test("EV-2: tamper / junk → null, never a throw (fail-closed)", async () => {
   const bob = await mintEncKeyPair();
   const sealed = await sealEnvelope(bob.pub, "x");
-  const flip = (s: string) => s.slice(0, -2) + (s.at(-2) === "A" ? "B" : "A") + s.slice(-1);
+  // 先頭文字を反転 — 末尾グループは base64 padding で捨てられるビットを含み、
+  // 元の文字が A〜D のとき改竄が no-op になる（実測 ~6% の flake）。先頭は常に効く。
+  const flip = (s: string) => (s[0] === "A" ? "B" : "A") + s.slice(1);
   assert.equal(await openEnvelope(bob.priv, { ...sealed, ciphertext: flip(sealed.ciphertext) }), null);
   assert.equal(await openEnvelope(bob.priv, { ...sealed, iv: "%%%" }), null);
   assert.equal(await openEnvelope(bob.priv, { ...sealed, ephPub: "{broken" }), null);
