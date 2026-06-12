@@ -75,6 +75,10 @@ function ContactExchange({
       <p className="m-accent">
         {MEET.home.signals.mutual} {MEET.home.signals.contactNote}
       </p>
+      {/* R2 GOAL — 渡す遅延（spec §11-5）: 渡すは任意・会うまで行ける */}
+      <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
+        {MEET.home.signals.contactCanWait}
+      </p>
       {theirNote !== null ? (
         <div className="m-proposal" style={{ marginBottom: "0.5rem" }}>
           <p className="m-item-tags" style={{ margin: 0 }}>
@@ -361,6 +365,106 @@ function NoteFace({
   );
 }
 
+// ── R2 GOAL — 後日談ループ（spec §11-6 前倒し）: 会った後、owner の言葉を
+// 記憶へ還流する。owner-local 完結 — ここからサーバへは一字も行かない。
+// AI の蒸留は任意（L0 = 自分の言葉のまま足す、が常に生きている）。
+function EpilogueFace({
+  peerName,
+  anchor,
+  onDistill,
+  onAddMemory,
+}: {
+  peerName: string;
+  anchor: string;
+  onDistill: (words: string, peerName: string, anchor: string) => Promise<{ title: string; text: string } | null>;
+  onAddMemory: (title: string, text: string) => Promise<boolean>;
+}) {
+  const [words, setWords] = useState("");
+  const [card, setCard] = useState<{ title: string; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [line, setLine] = useState<"" | "added" | "addFailed" | "distillFailed">("");
+
+  const distill = () => {
+    if (words.trim() === "" || busy) return;
+    setBusy(true);
+    setLine("");
+    void onDistill(words, peerName, anchor).then((c) => {
+      setBusy(false);
+      if (c === null) {
+        setLine("distillFailed"); // 言葉は欄に残る — そのまま足す道は生きている
+        return;
+      }
+      setCard(c);
+    });
+  };
+
+  const add = () => {
+    const c = card ?? { title: "", text: words.trim() };
+    if (c.text === "") return;
+    void onAddMemory(c.title, c.text).then((ok) => {
+      setLine(ok ? "added" : "addFailed");
+      if (ok) {
+        setWords("");
+        setCard(null);
+      }
+    });
+  };
+
+  return (
+    <details className="m-notefold">
+      <summary>{MEET.home.epilogue.fold}</summary>
+      <div style={{ marginTop: "0.5rem" }}>
+        <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
+          {MEET.home.epilogue.note}
+        </p>
+        <textarea
+          className="m-field"
+          rows={3}
+          value={words}
+          onChange={(e) => {
+            setWords(e.target.value);
+            setLine("");
+          }}
+          placeholder={MEET.home.epilogue.placeholder}
+        />
+        {card !== null && (
+          <div className="m-proposal" style={{ marginTop: "0.4rem" }}>
+            {card.title !== "" && <p className="m-item-tags" style={{ margin: 0 }}>{card.title}</p>}
+            <p className="m-item-text" style={{ whiteSpace: "pre-wrap" }}>{card.text}</p>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.4rem" }}>
+          <button
+            type="button"
+            className="m-btn m-btn-quiet"
+            disabled={(card === null && words.trim() === "")}
+            onClick={add}
+          >
+            {MEET.home.epilogue.add}
+          </button>
+          <button
+            type="button"
+            className="m-link"
+            disabled={words.trim() === "" || busy}
+            onClick={distill}
+          >
+            {busy ? MEET.profile.introBusy : MEET.home.epilogue.distill}
+          </button>
+        </div>
+        {line !== "" && (
+          <p className="m-note" aria-live="polite" style={{ marginTop: "0.4rem" }}>
+            {line === "added"
+              ? MEET.home.epilogue.added
+              : line === "addFailed"
+                ? MEET.home.epilogue.addFailed
+                : MEET.firstNote.failed}
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 // ── 便6: トーク — LINE/Slack の「形」を採り「圧」を採らない（spec §10）。
 // 時系列・自他の整列・日付区切り・下書きの保全。既読・入力中・presence・
 // 未読バッジは存在しない（このコンポーネントにその語彙がないことが pin）。
@@ -478,6 +582,8 @@ export function SignalsSection({
   onSaveFirstNote,
   onDraftNote,
   onDraftContact,
+  onDistillEpilogue,
+  onAddMemory,
 }: {
   inbox: InboxData | null;
   /** 便3: a 側の pair 面 — 自分が開いた edge が mutual（または mutual から閉じ）になったもの。 */
@@ -508,6 +614,13 @@ export function SignalsSection({
   /** R2 GOAL — Dock L3: ノート・渡す文面の下書き（browser 直・実行は owner）。 */
   onDraftNote: (edgeId: string, peerRef: string) => Promise<string | null>;
   onDraftContact: (peerName: string) => Promise<string | null>;
+  /** R2 GOAL — 後日談ループ（owner-local 完結）。 */
+  onDistillEpilogue: (
+    words: string,
+    peerName: string,
+    anchor: string,
+  ) => Promise<{ title: string; text: string } | null>;
+  onAddMemory: (title: string, text: string) => Promise<boolean>;
 }) {
   const t = useT();
   // c18 — 沈黙の禁止: こちらも話してみる の結末はこのカードに出る (keyed by edge).
@@ -656,6 +769,12 @@ export function SignalsSection({
                       initial={th.find((e) => e.kind === "note-out")?.text ?? ""}
                       onSave={onSaveNote}
                       onDraft={onDraftNote}
+                    />
+                    <EpilogueFace
+                      peerName={sig.fromName}
+                      anchor={sig.anchor}
+                      onDistill={onDistillEpilogue}
+                      onAddMemory={onAddMemory}
                     />
                     {/* c17: 連絡メモ交換は従属位置の fold へ — 便6-3 で E2EE 封筒に */}
                     <details className="m-contactfold">
@@ -819,6 +938,12 @@ export function SignalsSection({
                       initial={th.find((e) => e.kind === "note-out")?.text ?? ""}
                       onSave={onSaveNote}
                       onDraft={onDraftNote}
+                    />
+                    <EpilogueFace
+                      peerName={name}
+                      anchor={pair.anchor}
+                      onDistill={onDistillEpilogue}
+                      onAddMemory={onAddMemory}
                     />
                     <details className="m-contactfold">
                       <summary>{MEET.firstNote.contactOpen}</summary>

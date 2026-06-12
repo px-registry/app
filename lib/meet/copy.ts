@@ -124,6 +124,8 @@ export const MEET = {
       mutual: "おたがいが「話してみる」を押しました。",
       contactHeading: "連絡のメモ",
       contactNote: "連絡のメモを交換できます。届くのはこの相手だけです。",
+      /** R2 GOAL — 渡す遅延（spec §11-5 前倒し・黄・仮置き）: 渡すは任意・急がない。 */
+      contactCanWait: "渡すのは、会う段になってからでも。",
       contactPlaceholder: "例：LINEのID、メール、電話など、つながれる窓口",
       contactSave: "渡す",
       contactSaved: "渡しました",
@@ -152,6 +154,19 @@ export const MEET = {
       noteReaders: "相手と、相手のAIが読めます。",
       /** R2 GOAL（黄・仮置き） — 下書きリンクの宛先が見つからない事実の一行。 */
       portDraftMiss: "あなたのAIからの下書きが指すトークが、いま見つかりません。",
+    },
+    /**
+     * R2 GOAL — 後日談ループ（spec §11-6 前倒し・黄・仮置き文言）。
+     * owner-local 完結: ここに書いたものは端末の外に出ない（サーバ無関与）。
+     */
+    epilogue: {
+      fold: "会ったあとに",
+      note: "会ったことを、あなたの記憶に残せます。ここに書いたものは端末の外に出ません。",
+      placeholder: "どうでしたか。何が見つかりましたか。",
+      distill: "あなたのAIに整えてもらう",
+      add: "記憶に足す",
+      added: "記憶に足しました。",
+      addFailed: "記憶に足せませんでした。",
     },
     /**
      * Wave 2 — Dock Lite（spec §12・全句ゲート済の引用）。

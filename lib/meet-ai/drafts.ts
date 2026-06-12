@@ -91,6 +91,31 @@ export function buildPublicPhrasingPrompt(item: { title: string; text: string })
   return parts.join("\n");
 }
 
+// ── 後日談ループ（spec §11-6 前倒し・owner-local 完結）─────────────────────────
+// 会った後の owner の言葉を、記憶の一枚（memory card）へ蒸留する。還流先は
+// owner の端末の記憶だけ — サーバは何も知らない。縁の記録（双方署名）は R4。
+
+export const EPILOGUE_PROMPT = [
+  "あなたは、ownerが人と会ったあとの言葉を、ownerの記憶の一枚に整える取次です。",
+  "書き方:",
+  "- ownerの言葉だけから書く。書かれていない事実・感想を足さない。",
+  "- 後から読み返して役に立つ形に: 何があったか、何が見つかったか、次に何があるか（書かれていれば）。",
+  "- 相手の品定め・点数は書かない。",
+  '- 出力は次の JSON のみ: { "title": "一言タイトル（16字まで）", "text": "本文（1〜3行）" }',
+].join("\n");
+
+export function buildEpiloguePrompt(m: {
+  words: string;
+  peerName: string;
+  anchor: string;
+}): string {
+  const parts = [EPILOGUE_PROMPT, "", "【材料】"];
+  if (m.peerName.trim() !== "") parts.push(`会った相手の呼び名: ${m.peerName.trim()}`);
+  if (m.anchor.trim() !== "") parts.push(`接点: ${m.anchor.trim()}`);
+  parts.push(`ownerの言葉: ${m.words.trim()}`);
+  return parts.join("\n");
+}
+
 /** fail-closed parse — JSON 以外・空文字は null（正直な一行へ）。 */
 export function parsePublicPhrasingReply(raw: string): { title: string; text: string } | null {
   const stripped = raw.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, "").trim();

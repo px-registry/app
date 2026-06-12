@@ -77,6 +77,8 @@ import {
   buildNoteDraftPrompt,
   buildContactDraftPrompt,
   contactDraftKeepsPlaceholder,
+  buildEpiloguePrompt,
+  parsePublicPhrasingReply,
   type BasisMap,
 } from "@/lib/meet-ai";
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
@@ -665,6 +667,39 @@ export function HomeView() {
     return parseFirstNoteReply(r.text);
   };
 
+  // ── R2 GOAL — 後日談ループ（spec §11-6 前倒し・owner-local 完結）──────────────
+  // 蒸留は任意（L0 = そのまま足す）。還流先は端末の記憶だけ — サーバ無関与。
+  const distillEpilogue = async (
+    words: string,
+    peerName: string,
+    anchor: string,
+  ): Promise<{ title: string; text: string } | null> => {
+    const model = getModel();
+    const r = await generateProposals({
+      model,
+      apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+      endpoint: getEndpoint(),
+      prompt: buildEpiloguePrompt({ words, peerName, anchor }),
+    });
+    if (!r.ok) return null;
+    return parsePublicPhrasingReply(r.text);
+  };
+
+  const addEpilogueMemory = async (title: string, text: string): Promise<boolean> => {
+    try {
+      await memory.create({
+        kind: "rig_item",
+        // AI が整えた形でも、足す行為は owner の確認（このボタン）— validator の階級どおり
+        provenance: "owner_imported_confirmed",
+        value: { kind: "memory", title, text, tags: [], private: true },
+      });
+    } catch {
+      return false;
+    }
+    await reload();
+    return true;
+  };
+
   const draftContact = async (peerName: string): Promise<string | null> => {
     const model = getModel();
     const r = await generateProposals({
@@ -1251,6 +1286,8 @@ export function HomeView() {
         onSaveFirstNote={saveFirstNote}
         onDraftNote={draftNote}
         onDraftContact={draftContact}
+        onDistillEpilogue={distillEpilogue}
+        onAddMemory={addEpilogueMemory}
       />
         </div>
 

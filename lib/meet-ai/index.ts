@@ -49,6 +49,8 @@ export {
   PUBLIC_PHRASING_PROMPT,
   buildPublicPhrasingPrompt,
   parsePublicPhrasingReply,
+  EPILOGUE_PROMPT,
+  buildEpiloguePrompt,
   type NoteDraftMaterial,
 } from "./drafts.ts";
 export { anchorForRecipient, MAX_ANCHOR } from "./anchor.ts";
