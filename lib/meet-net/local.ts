@@ -42,6 +42,20 @@ export function markBoundarySeen(): void {
   localStorage.setItem(BOUNDARY_KEY, "1");
 }
 
+// ── 記憶装置 層2b — 会話窓「続きを端末に残す」トグル（②opt-in・既定 OFF）──────────
+// ③蒸留が既定（生 chat 揮発）。owner が ON にした時だけ会話控えが端末に残る。
+// この旗は端末ローカル UI 状態（PX へは送らない）。
+const WINDOW_PERSIST_KEY = "pxmeet:window-persist";
+
+/** 既定 OFF（明示 "1" の時だけ ON＝③蒸留既定を保つ・fail-closed）。 */
+export function getWindowPersist(): boolean {
+  return localStorage.getItem(WINDOW_PERSIST_KEY) === "1";
+}
+export function setWindowPersist(on: boolean): void {
+  if (on) localStorage.setItem(WINDOW_PERSIST_KEY, "1");
+  else localStorage.removeItem(WINDOW_PERSIST_KEY);
+}
+
 // ── visual refresh — theme phase (paper | sumi), device-local UI pref ─────────
 //
 // G-2 (指示書 §7): the existing device-side persistence method IS this audited

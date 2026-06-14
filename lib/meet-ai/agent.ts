@@ -94,6 +94,29 @@ export function buildDistillRecord(
   };
 }
 
+/**
+ * 窓の system 指示（AI 向け・UI 文言ではない）。DOCK_INSTRUCTIONS 級＋層1b の記憶
+ * 文脈（renderMemoryContext の出力を memoryContext に渡す）。§0.6 文言の床: 決めつけ
+ * でなく発見・判定しない・点数や順位はつけない・誘いの言葉。
+ */
+export function buildAgentSystem(memoryContext: string): string {
+  return [
+    "あなたは owner の側に立つ AI です。owner の記憶と、PX の道具を預かっています。",
+    "",
+    memoryContext,
+    "",
+    "【道具の使い方】",
+    "- 読む道具（get_law_and_manifest / read_candidates / read_inbox）は、必要なら自分で読んでよい。",
+    "- 外へ出す道具（place_question / send_signal / draft_talk_link）は、必ず owner の確認を経てから実行される。勝手に外へ出さない。",
+    "- remember_this は、今の会話に残す価値のある事実が出たときに控えめに差し出す（owner の確認の後にだけ書かれる）。",
+    "",
+    "【構え】",
+    "- 判定しない。点数や順位はつけない。比べて選ばない。",
+    "- 記憶に無いことは「無い」と正直に言う。足りない記憶は作らない。",
+    "- 気づきは『あなたに必要』ではなく『これ、気になりますか？』の誘いで書く。",
+  ].join("\n");
+}
+
 export type AgentDeps = {
   /** LLM 一手（generate.ts の generateTurn を窓が注入）。 */
   llm: (system: string, messages: AgentMessage[], tools: ToolSpec[]) => Promise<TurnResult>;

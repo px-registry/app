@@ -22,6 +22,7 @@ export { ReceivedStore, type ReceivedProposalV1, type ReadingV1 } from "./receiv
 export { FirstNoteStore, firstNoteKey, legacyFirstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
 export { ItemAliasStore, mintItemRef, type ItemAliasV1 } from "./alias.ts";
 export { EncKeyStore, type EncKeyRecordV1 } from "./enckey.ts";
+export { WindowChatStore, type WindowChatRecordV1 } from "./windowchat.ts";
 export { TalkStore, PeerKeyStore, type TalkEntryV1, type TalkEntryKind } from "./talk.ts";
 export { validateNewEntry, validateStoredEntry, validateJournalRecord, type ValidationResult } from "./validate.ts";
 export {
@@ -72,9 +73,10 @@ export {
   type MaskPair,
 } from "./mask-check.ts";
 
-import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE, JOURNAL_STORE } from "./indexeddb.ts";
+import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE, JOURNAL_STORE, WINDOWCHAT_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";
 import { MemJournalStore } from "./journal.ts";
+import { WindowChatStore, type WindowChatRecordV1 } from "./windowchat.ts";
 import type { MemJournalRecordV1 } from "./journal-types.ts";
 import { ReceivedStore, type ReceivedProposalV1 } from "./received.ts";
 import { FirstNoteStore, type FirstNoteDraftV1 } from "./firstnote.ts";
@@ -86,6 +88,11 @@ import type { MeetMemoryEntryV1 } from "./types.ts";
 /** Browser-side 記憶装置 journal store (層1a). Call only from client components. */
 export function openMemJournal(): MemJournalStore {
   return new MemJournalStore(new IndexedDbMeetBackend<MemJournalRecordV1>(JOURNAL_STORE));
+}
+
+/** Browser-side 会話窓の控え（②opt-in）. Call only from client components. */
+export function openWindowChat(): WindowChatStore {
+  return new WindowChatStore(new IndexedDbMeetBackend<WindowChatRecordV1>(WINDOWCHAT_STORE));
 }
 
 /** Browser-side memory store over IndexedDB. Carries the journal so 控え v2

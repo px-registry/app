@@ -30,11 +30,13 @@ export const ENCKEY_STORE = "enckey";
 export const TALK_STORE = "talk";
 export const PEERKEY_STORE = "peerkey";
 export const JOURNAL_STORE = "journal";
+export const WINDOWCHAT_STORE = "windowchat";
+// v7 (記憶装置 層2b): + windowchat（②opt-in の会話控え・既定では空）。
 // v6 (記憶装置 層1a): + journal (keyPath recordId). v5 (R2 便6): + talk / peerkey.
 // v4 (R2 0013): + enckey. v3 (R2 0010): + aliasmap. v2 (c17): + firstnote.
 // onupgradeneeded creates only what is missing, so older databases upgrade in
 // place without touching existing lanes.
-const VERSION = 6;
+const VERSION = 7;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -65,6 +67,10 @@ function openDb(): Promise<IDBDatabase> {
       // 記憶装置 層1a — journal lane (keyPath recordId, not entryId).
       if (!db.objectStoreNames.contains(JOURNAL_STORE)) {
         db.createObjectStore(JOURNAL_STORE, { keyPath: "recordId" });
+      }
+      // 記憶装置 層2b — windowchat lane（②opt-in の会話控え・singleton）。
+      if (!db.objectStoreNames.contains(WINDOWCHAT_STORE)) {
+        db.createObjectStore(WINDOWCHAT_STORE, { keyPath: "entryId" });
       }
     };
     req.onsuccess = () => resolve(req.result);

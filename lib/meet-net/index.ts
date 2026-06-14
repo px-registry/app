@@ -9,6 +9,8 @@ export {
   setPublishedSnapshot,
   boundarySeen,
   markBoundarySeen,
+  getWindowPersist,
+  setWindowPersist,
   getPatrolLastRun,
   getPatrolByQuestion,
   markPatrolRun,

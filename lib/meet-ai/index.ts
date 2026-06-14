@@ -73,6 +73,7 @@ export {
 } from "./generate.ts";
 export {
   runAgentTurn,
+  buildAgentSystem,
   agentTools,
   isReadTool,
   isWriteTool,
