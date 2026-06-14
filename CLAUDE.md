@@ -165,6 +165,9 @@ node scripts\r2-goal-ui-smoke.mjs                # UI 一周（二扉/pair面/#d
   品質評価は Hiroto のブラウザ（Claude 実鍵）で。want の無い記憶では law どおり「今日は無い」を返す
   （smoke の記憶 fixture には want を必ず入れる）。
 - wrangler dev は `_headers` を**起動時に読む**——変更したら再起動。
+- **px-guard が比較ソート（dot-sort）を遮断**（lib/meet-memory 等・ranking 忍び込み防止）。
+  順序が要るなら比較でなく**位置で並べる**（記憶装置 journal は seq 単調増加・穴なし＝配列
+  添字で order・`orderBySeq` in journal.ts が範例）。allowlist 追記での迂回は避けた。
 - **提案エントリのセレクタは `.m-entry`**（`.m-item` は記憶リスト側）。batch3 smoke の
   `.m-item`/`.m-proposal` 待ちは旧マークアップ — 新 smoke を書くとき写さない（c16 で180s×2浪費）。
 - **wrangler dev 起動中は `npx wrangler pages deploy` が EBUSY で落ちる**（npx キャッシュ共有）
