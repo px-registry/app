@@ -512,6 +512,15 @@ html[data-theme="sumi"] .meet-scope {
   border-radius: 50%;
   background: var(--faint);
 }
+/* 便A: ヒーロー退去後の毎日の画面 — 帯だけが最上部に座る。題字ぶんの天の余白を
+   詰め、帯の margin-top を相殺して計器を上に寄せる（m-hero は home 専用＝LP/二扉は
+   別レイアウトなので安全に調整できる）。 */
+.m-hero-bare {
+  padding-top: clamp(1.4rem, 3.2vw, 2rem);
+}
+.m-hero-bare .m-meter {
+  margin-top: 0;
+}
 
 /* ── type ──────────────────────────────────────────────────────────────────── */
 

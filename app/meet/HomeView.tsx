@@ -954,21 +954,12 @@ export function HomeView() {
 
   return (
     <>
-      {/* 視覚一新: hero — 題字は新ヒーローへ、旧の題字文言は縦の銘に座る。
-          傍点はヒーローの「誰もいない」のみ。<br> は640px未満で消える。 */}
-      <section className="m-hero">
-        <h1>
-          {t("meet.hero.lead")}
-          <br />
-          <span className="m-shu">
-            {t("meet.hero.accentPre")}
-            <em>{t("meet.hero.accentEm")}</em>
-            {t("meet.hero.accentPost")}
-          </span>
-        </h1>
-        <p className="m-hero-sub">{t("meet.hero.sub")}</p>
-        {/* 縦の銘は c9-1 で撤去（Hiroto 指摘「縦書きは過剰」） */}
-        {/* 計器行 — the patrol fact moved here from the proposals column */}
+      {/* 発表準備・便A: 毎日の画面の最上部からヒーロー二行＋リード文を退去する
+          （宣言は状態表示でない — 毎日開くツールの最上部に置くと説教になる）。
+          計器の帯だけを最上部へ繰り上げる。ヒーローコピー（meet.hero.*）は削除せず
+          copy に残し、LP・二扉ページの宣言として存置する。 */}
+      <section className="m-hero m-hero-bare">
+        {/* 計器行 — the patrol fact, now the first thing on the daily home */}
         <div className="m-meter" role="status">
           <span className="m-live">
             <span className="m-pulse" aria-hidden="true" />
