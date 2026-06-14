@@ -13,6 +13,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { onRequestPost, onRequestGet } from "./mcp.ts";
 import { deriveParticipantRef } from "../../lib/meet-net/ref.ts";
@@ -298,4 +299,19 @@ test("unknown tool / unknown method are honest errors", async () => {
   const res2 = await postMcp(rpc("resources/list"));
   const body2 = (await res2.json()) as { error: { code: number } };
   assert.equal(body2.error.code, -32601);
+});
+
+// ── 単一臓器（記憶装置 層2）: MCP transport も窓も同じ handlers-core を通る ──────
+
+test("PORT-core: mcp.ts delegates to handlers-core (no tool SQL in the transport)", () => {
+  const mcp = readFileSync(new URL("./mcp.ts", import.meta.url), "utf8");
+  assert.ok(/from\s+["']\.\/handlers-core\.ts["']/.test(mcp), "mcp.ts imports the core");
+  assert.ok(/callPortTool\s*\(/.test(mcp), "mcp.ts calls callPortTool");
+  // the tool bodies (SQL) moved out — the transport must not re-implement them
+  assert.ok(!mcp.includes("r15_pool_item"), "no pool SQL in the transport");
+  assert.ok(!mcp.includes("r15_edge"), "no edge SQL in the transport");
+
+  const core = readFileSync(new URL("./handlers-core.ts", import.meta.url), "utf8");
+  assert.ok(/export\s+async\s+function\s+callPortTool/.test(core), "core exports the single implementation");
+  assert.ok(core.includes("r15_pool_item") && core.includes("r15_edge"), "the tool bodies live in the core");
 });
