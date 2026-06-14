@@ -278,6 +278,62 @@ test("MM-9c: private defaults to TRUE; broken items dropped; never throws", () =
   assert.deepEqual(parseColdStartPaste("").items, []);
 });
 
+// ── MM-9d/e/f (発表準備便B): 札ブロック形式 — v2 正本の主形式、JSON は黙って互換 ──
+
+test("MM-9d: 札18枚が実往復（parse→store）、種類ごとの非公開既定、タグ任意", async () => {
+  const blocks: string[] = [
+    "have 活版印刷ができる工房\n名刺や栞を一枚から刷れる。道具ごと手を貸せる。\n活版 印刷",
+    "want 週末に一緒にものづくりする仲間\n月に一度、手を動かす集まりをやってみたい。\nものづくり",
+    "avoid 深夜の連絡\n夜はつながらない。朝に返す。", // avoid → 非公開既定（タグ行なし）
+    "memory 祖父の印刷所で育った\n紙とインクの匂いが原点。", // memory → 非公開既定
+    "have 伏せたい常連向けの仕事\n名前は出したくない仕事がある。\n非公開", // have だが「非公開」明記
+    "have タグなしのカード\nタグ行が無くても本文だけで通る。",
+  ];
+  while (blocks.length < 18) {
+    blocks.push(`have 本当に持っている道具その${blocks.length}\n日々使っている道具の一つ。\n道具`);
+  }
+  const paste = blocks.join("\n\n");
+  const r = parseColdStartPaste(paste);
+  assert.equal(r.items.length, 18, "18枚すべて読める");
+  assert.equal(r.warnings.length, 0, "壊れカードなし＝警告なし");
+
+  const byTitle = (t: string) => r.items.find((it) => it.title === t)!;
+  // 種類ごとの非公開既定
+  assert.equal(byTitle("深夜の連絡").private, true, "avoid は非公開既定");
+  assert.equal(byTitle("祖父の印刷所で育った").private, true, "memory は非公開既定");
+  assert.equal(byTitle("伏せたい常連向けの仕事").private, true, "have でも「非公開」明記で伏せる");
+  assert.equal(byTitle("活版印刷ができる工房").private, false, "have は既定で公開（owner が確認で選ぶ）");
+  // タグ任意・「非公開」はタグから除かれる
+  assert.deepEqual(byTitle("タグなしのカード").tags, []);
+  assert.deepEqual(byTitle("活版印刷ができる工房").tags, ["活版", "印刷"]);
+  assert.ok(!byTitle("伏せたい常連向けの仕事").tags.includes("非公開"));
+
+  // 実往復: 確認フローと同じ provenance で owner-local store に積んで読み戻す
+  const store = freshStore();
+  for (const item of r.items) {
+    await store.create({
+      kind: "rig_item",
+      provenance: "owner_imported_confirmed",
+      value: { ...item, tags: [...item.tags] },
+    });
+  }
+  assert.equal((await store.listRigItems()).length, 18, "18枚が owner-local に着地");
+});
+
+test("MM-9e: JSON は札形式導入後も黙って受け続ける（互換・告知しない）", () => {
+  const r = parseColdStartPaste(GOOD_ITEMS);
+  assert.equal(r.items.length, 2, "旧 JSON 出力が引き続き通る");
+  assert.equal(r.items[0].kind, "have");
+});
+
+test("MM-9f: 壊れたブロックは正直に一枚だけ落ちる（残りは生きる）", () => {
+  const good = "have 直せる自転車\n工具と経験がある。\n自転車";
+  const broken = "これは種類語で始まらない一枚\nなので読み取れない。"; // 先頭語が種類でない
+  const r = parseColdStartPaste([good, broken, good].join("\n\n"));
+  assert.equal(r.items.length, 2, "読める2枚は生きる");
+  assert.equal(r.warnings.length, 1, "落ちたのは一枚だけ（正直な一枚落ち）");
+});
+
 // ── MM-10 (第2便 A): 置いた問い＝want カード — pure helper pins ─────────────────
 
 test("MM-10: draftPlacedQuestion is a want card tagged 問い, text verbatim", () => {

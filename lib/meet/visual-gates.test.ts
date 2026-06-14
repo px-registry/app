@@ -121,24 +121,24 @@ test("VR-9 (c12/便3): gated copy — placeholder, name-row link", async () => {
   assert.equal(MEET.receive.nameWhere, "記憶で書けます");
 });
 
-// ── VR-10 (c14): 他人に読める書き方 — the coldstart prompt translates AT INTAKE
+// ── VR-10 (c14→便B): 他人に読める書き方 — the coldstart prompt translates AT INTAKE
 //
-// 設計原理: 翻訳は、文脈が最も濃い場所で、一度だけ。The block below is the
-// 2026-06-11 裁定文 VERBATIM (c12-6's 固有名詞ガード is INTEGRATED into it —
-// the old free-standing bullet must be extinct, no duplicate 規定). The
-// はじめかた §2 line announces it. Downstream (rule 9 v3's 平易な言い回し)
-// leans on this — the law itself stays untouched.
+// 設計原理: 翻訳は、文脈が最も濃い場所で、一度だけ。The block below is VERBATIM
+// from the v2 正本 (PX_INTAKE_PROMPT_v2・札ブロック形式, 2026-06-15 発表準備便B で
+// JSON 版から差し替え・期待の追従). c12-6's 固有名詞ガード stays INTEGRATED — in
+// v2 it is folded into the 造語 bullet (no free-standing 規定). The はじめかた §2
+// line announces it. Downstream (rule 9 v3's 平易な言い回し) leans on this — the
+// law itself stays untouched.
 
 test("VR-10: the legibility block rides the coldstart prompt verbatim", async () => {
   const { COLDSTART_PROMPT } = await import("../meet-memory/coldstart.ts");
   for (const line of [
-    "**■ 他人に読める書き方（いちばん大事）**",
-    "各項目は、**あなたを知らない人が初めて読んでも意味が取れる**ように書いてください。",
-    "- 題は短く。ただし内輪の名前・略語・プロジェクト名ではなく、内容が伝わる言葉で。",
-    "- 本文は、その話を一度も聞いたことのない相手に説明するつもりで、1〜3文。何をしている・何を求めている・何を持っているのかが、それだけで分かるように。",
-    "- 造語・専門の符号・社内の言い回しは、そのまま使わず、内容の言い換えで書く。",
-    "- 会社名・店名・人名・取引先名などの固有名詞は、そのまま書かず、内容が伝わる言い換えにする（例:「◯◯株式会社との取引」→「飲食チェーンとの取引」）。本人の呼び名や連絡先は項目に含めない。",
-    "- 本人だけに通じる書き方になっていないか、書き終えたら一度、知らない人の目で読み返してから出力する。",
+    "**他人に読める書き方（いちばん大事）**",
+    "各カードは、私を知らない人が初めて読んでも意味が取れるように書いて。",
+    "- タイトルは短く。ただし内輪の名前・略語・プロジェクト名ではなく、内容が伝わる言葉で。",
+    "- 本文は、その話を一度も聞いたことのない相手に説明するつもりで。何をしている・何を求めている・何を持っているのかが、それだけで分かるように。",
+    "- 造語・専門の符号・社内の言い回しは、内容の言い換えで書く。会社名・店名・人名は、内容が伝わる言い換えに（例:「◯◯株式会社との取引」→「飲食チェーンとの取引」）。呼び名や連絡先はカードに含めない。",
+    "- 書き終えたら一度、知らない人の目で読み返してから出力する。",
   ]) {
     assert.ok(COLDSTART_PROMPT.includes(line), `coldstart prompt carries: ${line.slice(0, 24)}…`);
   }

@@ -1,13 +1,17 @@
 // R1.5 meet memory — cold-start intake (rig-intake lineage: fail-closed, never
 // throws, warnings carry no raw content).
 //
-// A tester pastes their everyday LLM's output. We accept, leniently:
+// A tester pastes their everyday LLM's output. The v2 正本 asks the LLM for
+// 札ブロック (cards) — blank-line-separated, 1枚＝3行 (「種類 タイトル」/本文/
+// 任意のタグ行). That is the primary format. The OLD JSON shapes are still
+// accepted silently (互換・告知しない) so testers mid-flight never break:
 //   - a bare JSON array of items
 //   - the same array inside a ```fenced``` block or surrounded by prose
 //   - { "items": [...] } or the facilitator shape [{ ownerId, items }] (first
 //     owner's items are taken)
-// Per the goal, the real samples this five-person test produces become the
-// parser spec — a line-format parser is deliberately deferred until then.
+// We try JSON first; only when no JSON item-structure is present do we read the
+// paste as cards. 1枚ずつ fail-closed: an unreadable card is dropped with a
+// warning while the rest survive (正直な一枚落ち).
 //
 // Item normalization mirrors lib/rig/rig-intake.ts parseItem semantics:
 // kind/text essential (else dropped with a warning); title defaults to "";
@@ -88,27 +92,15 @@ function itemArrayOf(parsed: unknown, warnings: string[]): unknown[] | null {
   return null;
 }
 
-/**
- * Parse a pasted cold-start output into reviewed-before-stored items.
- * NEVER throws; whatever does not parse is reported as a warning (no raw
- * content in warnings) and skipped.
- */
-export function parseColdStartPaste(paste: string): MeetIntakeResult {
-  const warnings: string[] = [];
-  if (paste.trim() === "") {
-    return { items: [], warnings: ["まだ何も貼られていません。"] };
-  }
+/** JSON path (kept for compatibility — accepted silently, never announced).
+ *  Returns null when the paste carries no JSON item-structure, so the caller
+ *  falls through to the card-block parser. */
+function tryJsonItems(paste: string): MeetIntakeResult | null {
   const parsed = extractJson(paste);
-  if (parsed === null) {
-    return {
-      items: [],
-      warnings: ["JSONが見つかりませんでした。AIの出力をそのまま貼ってください。"],
-    };
-  }
+  if (parsed === null) return null;
+  const warnings: string[] = [];
   const rawItems = itemArrayOf(parsed, warnings);
-  if (rawItems === null) {
-    return { items: [], warnings: ["項目の並びが見つかりませんでした。"] };
-  }
+  if (rawItems === null) return null;
   const items: RigMemoryItemV1[] = [];
   rawItems.forEach((raw, i) => {
     const item = parseItem(raw);
@@ -122,4 +114,77 @@ export function parseColdStartPaste(paste: string): MeetIntakeResult {
     warnings.push("読み取れる項目がありませんでした。");
   }
   return { items, warnings };
+}
+
+/** Parse one 札ブロック into an item, fail-closed.
+ *  Line 1「種類 タイトル」(先頭語=種類), line 2 本文 (required), line 3 以降
+ *  タグ＋任意の「非公開」. avoid/memory は非公開既定; have/want は「非公開」明記で
+ *  のみ非公開。Returns null when the block is not a readable card. */
+function parseCard(block: string): RigMemoryItemV1 | null {
+  const lines = block
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+  if (lines.length < 2) return null; // 種類行 + 本文 が最低条件
+  const head = lines[0];
+  const sp = head.search(/\s/);
+  const kindWord = (sp === -1 ? head : head.slice(0, sp)).toLowerCase();
+  if (!KIND_SET.has(kindWord)) return null;
+  const kind = kindWord as RigMemoryKindV1;
+  const title = sp === -1 ? "" : head.slice(sp + 1).trim();
+  const text = lines[1];
+  if (text === "") return null;
+  const tagTokens = lines
+    .slice(2)
+    .join(" ")
+    .split(/\s+/)
+    .filter((t) => t !== "");
+  const tags = tagTokens.filter((t) => t !== "非公開");
+  const forcedPrivate = tagTokens.includes("非公開");
+  // Fail-closed default: avoid/memory ride 非公開; have/want public unless 非公開.
+  const priv = forcedPrivate || kind === "avoid" || kind === "memory";
+  return { kind, title, text, tags, private: priv };
+}
+
+/** v2 札ブロック parser: blocks separated by a blank line, each 1枚ずつ validated. */
+function parseCardBlocks(paste: string): MeetIntakeResult {
+  const warnings: string[] = [];
+  const items: RigMemoryItemV1[] = [];
+  // \r\n を正規化し、念のためコードフェンスを剥がす（v2 は不要と言うが LLM 差を吸収）。
+  const cleaned = paste
+    .replace(/\r\n?/g, "\n")
+    .replace(/```[a-zA-Z]*\n?/g, "")
+    .replace(/```/g, "");
+  const blocks = cleaned
+    .split(/\n[ \t　]*\n/)
+    .map((b) => b.trim())
+    .filter((b) => b !== "");
+  blocks.forEach((block, i) => {
+    const card = parseCard(block);
+    if (card === null) {
+      warnings.push(`${i + 1}枚目のカードは読み取れなかったため除外しました。`);
+      return;
+    }
+    items.push(card);
+  });
+  if (items.length === 0 && warnings.length === 0) {
+    warnings.push("カードが見つかりませんでした。AIの出力をそのまま貼ってください。");
+  }
+  return { items, warnings };
+}
+
+/**
+ * Parse a pasted cold-start output into reviewed-before-stored items.
+ * NEVER throws; whatever does not parse is reported as a warning (no raw
+ * content in warnings) and skipped. v2 札ブロックが主形式、旧 JSON は黙って受ける。
+ */
+export function parseColdStartPaste(paste: string): MeetIntakeResult {
+  if (paste.trim() === "") {
+    return { items: [], warnings: ["まだ何も貼られていません。"] };
+  }
+  // 旧 JSON 形式は黙って受け続ける（互換・告知しない）— まず JSON として読めるか。
+  const json = tryJsonItems(paste);
+  if (json !== null) return json;
+  // v2 札ブロック形式。
+  return parseCardBlocks(paste);
 }
