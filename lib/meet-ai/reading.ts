@@ -175,6 +175,21 @@ export function composeReadingPrompt(
   return { prompt, refs, selection };
 }
 
+/**
+ * 記憶の文脈ブロックだけを描く（層2 の窓の system へ畳む材料）。返答の形・読み方の
+ * 指示は付けない — agent 側が自分の system 指示を持つ。selection は PURE。
+ */
+export function renderMemoryContext(
+  all: MemJournalRecordV1[],
+  question: string,
+  opts?: ReadingOpts,
+): string {
+  const selection = selectForReading(all, question, opts);
+  if (selection.records.length === 0) return `${MEMORY_HEADING}\n（まだ記憶がありません）`;
+  const lines = selection.records.map((r, i) => renderMemoryLine(`m${i + 1}`, r));
+  return `${MEMORY_HEADING}\n${lines.join("\n")}`;
+}
+
 /** 指示書の名前どおりの薄い入口（プロンプト文字列だけ要る呼び手向け）。 */
 export function buildReadingPrompt(
   all: MemJournalRecordV1[],

@@ -28,6 +28,7 @@ export {
 } from "./snapshot.ts";
 export {
   publishProjection,
+  portCall,
   fetchEncKey,
   fetchPool,
   sendEnvelope,

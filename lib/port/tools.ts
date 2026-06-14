@@ -126,3 +126,22 @@ export const PORT_TOOLS: readonly PortToolDef[] = Object.freeze([
 ]) as readonly PortToolDef[];
 
 export const PORT_TOOL_NAMES = Object.freeze(PORT_TOOLS.map((t) => t.name)) as readonly string[];
+
+// ── 実行の二態（spec §12 Tool Contract・記憶装置 層2 の窓が読む）─────────────────
+// read 系 = ループ内で自動実行してよい（owner の見えるものを読むだけ・readOnly）。
+// write 系 = 実行前に必ず owner の確認カードを出す（沈黙の禁止・fail-closed）。
+//
+// 注: draft_talk_link は annotations.readOnlyHint=true（サーバ副作用なし — edge を
+// 検証してリンク雛形を返すだけ）だが、**外へ出る操作**なので窓では write 系として
+// owner 確認を要する（CC_PROMPT 第3便の個別指示が annotations より優先）。
+export const PORT_READ_TOOLS = Object.freeze([
+  "get_law_and_manifest",
+  "read_candidates",
+  "read_inbox",
+]) as readonly string[];
+
+export const PORT_WRITE_TOOLS = Object.freeze([
+  "place_question",
+  "send_signal",
+  "draft_talk_link",
+]) as readonly string[];

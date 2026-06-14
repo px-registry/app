@@ -55,7 +55,33 @@ export {
 } from "./drafts.ts";
 export { anchorForRecipient, MAX_ANCHOR } from "./anchor.ts";
 export { buildDockPreview, buildDockPrompt, type DockMaterial } from "./dock.ts";
-export { generateProposals, probeOllama, type GenerateInput, type GenerateResult } from "./generate.ts";
+export {
+  generateProposals,
+  generateTurn,
+  probeOllama,
+  toAnthropicBody,
+  parseAnthropicTurn,
+  toOpenAIBody,
+  parseOpenAITurn,
+  type GenerateInput,
+  type GenerateResult,
+  type ToolSpec,
+  type ToolUse,
+  type ToolResult,
+  type AgentMessage,
+  type TurnResult,
+} from "./generate.ts";
+export {
+  runAgentTurn,
+  agentTools,
+  isReadTool,
+  isWriteTool,
+  buildDistillRecord,
+  REMEMBER_TOOL,
+  REMEMBER_TOOL_NAME,
+  type AgentDeps,
+  type AgentTurnOpts,
+} from "./agent.ts";
 export { buildDetectPrompt, parseDetectReply, buildIntroPrompt, parseIntroReply } from "./mask.ts";
 export {
   FIRST_NOTE_PROMPT,
@@ -85,6 +111,7 @@ export {
   selectForReading,
   extractTriggerTags,
   composeReadingPrompt,
+  renderMemoryContext,
   buildReadingPrompt,
   parseReadingReply,
   resolveReading,

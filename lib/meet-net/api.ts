@@ -441,6 +441,51 @@ export async function fetchEncKey(
   }
 }
 
+// ── 記憶装置 層2 — チャットポートの direct-call transport（窓 → /port/mcp）──────
+// PX 内の常駐会話窓の agent が道具を実行する口。外部 LLM の MCP コネクタと **同じ
+// /port/mcp（= 同じ handlers-core）** を、owner token で直に叩く（単一臓器）。
+//
+// no-log: ここを出るのは tool の name と typed args **だけ**（owner が UI でやる操作と
+// 同一の payload）。会話本文は一字も乗らない — MCP の tools/call params に message を
+// 入れる経路は存在しない。
+export async function portCall(input: {
+  ownerToken: string;
+  name: string;
+  args: Record<string, unknown>;
+}): Promise<NetResult<{ content: string; isError: boolean }>> {
+  try {
+    const res = await fetch("/port/mcp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${input.ownerToken}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: input.name, arguments: input.args },
+      }),
+    });
+    const body: unknown = await res.json().catch(() => null);
+    if (res.status === 401) return { ok: false, error: "unauthorized" };
+    if (!res.ok || !isRecord(body)) return { ok: false, error: "port_failed" };
+    const result = isRecord(body.result) ? body.result : null;
+    if (result === null) {
+      const err = isRecord(body.error) && typeof body.error.message === "string" ? body.error.message : "port_failed";
+      return { ok: false, error: err };
+    }
+    const content = Array.isArray(result.content) ? result.content : [];
+    const text = content
+      .filter(isRecord)
+      .map((c) => (typeof c.text === "string" ? c.text : ""))
+      .join("");
+    return { ok: true, content: text, isError: result.isError === true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
 export async function fetchPool(
   myRef: string,
 ): Promise<NetResult<{ items: PoolItemPublic[] }>> {

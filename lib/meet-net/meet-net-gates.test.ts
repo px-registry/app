@@ -20,6 +20,7 @@ import {
   snapshotPendingCount,
 } from "./snapshot.ts";
 import { deriveParticipantRef, isParticipantRef, isOwnerToken } from "./ref.ts";
+import { portCall } from "./api.ts";
 import { toPublicView } from "../meet-memory/public-view.ts";
 import { findForbiddenTerm } from "../meet/forbidden.ts";
 import type { RigMemoryItemV1 } from "../rig/rig.ts";
@@ -184,6 +185,59 @@ test("MN-7: private phrasing of a 書き方-item never survives the outbound pro
   assert.ok(!out.includes("publicTitle") && !out.includes("publicText"), "closed key set");
   // untouched items pass through verbatim
   assert.ok(out.includes("床を張る人"));
+});
+
+// ── MN-9 (記憶装置 層2): portCall は typed payload だけ運ぶ（no-log）──────────────
+// 窓の direct-call transport。会話本文は一字も乗らない — /port/mcp の tools/call
+// params に出るのは tool 名と typed args（owner が UI でやる操作と同一）だけ。
+
+test("MN-9: portCall posts only {name, arguments} to /port/mcp — no message body", async () => {
+  const realFetch = globalThis.fetch;
+  let captured: { url: string; auth: string | null; body: unknown } | null = null;
+  try {
+    globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      captured = {
+        url: String(url),
+        auth: headers.get("Authorization"),
+        body: JSON.parse(String(init?.body ?? "{}")),
+      };
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "{\"ok\":true}" }] } }));
+    }) as typeof fetch;
+
+    const r = await portCall({ ownerToken: "t".repeat(32), name: "read_candidates", args: { x: 1 } });
+    assert.ok(r.ok && r.content.includes("ok"));
+    assert.ok(captured !== null);
+    const cap = captured as { url: string; auth: string | null; body: Record<string, unknown> };
+    assert.equal(cap.url, "/port/mcp");
+    assert.equal(cap.auth, `Bearer ${"t".repeat(32)}`, "owner token rides the header, not the body");
+    assert.equal(cap.body.method, "tools/call");
+    const params = cap.body.params as Record<string, unknown>;
+    // the ONLY payload keys are name + arguments — no message/text/history field
+    const keys = Object.keys(params);
+    assert.equal(keys.length, 2, "exactly two payload keys");
+    assert.ok(keys.includes("name") && keys.includes("arguments"), "only name + arguments");
+    assert.deepEqual(params.arguments, { x: 1 }, "args pass through verbatim — nothing added");
+    assert.equal(params.name, "read_candidates");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("MN-9b: portCall is fail-closed (401 → unauthorized; junk → port_failed)", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () => new Response("{}", { status: 401 })) as typeof fetch;
+    assert.deepEqual(await portCall({ ownerToken: "x", name: "read_inbox", args: {} }), {
+      ok: false,
+      error: "unauthorized",
+    });
+    globalThis.fetch = (async () => new Response("not json", { status: 200 })) as typeof fetch;
+    const r = await portCall({ ownerToken: "x", name: "read_inbox", args: {} });
+    assert.equal(r.ok, false);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 // ── MN-8 (第9便 C): serve count is COUNT-ONLY — no viewer identity column ──────
