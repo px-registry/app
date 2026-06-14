@@ -32,7 +32,15 @@ export {
   type MeetMemoryExportV2,
   type ImportReport,
 } from "./store.ts";
-export { MemJournalStore, type JournalBackend } from "./journal.ts";
+export {
+  MemJournalStore,
+  foldLatestEvents,
+  foldSupersededIds,
+  foldForgottenIds,
+  foldSurfacedIds,
+  foldHeads,
+  type JournalBackend,
+} from "./journal.ts";
 export {
   WITNESS_SOURCES,
   type MemJournalRecordV1,

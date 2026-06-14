@@ -41,6 +41,50 @@ function orderBySeq(records: MemJournalRecordV1[]): MemJournalRecordV1[] {
   return slots.filter((r): r is MemJournalRecordV1 => r !== undefined);
 }
 
+// ── 畳み込み primitive（PURE・records 配列に対して・最新優先）──────────────────────
+// store メソッドも reading（層1b）も同じ一本の真理を使う。「最新優先」は seq 最大が
+// 勝つ — どれも比較ソートでなく seq 位置順（orderBySeq）で読む。
+
+/** 各 targetRef の最新 event（seq 最大が勝つ）。 */
+export function foldLatestEvents(records: MemJournalRecordV1[]): Map<string, "surface" | "forget"> {
+  const out = new Map<string, "surface" | "forget">();
+  for (const r of orderBySeq(records)) {
+    if (r.recordType === "event") out.set(r.targetRef, r.eventKind);
+  }
+  return out;
+}
+
+/** supersede されたことのある recordId（鎖の非 head 側）。 */
+export function foldSupersededIds(records: MemJournalRecordV1[]): Set<string> {
+  const out = new Set<string>();
+  for (const r of records) if (r.recordType === "content" && r.supersedes) out.add(r.supersedes);
+  return out;
+}
+
+/** 最新 event が forget の recordId（忘却の指し）。 */
+export function foldForgottenIds(records: MemJournalRecordV1[]): Set<string> {
+  const out = new Set<string>();
+  for (const [target, kind] of foldLatestEvents(records)) if (kind === "forget") out.add(target);
+  return out;
+}
+
+/** 最新 event が surface の recordId（表層へ上げた指し）。 */
+export function foldSurfacedIds(records: MemJournalRecordV1[]): Set<string> {
+  const out = new Set<string>();
+  for (const [target, kind] of foldLatestEvents(records)) if (kind === "surface") out.add(target);
+  return out;
+}
+
+/**
+ * content の head（supersedes 連鎖の最新 body・古い body は落とす）。seq 昇順。
+ * 忘却（forget）はここでは落とさない — 既定除外は呼び手（store.heads / reading）が
+ * forgotten 集合で重ねる（「全部見せて」が forget を戻せるように分離して持つ）。
+ */
+export function foldHeads(records: MemJournalRecordV1[]): MemJournalRecordV1[] {
+  const superseded = foldSupersededIds(records);
+  return orderBySeq(records).filter((r) => r.recordType === "content" && !superseded.has(r.recordId));
+}
+
 export class MemJournalStore {
   private backend: JournalBackend;
   private now: () => string;
@@ -138,38 +182,33 @@ export class MemJournalStore {
   }
 
   // ── 読み時畳み込みの primitive（最新優先・層1b の reading はこの上に建てる）──────
+  // すべて上の PURE 関数に委譲する（store と reading が同じ一本の真理を読む）。
 
   /** 各 targetRef の最新 event（seq 最大が勝つ）。surface/forget の現在状態。 */
   async latestEventByTarget(): Promise<Map<string, "surface" | "forget">> {
-    const out = new Map<string, "surface" | "forget">();
-    for (const r of await this.list()) {
-      if (r.recordType === "event") out.set(r.targetRef, r.eventKind); // list() は seq 昇順 ⇒ 最後勝ち
-    }
-    return out;
+    return foldLatestEvents(await this.backend.list());
   }
 
   /** supersede されたことのある recordId 全部（鎖の非 head 側）。 */
   async supersededIds(): Promise<Set<string>> {
-    const out = new Set<string>();
-    for (const r of await this.backend.list()) {
-      if (r.recordType === "content" && r.supersedes) out.add(r.supersedes);
-    }
-    return out;
+    return foldSupersededIds(await this.backend.list());
   }
 
   /**
    * 既定ビューの種 — content の head（未 supersede）で、最新 event が forget でない
-   * もの。最新優先（鎖も忘却も seq 最大が勝つ）。これは store API 段の畳み込みで、
-   * その日の問いで切る深さ・層は読み側（層1b）が乗せる。
+   * もの。最新優先（鎖も忘却も seq 最大が勝つ）。その日の問いで切る深さ・層は読み側
+   * （層1b）が乗せる。
    */
   async heads(): Promise<MemJournalRecordV1[]> {
-    const superseded = await this.supersededIds();
-    const events = await this.latestEventByTarget();
-    return (await this.list()).filter(
-      (r) =>
-        r.recordType === "content" &&
-        !superseded.has(r.recordId) &&
-        events.get(r.recordId) !== "forget",
+    const all = await this.backend.list();
+    const forgotten = foldForgottenIds(all);
+    return foldHeads(all).filter((r) => !forgotten.has(r.recordId));
+  }
+
+  /** あるタグに紐づく head（既定除外: forgotten は出さない）。タグ＝読み時トリガー。 */
+  async listByTag(tag: string): Promise<MemJournalRecordV1[]> {
+    return (await this.heads()).filter(
+      (r) => r.recordType === "content" && r.body.tags.includes(tag),
     );
   }
 }
