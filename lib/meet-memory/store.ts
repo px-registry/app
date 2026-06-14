@@ -10,6 +10,9 @@
 
 import { validateNewEntry, validateStoredEntry } from "./validate.ts";
 import type { MeetBackend } from "./backend.ts";
+import type { MemJournalStore } from "./journal.ts";
+import type { MemJournalRecordV1 } from "./journal-types.ts";
+import type { SealedKeyV1 } from "../meet-crypto/seal.ts";
 import type {
   MeetMemoryEntryV1,
   MeetEntryKind,
@@ -21,18 +24,36 @@ import type {
 } from "./types.ts";
 
 export const MEET_EXPORT_FORMAT = "px.meet-memory/v1";
+/** 記憶装置 層1a — 控えは v2 へ（journal 同梱・sealedKey 任意）。v1 は黙って読む。 */
+export const MEET_EXPORT_FORMAT_V2 = "px.meet-memory/v2";
 
-/** Machine-readable backup — provenance included, no server fields. */
+/** Machine-readable backup (v1) — provenance included, no server fields. */
 export type MeetMemoryExportV1 = {
   format: typeof MEET_EXPORT_FORMAT;
   exportedAt: string;
   entries: MeetMemoryEntryV1[];
 };
 
+/**
+ * 控え v2 — substrate entries ＋ 記憶装置 journal の長さ ＋ 任意の封緘鍵。
+ * sealedKey は passphrase 設定時のみ存在（不在＝秘密鍵は控えに出ない=安全既定の保存）。
+ * 平文の私有スカラ "d" はここに現れない（鍵は seal.ts で封緘形＝opaque ciphertext）。
+ */
+export type MeetMemoryExportV2 = {
+  format: typeof MEET_EXPORT_FORMAT_V2;
+  exportedAt: string;
+  entries: MeetMemoryEntryV1[];
+  journal: MemJournalRecordV1[];
+  sealedKey?: SealedKeyV1;
+};
+
 export type ImportReport = {
   added: number;
   updated: number;
   rejected: number;
+  /** 記憶装置 journal の復元数（v2 控えのみ・v1 では 0）。 */
+  journalRestored: number;
+  journalRejected: number;
   warnings: string[];
 };
 
@@ -47,11 +68,17 @@ export class MeetMemoryStore {
   private backend: MeetBackend;
   private now: () => string;
   private genId: () => string;
+  /** 記憶装置 journal — 控え v2 の同梱対象。未配線でも substrate は単独で動く。 */
+  private journal?: MemJournalStore;
 
-  constructor(backend: MeetBackend, opts?: { now?: () => string; genId?: () => string }) {
+  constructor(
+    backend: MeetBackend,
+    opts?: { now?: () => string; genId?: () => string; journal?: MemJournalStore },
+  ) {
     this.backend = backend;
     this.now = opts?.now ?? (() => new Date().toISOString());
     this.genId = opts?.genId ?? defaultGenId;
+    this.journal = opts?.journal;
   }
 
   list(): Promise<MeetMemoryEntryV1[]> {
@@ -149,22 +176,38 @@ export class MeetMemoryStore {
 
   // ── backup (STOP #2 hybrid: export AND import) ──────────────────────────────
 
-  async exportAll(): Promise<MeetMemoryExportV1> {
-    return {
-      format: MEET_EXPORT_FORMAT,
+  /**
+   * 控え v2 — substrate entries ＋ journal の長さ（配線時）＋ 任意の封緘鍵。
+   * sealedKey は呼び手が passphrase 設定時にだけ渡す。渡さなければ不在＝秘密鍵は
+   * 控えに一切出ない（安全既定の保存）。journal 未配線なら journal: []（v1 互換の中身）。
+   */
+  async exportAll(opts?: { sealedKey?: SealedKeyV1 }): Promise<MeetMemoryExportV2> {
+    const out: MeetMemoryExportV2 = {
+      format: MEET_EXPORT_FORMAT_V2,
       exportedAt: this.now(),
       entries: await this.backend.list(),
+      journal: this.journal ? await this.journal.list() : [],
     };
+    if (opts?.sealedKey !== undefined) out.sealedKey = opts.sealedKey;
+    return out;
   }
 
   /**
    * Restore from a backup JSON string. FAIL-CLOSED and never throws: a bad
    * format / syntax error rejects everything; each entry is re-validated and a
-   * broken one is skipped with a warning. Same entryId → overwritten (the
-   * backup wins); new entryId → added. Nothing is deleted.
+   * broken one is skipped with a warning. Same id → overwritten (the backup
+   * wins); new id → added. Nothing is deleted. Accepts BOTH v1 and v2 (v2 carries
+   * the journal; v1 silently has none).
    */
   async importBackup(json: string): Promise<ImportReport> {
-    const report: ImportReport = { added: 0, updated: 0, rejected: 0, warnings: [] };
+    const report: ImportReport = {
+      added: 0,
+      updated: 0,
+      rejected: 0,
+      journalRestored: 0,
+      journalRejected: 0,
+      warnings: [],
+    };
     let raw: unknown;
     try {
       raw = JSON.parse(json);
@@ -172,16 +215,18 @@ export class MeetMemoryStore {
       report.warnings.push("控えのJSONを読み取れませんでした。");
       return report;
     }
-    if (
-      typeof raw !== "object" ||
-      raw === null ||
-      (raw as Record<string, unknown>).format !== MEET_EXPORT_FORMAT ||
-      !Array.isArray((raw as Record<string, unknown>).entries)
-    ) {
+    if (typeof raw !== "object" || raw === null) {
       report.warnings.push("この形式の控えではありません。");
       return report;
     }
-    for (const entry of (raw as { entries: unknown[] }).entries) {
+    const obj = raw as Record<string, unknown>;
+    const isV1 = obj.format === MEET_EXPORT_FORMAT;
+    const isV2 = obj.format === MEET_EXPORT_FORMAT_V2;
+    if ((!isV1 && !isV2) || !Array.isArray(obj.entries)) {
+      report.warnings.push("この形式の控えではありません。");
+      return report;
+    }
+    for (const entry of obj.entries as unknown[]) {
       const r = validateStoredEntry(entry);
       if (!r.ok) {
         report.rejected += 1;
@@ -193,6 +238,17 @@ export class MeetMemoryStore {
       await this.backend.put(typed);
       if (existing) report.updated += 1;
       else report.added += 1;
+    }
+    // v2: 記憶装置 journal の長さを復元（配線時のみ・fail-closed・verbatim）。
+    if (isV2 && Array.isArray(obj.journal) && this.journal) {
+      for (const rec of obj.journal as unknown[]) {
+        const ok = await this.journal.restore(rec as MemJournalRecordV1);
+        if (ok) report.journalRestored += 1;
+        else {
+          report.journalRejected += 1;
+          report.warnings.push("壊れた記憶レコードをひとつ除外しました。");
+        }
+      }
     }
     return report;
   }

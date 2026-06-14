@@ -13,6 +13,8 @@
 //   firstnote — c17: 第一信の下書き, one per edge (peerRef-derived key);
 //               like received, AI output that never re-enters a prompt
 //   aliasmap  — R2 0010: entryId → item_ref（公開項目の安定 alias の対応表）
+//   journal   — 記憶装置 層1a: MemJournalRecordV1（append-only の長さ; keyPath は
+//               recordId）。既存 lane は不触 — additive に足すだけ。
 //
 // Imported only from client components via the lib barrel. node:test uses
 // InMemoryMeetBackend instead, so this DOM-only code never loads there.
@@ -27,10 +29,12 @@ export const ALIAS_STORE = "aliasmap";
 export const ENCKEY_STORE = "enckey";
 export const TALK_STORE = "talk";
 export const PEERKEY_STORE = "peerkey";
-// v5 (R2 便6): + talk / peerkey. v4 (R2 0013): + enckey. v3 (R2 0010): + aliasmap.
-// v2 (c17): + firstnote. onupgradeneeded creates only what is missing, so older
-// databases upgrade in place without touching existing lanes.
-const VERSION = 5;
+export const JOURNAL_STORE = "journal";
+// v6 (記憶装置 層1a): + journal (keyPath recordId). v5 (R2 便6): + talk / peerkey.
+// v4 (R2 0013): + enckey. v3 (R2 0010): + aliasmap. v2 (c17): + firstnote.
+// onupgradeneeded creates only what is missing, so older databases upgrade in
+// place without touching existing lanes.
+const VERSION = 6;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -58,6 +62,10 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(PEERKEY_STORE)) {
         db.createObjectStore(PEERKEY_STORE, { keyPath: "entryId" });
       }
+      // 記憶装置 層1a — journal lane (keyPath recordId, not entryId).
+      if (!db.objectStoreNames.contains(JOURNAL_STORE)) {
+        db.createObjectStore(JOURNAL_STORE, { keyPath: "recordId" });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -81,8 +89,10 @@ function tx<T>(
   );
 }
 
-/** The browser-backed store. Owner-local, never networked. */
-export class IndexedDbMeetBackend<T extends { entryId: string }> implements KeyedBackend<T> {
+/** The browser-backed store. Owner-local, never networked. The key field comes
+ *  from the object store's keyPath (entryId for most lanes, recordId for the
+ *  journal), so the class body never names a key field. */
+export class IndexedDbMeetBackend<T> implements KeyedBackend<T> {
   private store: string;
   constructor(store: string = MEMORY_STORE) {
     this.store = store;

@@ -23,13 +23,25 @@ export { FirstNoteStore, firstNoteKey, legacyFirstNoteKey, type FirstNoteDraftV1
 export { ItemAliasStore, mintItemRef, type ItemAliasV1 } from "./alias.ts";
 export { EncKeyStore, type EncKeyRecordV1 } from "./enckey.ts";
 export { TalkStore, PeerKeyStore, type TalkEntryV1, type TalkEntryKind } from "./talk.ts";
-export { validateNewEntry, validateStoredEntry, type ValidationResult } from "./validate.ts";
+export { validateNewEntry, validateStoredEntry, validateJournalRecord, type ValidationResult } from "./validate.ts";
 export {
   MeetMemoryStore,
   MEET_EXPORT_FORMAT,
+  MEET_EXPORT_FORMAT_V2,
   type MeetMemoryExportV1,
+  type MeetMemoryExportV2,
   type ImportReport,
 } from "./store.ts";
+export { MemJournalStore, type JournalBackend } from "./journal.ts";
+export {
+  WITNESS_SOURCES,
+  type MemJournalRecordV1,
+  type JournalBase,
+  type SourceRefV1,
+  type WitnessSourceV1,
+  type NewContentRecordV1,
+  type NewEventRecordV1,
+} from "./journal-types.ts";
 export { parseColdStartPaste, type MeetIntakeResult } from "./intake.ts";
 export { COLDSTART_PROMPT, COLDSTART_NOTE } from "./coldstart.ts";
 export { MEET_MEMORY_BOUNDARY, type MeetMemoryBoundary } from "./boundary.ts";
@@ -52,8 +64,10 @@ export {
   type MaskPair,
 } from "./mask-check.ts";
 
-import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE } from "./indexeddb.ts";
+import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE, JOURNAL_STORE } from "./indexeddb.ts";
 import { MeetMemoryStore } from "./store.ts";
+import { MemJournalStore } from "./journal.ts";
+import type { MemJournalRecordV1 } from "./journal-types.ts";
 import { ReceivedStore, type ReceivedProposalV1 } from "./received.ts";
 import { FirstNoteStore, type FirstNoteDraftV1 } from "./firstnote.ts";
 import { ItemAliasStore, type ItemAliasV1 } from "./alias.ts";
@@ -61,9 +75,17 @@ import { EncKeyStore, type EncKeyRecordV1 } from "./enckey.ts";
 import { TalkStore, PeerKeyStore, type TalkEntryV1, type PeerKeyGenV1 } from "./talk.ts";
 import type { MeetMemoryEntryV1 } from "./types.ts";
 
-/** Browser-side memory store over IndexedDB. Call only from client components. */
+/** Browser-side 記憶装置 journal store (層1a). Call only from client components. */
+export function openMemJournal(): MemJournalStore {
+  return new MemJournalStore(new IndexedDbMeetBackend<MemJournalRecordV1>(JOURNAL_STORE));
+}
+
+/** Browser-side memory store over IndexedDB. Carries the journal so 控え v2
+ *  (export/import) includes the 記憶装置 length. Call only from client components. */
 export function openMeetMemory(): MeetMemoryStore {
-  return new MeetMemoryStore(new IndexedDbMeetBackend<MeetMemoryEntryV1>(MEMORY_STORE));
+  return new MeetMemoryStore(new IndexedDbMeetBackend<MeetMemoryEntryV1>(MEMORY_STORE), {
+    journal: openMemJournal(),
+  });
 }
 
 /** Browser-side received-proposals shelf. Call only from client components. */

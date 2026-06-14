@@ -22,7 +22,7 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import { InMemoryMeetBackend, InMemoryKeyedBackend } from "./backend.ts";
 import { FirstNoteStore, firstNoteKey, type FirstNoteDraftV1 } from "./firstnote.ts";
-import { MeetMemoryStore, MEET_EXPORT_FORMAT } from "./store.ts";
+import { MeetMemoryStore, MEET_EXPORT_FORMAT, MEET_EXPORT_FORMAT_V2 } from "./store.ts";
 import { validateNewEntry } from "./validate.ts";
 import { parseColdStartPaste } from "./intake.ts";
 import {
@@ -203,12 +203,14 @@ test("MM-7b: question / profile are upserted singletons", async () => {
   assert.equal((await store.listByKind("profile")).length, 1);
 });
 
-test("MM-7c: export → clear → import restores the entries (hybrid backup)", async () => {
+test("MM-7c: export → clear → import restores the entries (hybrid backup, v2)", async () => {
   const store = freshStore();
   await store.create({ kind: "rig_item", provenance: "owner_imported_confirmed", value: { ...ITEM, tags: [...ITEM.tags] } });
   await store.setQuestion("今日の問い");
   const dump = await store.exportAll();
-  assert.equal(dump.format, MEET_EXPORT_FORMAT);
+  // 記憶装置 層1a: 控えは v2 へ（journal 同梱・ここでは未配線なので空）。
+  assert.equal(dump.format, MEET_EXPORT_FORMAT_V2);
+  assert.deepEqual(dump.journal, []);
   assert.equal(dump.entries.length, 2);
   await store.clear();
   const report = await store.importBackup(JSON.stringify(dump));
@@ -216,6 +218,21 @@ test("MM-7c: export → clear → import restores the entries (hybrid backup)", 
   assert.equal(report.rejected, 0);
   assert.equal(await store.getQuestion(), "今日の問い");
   assert.equal((await store.listRigItems()).length, 1);
+});
+
+test("MM-7c2: a v1 控え still imports silently (forward-compatible reader)", async () => {
+  const store = freshStore();
+  const v1 = {
+    format: MEET_EXPORT_FORMAT,
+    exportedAt: "2026-06-10T00:00:00.000Z",
+    entries: [
+      { entryId: "v1-1", provenance: "owner_written", kind: "question", value: { text: "q" }, createdAt: "2026-06-10", updatedAt: "2026-06-10" },
+    ],
+  };
+  const report = await store.importBackup(JSON.stringify(v1));
+  assert.equal(report.added, 1);
+  assert.equal(report.journalRestored, 0, "a v1 控え carries no journal");
+  assert.equal(await store.getQuestion(), "q");
 });
 
 // ── MM-8: import fail-closed ────────────────────────────────────────────────────
