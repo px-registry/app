@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MEET, questionPlaceholderByHour } from "@/lib/meet/copy.ts";
+import { MemoryWindow } from "./MemoryWindow.tsx";
 import {
   openMeetMemory,
   openReceived,
@@ -1436,6 +1437,7 @@ export function HomeView() {
       />
         </div>
       </div>
+      <MemoryWindow />
     </>
   );
 }
