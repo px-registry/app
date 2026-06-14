@@ -80,3 +80,17 @@ export {
   type PatrolQuestion,
   type PatrolDecision,
 } from "./patrol.ts";
+export {
+  READING_WINDOW,
+  selectForReading,
+  extractTriggerTags,
+  composeReadingPrompt,
+  buildReadingPrompt,
+  parseReadingReply,
+  resolveReading,
+  ReadingViewCache,
+  type ReadingOpts,
+  type ReadingSelection,
+  type ReadingReply,
+  type ReadingResultV1,
+} from "./reading.ts";
