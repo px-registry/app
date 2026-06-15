@@ -1812,3 +1812,59 @@ textarea.m-field {
   margin: 0;
   font-family: var(--mincho);
 }
+
+/* ── 記憶装置 §0.6 — そっと置かれるアンテナ候補（薄く・圧なし）──────────────────── */
+.m-antcand {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--shu-soft);
+  border: 1px dashed var(--shu-line);
+  border-radius: var(--radius-card);
+}
+.m-antcand-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.m-antcand-eyebrow {
+  font-family: var(--ui);
+  font-size: 10.5px;
+  letter-spacing: var(--ls-eyebrow);
+  color: var(--shu);
+}
+.m-antcand-tag {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: var(--ls-chip);
+  color: var(--sub);
+  border: 1px solid var(--line-deep);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+.m-antcand-x {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--sub);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+.m-antcand-x:hover { color: var(--text); }
+.m-antcand-text {
+  font-family: var(--mincho);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+  margin: 0 0 0.25rem;
+}
+.m-antcand-why {
+  font-family: var(--mincho);
+  font-size: 12.5px;
+  color: var(--sub);
+  margin: 0 0 0.3rem;
+}
+.m-antcand-lead { margin: 0 0 0.6rem; }
+.m-antcand-row { display: flex; gap: 0.5rem; }

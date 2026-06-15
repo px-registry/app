@@ -17,6 +17,7 @@ import { MEET, questionPlaceholderByHour } from "@/lib/meet/copy.ts";
 import { MemoryWindow } from "./MemoryWindow.tsx";
 import {
   openMeetMemory,
+  openMemJournal,
   openReceived,
   openFirstNotes,
   openItemAliases,
@@ -69,6 +70,10 @@ import {
   toRigPoolWithRefs,
   parseProposalReply,
   generateProposals,
+  renderMemoryContext,
+  buildAntennaPrompt,
+  parseAntennaCandidates,
+  type AntennaCandidate,
   pickPatrolTarget,
   anchorForRecipient,
   buildFirstNotePrompt,
@@ -149,6 +154,8 @@ function fmtHm(iso: string): string {
 export function HomeView() {
   const t = useT();
   const memory = useMemo(() => openMeetMemory(), []);
+  // 記憶装置 §0.6 — アンテナ候補は journal（第1便の長さ）を読む（第2便 reading）。
+  const journal = useMemo(() => openMemJournal(), []);
   const shelf = useMemo(() => openReceived(), []);
   // c17: 第一信の下書きレーン — edge 単位・端末のみ（serverへ送らない）
   const notesLane = useMemo(() => openFirstNotes(), []);
@@ -181,6 +188,10 @@ export function HomeView() {
   const [gen, setGen] = useState<GenState>({ phase: "idle" });
   const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null);
   const [editingPlaced, setEditingPlaced] = useState<string | null>(null);
+  // 記憶装置 §0.6 — そっと置かれるアンテナ候補（一枚・通知ではない）。生成は一度だけ
+  // 静かに走り、無視（×）すればこのセッションでは出さない（圧の装置を作らない）。
+  const [candidate, setCandidate] = useState<AntennaCandidate | null>(null);
+  const candidateRan = useRef(false);
   const [snapshot, setSnapshot] = useState("");
   const [poolBusy, setPoolBusy] = useState(false);
   const [patrolBusy, setPatrolBusy] = useState(false);
@@ -426,6 +437,47 @@ export function HomeView() {
     await memory.setQuestion("");
     await reload();
   };
+
+  // 記憶装置 §0.6 — アンテナ候補をそっと生成（journal を読む・一度だけ・通知でない）。
+  // reading 非汚染（第2便 RD-1 継承）: journal には書き戻さない — 読むだけ。
+  const genCandidate = useCallback(async () => {
+    if (candidateRan.current || !connected) return;
+    candidateRan.current = true; // 一度だけ静かに（圧の装置を作らない）
+    try {
+      const records = await journal.list();
+      if (records.length === 0) return; // journal が空なら候補は出さない（そっと）
+      const model = getModel();
+      const r = await generateProposals({
+        model,
+        apiKey: model.provider === "ollama" ? "" : getKey(model.provider),
+        endpoint: getEndpoint(),
+        prompt: buildAntennaPrompt(renderMemoryContext(records, "")),
+      });
+      if (!r.ok) return; // そっと: 失敗は黙る（正直な空＝候補なし）
+      const cands = parseAntennaCandidates(r.text);
+      if (cands.length > 0) setCandidate(cands[0]); // 一枚だけ薄く置く
+    } catch {
+      /* そっと: 候補は best-effort・例外も黙る */
+    }
+  }, [connected, journal]);
+
+  // 察するのは AI・立てるのは owner: ✅ は既存の place 二態へ載せる（owner 確認カードを
+  // 必ず経る — 候補から直に書き込まない＝第3便 AG-1 の二態を踏襲）。
+  const placeCandidate = (c: AntennaCandidate) => {
+    setPlaceDraft({
+      title: c.title !== "" ? c.title : draftPlacedQuestionTitle(c.text),
+      text: c.text,
+      private: false,
+      business: false,
+    });
+    setCandidate(null);
+  };
+  const dismissCandidate = () => setCandidate(null); // 無視すれば消える
+
+  // つながっていれば、開いた時にそっと候補を一度だけ用意する（通知ではない）。
+  useEffect(() => {
+    if (connected) void genCandidate();
+  }, [connected, genCandidate]);
 
   const savePlaced = async (entryId: string, item: MeetRigItemV1, title: string, text: string) => {
     await memory.update(entryId, { ...item, title, text });
@@ -1148,6 +1200,38 @@ export function HomeView() {
                   {MEET.home.place.cancel}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 記憶装置 §0.6 — そっと置かれるアンテナ候補（一枚・薄く・通知ではない）。
+            押せば place 二態へ・無視（×）すれば消える。圧の装置（既読/バッジ）なし。 */}
+        {candidate !== null && placeDraft === null && (
+          <div className="m-antcand">
+            <div className="m-antcand-head">
+              <span className="m-antcand-eyebrow">{MEET.home.antennaCandidate.eyebrow}</span>
+              {candidate.implicit && (
+                <span className="m-antcand-tag">{MEET.home.antennaCandidate.implicitTag}</span>
+              )}
+              <button
+                type="button"
+                className="m-antcand-x"
+                onClick={dismissCandidate}
+                aria-label={MEET.home.aiWindow.distillSkip}
+              >
+                ×
+              </button>
+            </div>
+            <p className="m-antcand-text">{candidate.text}</p>
+            {candidate.why !== "" && <p className="m-antcand-why">{candidate.why}</p>}
+            <p className="m-note m-antcand-lead">{MEET.home.antennaCandidate.lead}</p>
+            <div className="m-antcand-row">
+              <button type="button" className="m-btn m-btn-primary" onClick={() => placeCandidate(candidate)}>
+                {MEET.home.place.action}
+              </button>
+              <button type="button" className="m-btn m-btn-quiet" onClick={dismissCandidate}>
+                {MEET.home.aiWindow.distillSkip}
+              </button>
             </div>
           </div>
         )}

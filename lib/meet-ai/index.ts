@@ -72,6 +72,11 @@ export {
   type TurnResult,
 } from "./generate.ts";
 export {
+  buildAntennaPrompt,
+  parseAntennaCandidates,
+  type AntennaCandidate,
+} from "./antenna.ts";
+export {
   runAgentTurn,
   buildAgentSystem,
   agentTools,
