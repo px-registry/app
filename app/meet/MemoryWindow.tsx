@@ -34,6 +34,7 @@ import {
   type AgentMessage,
   type AgentDeps,
 } from "@/lib/meet-ai";
+import { FocusScope } from "@react-aria/focus";
 import { PORT_TOOLS } from "@/lib/port/tools.ts";
 import {
   getOrMintOwnerToken,
@@ -74,6 +75,13 @@ export function MemoryWindow() {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Pending | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // 確認カード（§12 二態）の a11y: 出たら容器へフォーカスを移す（approve ボタンには
+  // 寄せない — 不用意な Enter で承認しないため）。FocusScope が Tab を閉じ込め、
+  // Escape は declined（沈黙の禁止: 断りも結果として会話に残る）、閉じると元へ復帰。
+  const confirmRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (pending !== null) confirmRef.current?.focus();
+  }, [pending]);
 
   // localStorage / IndexedDB は effect で初期化（prerender を落とさない）。
   useEffect(() => {
@@ -195,7 +203,21 @@ export function MemoryWindow() {
         })}
 
         {pending !== null && (
-          <div className="m-aiwin-confirm" role="dialog" aria-label={C.confirmLead}>
+          <FocusScope contain restoreFocus>
+          <div
+            ref={confirmRef}
+            tabIndex={-1}
+            className="m-aiwin-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={C.confirmLead}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                pending.resolve(false);
+              }
+            }}
+          >
             {pending.name === REMEMBER_TOOL_NAME ? (
               <>
                 <p className="m-aiwin-confirm-lead">{C.distillAsk}</p>
@@ -218,6 +240,7 @@ export function MemoryWindow() {
               </button>
             </div>
           </div>
+          </FocusScope>
         )}
       </div>
 

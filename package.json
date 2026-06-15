@@ -10,6 +10,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@react-aria/focus": "^3.22.1",
     "fflate": "^0.8.3",
     "next": "^15.5.0",
     "qrcode-generator": "^2.0.4",
