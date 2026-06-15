@@ -94,6 +94,7 @@ import { useT } from "@/lib/i18n/context.tsx";
 import { SignalsSection, type FirstNoteFaceData } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
 import { fmtHm } from "./format.ts";
+import { MeetWorkspace } from "./MeetWorkspace.tsx";
 import { AntennaSurface } from "./surfaces/AntennaSurface.tsx";
 import { ProposalsSurface } from "./surfaces/ProposalsSurface.tsx";
 import {
@@ -130,9 +131,10 @@ export function HomeView() {
   const talkLane = useMemo(() => openTalk(), []);
   const peerKeyLane = useMemo(() => openPeerKeys(), []);
 
-  // ワークスペース化(β) 第1便 — 器の足場（次便の canvas 切替で使う）。この便は
-  // 持つだけ・切替に使わない（全 surface が今までどおり縦積みで見えている）。
+  // ワークスペース化(β) — 器: canvas に開く面（rail で切替・C裁定一面）。
   const [activeSurface, setActiveSurface] = useState<SurfaceKey>("antenna");
+  // 「あなたのAI」窓（floating）の開閉 — rail の窓トグルと FAB が同じ state を握る。
+  const [windowOpen, setWindowOpen] = useState(false);
   const [question, setQuestion] = useState("");
   // Antenna 化の小便: placeholder が機能を語る（時間帯 v1・静的）。SSR/prerender と
   // の不一致を避けるため mount 後に時刻で確定する（空の一瞬は無害 — 値ではない）。
@@ -190,11 +192,16 @@ export function HomeView() {
     setPortDraft({ edgeId: room, text });
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
-  // 下書きの宛先トークルームへ静かに寄る（motion なし・一度だけ）
+  // 下書きが来たら canvas をトーク面へ寄せる（room はトーク面にしか無い・一面）。
   useEffect(() => {
     if (portDraft === null || inbox === null) return;
-    document.getElementById(`room-${portDraft.edgeId}`)?.scrollIntoView({ block: "center" });
+    setActiveSurface("talk");
   }, [portDraft, inbox]);
+  // トーク面が立ったら宛先ルームへ静かに寄る（motion なし・一度だけ）。
+  useEffect(() => {
+    if (portDraft === null || activeSurface !== "talk") return;
+    document.getElementById(`room-${portDraft.edgeId}`)?.scrollIntoView({ block: "center" });
+  }, [portDraft, activeSurface]);
 
   const reload = useCallback(async () => {
     setQuestion(await memory.getQuestion());
@@ -980,6 +987,8 @@ export function HomeView() {
   const ws: MeetWorkspaceValue = {
     activeSurface,
     setActiveSurface,
+    windowOpen,
+    setWindowOpen,
     connected,
     ready,
     hasItems,
@@ -1064,52 +1073,50 @@ export function HomeView() {
           <span>{t("meet.meter.keys")}</span>
         </div>
       </section>
-      {/* 第6便構図: 主柱=届いた提案（読み物）／側柱=問いの手（sticky panel）.
-          DOM order stays mobile's; the grid places columns. Layout only. */}
-      <div className="m-home">
-        <div className="m-home-left">
-      <AntennaSurface />
-
-      {/* R2 GOAL — 沈黙の禁止: 下書きリンクの宛先が見つからないとき、その事実を言う */}
-      {portDraft !== null &&
-        inbox !== null &&
-        ![...inbox.incoming, ...inbox.outgoing].some(
-          (e) => e.edgeId === portDraft.edgeId && e.state === "mutual",
-        ) && (
-          <p className="m-note" aria-live="polite">
-            {MEET.home.talk.portDraftMiss}
-          </p>
+      {/* 器（rail＋canvas 主役）: rail で面を選ぶと canvas に大きく開く（C裁定一面）。
+          二柱対等（旧 .m-home）を canvas 主役＋rail 脇役へ役割転換。 */}
+      <MeetWorkspace>
+        {activeSurface === "antenna" && <AntennaSurface />}
+        {activeSurface === "proposals" && <ProposalsSurface />}
+        {activeSurface === "talk" && (
+          <>
+            {/* R2 GOAL — 沈黙の禁止: 下書きリンクの宛先が見つからないとき、その事実を言う */}
+            {portDraft !== null &&
+              inbox !== null &&
+              ![...inbox.incoming, ...inbox.outgoing].some(
+                (e) => e.edgeId === portDraft.edgeId && e.state === "mutual",
+              ) && (
+                <p className="m-note" aria-live="polite">
+                  {MEET.home.talk.portDraftMiss}
+                </p>
+              )}
+            <SignalsSection
+              inbox={inbox}
+              outgoingPairs={outgoingPairs}
+              firstNotes={firstNotes}
+              threads={threads}
+              peerNotes={peerNotes}
+              poolRefs={poolRefs}
+              portDraft={portDraft}
+              onTalkBack={talkBack}
+              onClose={closeEdge}
+              onSendMessage={sendTalkMessage}
+              onSaveNote={saveNote}
+              onSaveContact={saveContact}
+              onMakeFirstNote={makeFirstNote}
+              onSaveFirstNote={saveFirstNote}
+              onDraftNote={draftNote}
+              onDraftContact={draftContact}
+              onDistillEpilogue={distillEpilogue}
+              onAddMemory={addEpilogueMemory}
+            />
+          </>
         )}
-      <SignalsSection
-        inbox={inbox}
-        outgoingPairs={outgoingPairs}
-        firstNotes={firstNotes}
-        threads={threads}
-        peerNotes={peerNotes}
-        poolRefs={poolRefs}
-        portDraft={portDraft}
-        onTalkBack={talkBack}
-        onClose={closeEdge}
-        onSendMessage={sendTalkMessage}
-        onSaveNote={saveNote}
-        onSaveContact={saveContact}
-        onMakeFirstNote={makeFirstNote}
-        onSaveFirstNote={saveFirstNote}
-        onDraftNote={draftNote}
-        onDraftContact={draftContact}
-        onDistillEpilogue={distillEpilogue}
-        onAddMemory={addEpilogueMemory}
-      />
-        </div>
-
-        <div className="m-home-right">
-      <ProposalsSurface />
-
+      </MeetWorkspace>
+      {/* 境界の開示は常時可視（憲法・どの面からも読める）。 */}
       <BoundaryNote
         lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.order, MEET.boundary.disclosure]}
       />
-        </div>
-      </div>
       <MemoryWindow />
     </MeetWorkspaceProvider>
   );

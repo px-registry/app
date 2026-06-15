@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@react-aria/focus": "^3.22.1",
+    "@react-aria/toolbar": "^3.0.0-beta.26",
     "fflate": "^0.8.3",
     "next": "^15.5.0",
     "qrcode-generator": "^2.0.4",

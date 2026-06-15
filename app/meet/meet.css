@@ -383,6 +383,60 @@ html[data-theme="sumi"] .meet-scope {
   display: none;
 }
 
+/* ── ワークスペース器（rail＋canvas）— base = mobile（rail は下ドック）── 第2便 ──
+   rail が3導線 nav を兼ねるので、器が立つ間（home）はルート nav を退ける。 */
+html[data-ws] .m-nav,
+html[data-ws] .m-nav-top {
+  display: none;
+}
+.m-ws {
+  display: block;
+}
+.m-ws-canvas {
+  min-width: 0;
+}
+/* mobile 下ドック: MeetNav の固定バーと同じ構え（親指の届く下辺・5道具・先例 P3）。 */
+.m-rail {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line-soft);
+  padding-bottom: var(--inset-b);
+}
+.m-rail-inner {
+  max-width: 30rem;
+  margin: 0 auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+.m-rail-item {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 0.65rem 0.2rem 0.75rem;
+  font-size: 0.68rem;
+  letter-spacing: var(--ls-chip);
+  color: var(--sub);
+  background: none;
+  border: none;
+  border-top: 2px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-rail-item[data-active="true"] {
+  color: var(--ink);
+  border-top-color: var(--shu);
+}
+
 /* header right cluster: theme + language */
 .m-toggles {
   margin-left: auto;
@@ -1506,54 +1560,61 @@ textarea.m-field {
     margin: 2rem 0 2.25rem;
   }
 
-  /* ── home 構図: 主柱=AIが見つけた提案（7fr）, 側柱=問いの手（4fr）。
-     c9-3: 柱の間は罫＋ガター（gap は罫と二重にならないよう詰める）。 ──────── */
-  .m-home {
-    display: grid;
-    grid-template-columns: minmax(0, 7fr) minmax(320px, 4fr);
-    column-gap: clamp(12px, 1.2vw, 16px);
-    align-items: start;
+  /* ── ワークスペース器: rail 細（道具棚・脇役）＋canvas 主役 ── 第2便 ────────
+     二柱対等（旧 .m-home 7fr/4fr）を canvas 主役＋rail 脇役へ役割転換。 */
+  .m-ws {
+    display: flex;
+    align-items: flex-start;
+    gap: clamp(20px, 2.4vw, 44px);
   }
-  .m-home-right {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .m-home-left {
-    grid-column: 2;
-    grid-row: 1;
-    border-left: 1px solid var(--line-soft);
-    padding-left: clamp(28px, 3.4vw, 48px);
-  }
-  /* the rail: quiet sections separated by hairlines (v3 rail);
-     c9-4: the seam rhythm is --section-gap, split across the hairline */
-  .m-home-left .m-section {
-    margin: 0;
-    padding: calc(var(--section-gap) / 2) 0;
-    border-top: 1px solid var(--line-soft);
-  }
-  .m-home-left .m-section:first-child {
-    padding-top: 0;
+  .m-rail {
+    position: sticky;
+    top: clamp(16px, 3vh, 28px);
+    flex: 0 0 auto;
+    width: clamp(150px, 16vw, 200px);
+    background: none;
+    backdrop-filter: none;
     border-top: none;
-  }
-  .m-home-left .m-section:last-child {
     padding-bottom: 0;
   }
-  .m-home-left .m-btn {
-    padding: 0.7rem 0.95rem;
-    font-size: 12.5px;
+  .m-rail-inner {
+    max-width: none;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
-  .m-home-right .m-promise {
+  .m-rail-item {
+    text-align: left;
+    border-top: none;
+    border-left: 2px solid transparent;
+    padding: 0.55rem 0.85rem;
+    font-size: 13px;
+    border-radius: 8px;
+    white-space: normal;
+  }
+  .m-rail-item[data-active="true"] {
+    border-left-color: var(--shu);
+    background: var(--current-wash);
+    color: var(--ink);
+  }
+  .m-ws-canvas {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 820px;
+  }
+  .m-promise {
     margin-top: var(--section-gap);
   }
   /* 朱は1画面に1つ（探しに行く）— the per-card CTA keeps a 朱 edge, not a fill */
-  .m-home-right .m-proposal-talk.m-btn-primary {
+  .m-ws-canvas .m-proposal-talk.m-btn-primary {
     background: var(--ghost-bg);
     border-color: var(--shu-line);
     color: var(--shu-deep);
     box-shadow: none;
     text-shadow: none;
   }
-  .m-home-right .m-proposal-talk.m-btn-primary:hover {
+  .m-ws-canvas .m-proposal-talk.m-btn-primary:hover {
     background: var(--shu-soft);
   }
 

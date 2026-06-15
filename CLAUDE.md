@@ -140,6 +140,11 @@ node scripts\r2-port-smoke.mjs                   # チャットポート API（�
 node scripts\r2-goal-ui-smoke.mjs                # UI 一周（二扉/pair面/#draft=/Dock L2・実 Ollama）
 ```
 
+- **ワークスペース器 smoke（第2便〜）**: `scripts\r2-ws-smoke.mjs` は rail＝toolbar・canvas
+  一面切替・あなたのAI 窓トグル・キーボード roving を実ブラウザで見る。**Ollama 不要**
+  （切替は client state のみ）。2手: `python -m http.server 8099 -d out &` → `node scripts\r2-ws-smoke.mjs`
+  （要 playwright・chromium）。器の骨格の回帰ネット。
+
 - **退役（2026-06-13）**: r15-ui-smoke.mjs は pre-R2 の signal 形で恒久 stale → 削除（歴史は git）。
   r15-smoke.ps1 も同 stale — R2 では使わない（档案として残置）。
 - 便別 smoke（R1.5 期・対象機能の回帰確認にだけ使う）: batch2-9・c17・ollama-smoke・responsive-sweep。

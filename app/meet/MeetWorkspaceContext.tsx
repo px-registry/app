@@ -27,9 +27,15 @@ export type CardEdge = { edgeId: string; state: "sent" | "mutual" | "closed"; do
 export type SurfaceKey = "antenna" | "proposals" | "talk" | "memory" | "start";
 
 export interface MeetWorkspaceValue {
-  // ── 器の足場（この便は未使用・次便の canvas 切替で使う）──────────────────────
+  // ── 器（rail＋canvas 主役）──────────────────────────────────────────────────
+  // canvas に開く面（rail で選ぶ・C裁定一面）。memory/start は canvas でなく
+  // 窓トグル・ルート遷移に割り当てる（下の windowOpen と start リンク）。
   activeSurface: SurfaceKey;
   setActiveSurface: Dispatch<SetStateAction<SurfaceKey>>;
+  // 「あなたのAI」窓（floating・FAB 維持）の開閉。rail の窓トグルと FAB が同じ state を
+  // 握る（owner も AI もいずれ同じ経路 — 第3便の戸口の下地）。
+  windowOpen: boolean;
+  setWindowOpen: Dispatch<SetStateAction<boolean>>;
 
   // ── 接続・本人 ─────────────────────────────────────────────────────────────
   connected: boolean;
