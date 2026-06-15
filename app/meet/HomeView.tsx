@@ -91,64 +91,27 @@ import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { mintEncKeyPair, encPubToString, parseEncPub } from "@/lib/meet-crypto/keys.ts";
 import { sealEnvelope, openEnvelope } from "@/lib/meet-crypto/envelope.ts";
 import { useT } from "@/lib/i18n/context.tsx";
-import { ProposalEntry } from "./ProposalEntry.tsx";
 import { SignalsSection, type FirstNoteFaceData } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
-import { Ring } from "./Ring.tsx";
+import { fmtHm } from "./format.ts";
+import { AntennaSurface } from "./surfaces/AntennaSurface.tsx";
+import { ProposalsSurface } from "./surfaces/ProposalsSurface.tsx";
+import {
+  MeetWorkspaceProvider,
+  type MeetWorkspaceValue,
+  type SurfaceKey,
+  type GenState,
+  type RigEntry,
+  type PlaceDraft,
+} from "./MeetWorkspaceContext.tsx";
 
 // 第9便 A: endings live as ENTRIES now; under the button only the running
 // indicator and the last-resort line (entry write itself failed) remain.
-type GenState = { phase: "idle" } | { phase: "busy" } | { phase: "error"; code: string };
-type RigEntry = { entryId: string; item: MeetRigItemV1 };
-type PlaceDraft = { title: string; text: string; private: boolean; business: boolean };
+// ワークスペース化(β) 第1便: 型（GenState/RigEntry/PlaceDraft）は ./MeetWorkspaceContext、
+// fmtHm は ./format、PlacedEdit は ./surfaces/AntennaSurface へ持ち出した（見た目不変）。
 
 function readingJson(entry: ReceivedProposalV1): string {
   return JSON.stringify({ echo: entry.echoFlag, cards: entry.readings });
-}
-
-// ── 置いてある問い — inline edit form (title/text only; the card stays a want) ──
-function PlacedEdit({
-  item,
-  onSave,
-  onCancel,
-}: {
-  item: MeetRigItemV1;
-  onSave: (title: string, text: string) => void;
-  onCancel: () => void;
-}) {
-  const [title, setTitle] = useState(item.title);
-  const [text, setText] = useState(item.text);
-  return (
-    <div className="m-form">
-      <label className="m-note">{MEET.memory.titleLabel}</label>
-      <input className="m-field" value={title} onChange={(e) => setTitle(e.target.value)} />
-      <label className="m-note">{MEET.home.place.textLabel}</label>
-      <textarea
-        className="m-field"
-        rows={2}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
-        <button
-          type="button"
-          className="m-btn m-btn-primary"
-          disabled={text.trim() === ""}
-          onClick={() => onSave(title.trim(), text.trim())}
-        >
-          {MEET.memory.save}
-        </button>
-        <button type="button" className="m-btn m-btn-quiet" onClick={onCancel}>
-          {MEET.memory.cancel}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function fmtHm(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 export function HomeView() {
@@ -167,6 +130,9 @@ export function HomeView() {
   const talkLane = useMemo(() => openTalk(), []);
   const peerKeyLane = useMemo(() => openPeerKeys(), []);
 
+  // ワークスペース化(β) 第1便 — 器の足場（次便の canvas 切替で使う）。この便は
+  // 持つだけ・切替に使わない（全 surface が今までどおり縦積みで見えている）。
+  const [activeSurface, setActiveSurface] = useState<SurfaceKey>("antenna");
   const [question, setQuestion] = useState("");
   // Antenna 化の小便: placeholder が機能を語る（時間帯 v1・静的）。SSR/prerender と
   // の不一致を避けるため mount 後に時刻で確定する（空の一瞬は無害 — 値ではない）。
@@ -408,6 +374,10 @@ export function HomeView() {
     if (pos < 0) return null;
     return inbox?.questionReads.find((r) => r.position === pos)?.count ?? 0;
   };
+
+  // 分解で AntennaSurface へ移した問い欄の onBlur 保存（memory は surface に露出
+  // しないので、この一手だけ HomeView 側のハンドラ経由で context に渡す）。
+  const persistQuestion = () => void memory.setQuestion(question);
 
   const openPlace = () => {
     const q = question.trim();
@@ -1005,8 +975,65 @@ export function HomeView() {
     await reload();
   };
 
+  // ワークスペース化(β) 第1便 — 分解の受け皿（E裁定: context lite）。state・action は
+  // すべて HomeView が今までどおり持ち、その値を surface へ配るだけ（見た目不変）。
+  const ws: MeetWorkspaceValue = {
+    activeSurface,
+    setActiveSurface,
+    connected,
+    ready,
+    hasItems,
+    displayName,
+    participants,
+    question,
+    setQuestion,
+    persistQuestion,
+    qPlaceholder,
+    seekNote,
+    setSeekNote,
+    gen,
+    receive,
+    openPlace,
+    placeDraft,
+    setPlaceDraft,
+    confirmPlace,
+    candidate,
+    placeCandidate,
+    dismissCandidate,
+    placedEntries,
+    placedState,
+    readsOf,
+    snapshot,
+    editingPlaced,
+    setEditingPlaced,
+    savePlaced,
+    setPlacedPrivate,
+    removePlaced,
+    poolStale,
+    updatePool,
+    poolBusy,
+    rigEntries,
+    received,
+    cardEdges,
+    poolRefs,
+    lastPatrolAt,
+    dockAsk,
+    setDockAsk,
+    dockNote,
+    setDockNote,
+    dockBusy,
+    dockPreview,
+    dockBuildPreview,
+    dockRun,
+    talk,
+    closeEdge,
+    askYourAi,
+    reading,
+    removeEntry,
+  };
+
   return (
-    <>
+    <MeetWorkspaceProvider value={ws}>
       {/* 発表準備・便A: 毎日の画面の最上部からヒーロー二行＋リード文を退去する
           （宣言は状態表示でない — 毎日開くツールの最上部に置くと説教になる）。
           計器の帯だけを最上部へ繰り上げる。ヒーローコピー（meet.hero.*）は削除せず
@@ -1041,315 +1068,7 @@ export function HomeView() {
           DOM order stays mobile's; the grid places columns. Layout only. */}
       <div className="m-home">
         <div className="m-home-left">
-      <section className="m-section">
-        <p className="m-eyebrow">{MEET.home.place.eyebrowAsk}</p>
-        <div className="m-secrow">
-          <h2 className="m-h2">{MEET.home.place.heading}</h2>
-        </div>
-        <textarea
-          className="m-field m-composer"
-          rows={2}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onBlur={() => void memory.setQuestion(question)}
-          placeholder={qPlaceholder}
-        />
-
-        {/* 対ボタン［探しにいく］［アンテナを立てる］— 常設。未接続の探しにいくは
-            offline 一行へ正直に倒す（沈黙の禁止・同一定数の再利用）。 */}
-        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
-          <button
-            type="button"
-            className="m-btn m-btn-primary"
-            style={{ flex: 1 }}
-            onClick={() => {
-              if (!connected) {
-                setSeekNote(MEET.home.dockSearch.offline);
-                return;
-              }
-              setSeekNote("");
-              void receive();
-            }}
-            disabled={gen.phase === "busy"}
-          >
-            {gen.phase === "busy" ? MEET.receive.busy : MEET.home.receive}
-          </button>
-          <button
-            type="button"
-            className="m-btn m-btn-quiet"
-            onClick={openPlace}
-            disabled={question.trim() === "" || placeDraft !== null}
-          >
-            {MEET.home.place.action}
-          </button>
-        </div>
-        {seekNote !== "" && (
-          <p className="m-note" aria-live="polite">
-            {seekNote}
-          </p>
-        )}
-        {!ready && (
-          <div className="m-empty" style={{ marginTop: "0.75rem", textAlign: "left" }}>
-            {/* c12-4: each row carries its own 導線 — the key/memory rows land
-                on their はじめかた step, the name row lands on the 記憶 name
-                field (it lives there, not on はじめかた). */}
-            <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
-              {!connected && (
-                <li>
-                  <Link className="m-rowlink" href="/meet/start/#step-key">
-                    {MEET.receive.needKey}
-                  </Link>
-                </li>
-              )}
-              {!hasItems && (
-                <li>
-                  <Link className="m-rowlink" href="/meet/start/#step-intake">
-                    {MEET.receive.needMemory}
-                  </Link>
-                </li>
-              )}
-              {displayName === "" && (
-                <li>
-                  {MEET.receive.needName}{" "}
-                  <Link className="m-rowlink" href="/meet/memory/#name">
-                    {MEET.receive.nameWhere}
-                  </Link>
-                </li>
-              )}
-            </ul>
-            {!connected && (
-              <p className="m-note" style={{ marginTop: "0.5rem" }}>
-                {MEET.receive.noKeyLoop}
-              </p>
-            )}
-            <p className="m-note" style={{ marginTop: "0.5rem" }}>
-              <Link href="/meet/start/" style={{ color: "var(--shu-deep)" }}>
-                {MEET.receive.toStart}
-              </Link>
-            </p>
-          </div>
-        )}
-        {participants !== null && (
-          <p className="m-note" aria-live="polite">
-            {MEET.home.presence.participants(participants)}
-          </p>
-        )}
-        {gen.phase === "error" && (
-          // last resort only — every normal ending is an entry in the 欄 below
-          <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>
-            {MEET.receive.errors[gen.code] ?? MEET.receive.errors.provider}
-          </p>
-        )}
-
-        {placeDraft !== null && (
-          <div className="m-card" style={{ marginTop: "0.75rem" }}>
-            <p className="m-item-title" style={{ marginTop: 0 }}>
-              {MEET.home.place.confirmHeading}
-            </p>
-            <p className="m-note">{MEET.home.place.confirmNote}</p>
-            <div className="m-form">
-              <label className="m-note">{MEET.home.place.titleLabel}</label>
-              <input
-                className="m-field"
-                value={placeDraft.title}
-                onChange={(e) => setPlaceDraft({ ...placeDraft, title: e.target.value })}
-              />
-              <label className="m-note">{MEET.home.place.textLabel}</label>
-              <textarea
-                className="m-field"
-                rows={2}
-                value={placeDraft.text}
-                onChange={(e) => setPlaceDraft({ ...placeDraft, text: e.target.value })}
-              />
-              {/* 0012: チェック一個・説明文なし（公開性はこのカード自体が語済み） */}
-              <label
-                className="m-note"
-                style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.5rem" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={placeDraft.business}
-                  onChange={(e) => setPlaceDraft({ ...placeDraft, business: e.target.checked })}
-                />
-                {MEET.home.place.business}
-              </label>
-              <div className="m-item-head" style={{ marginTop: "0.5rem" }}>
-                <button
-                  type="button"
-                  className={`m-toggle ${placeDraft.private ? "" : "m-toggle-on"}`}
-                  onClick={() => setPlaceDraft({ ...placeDraft, private: !placeDraft.private })}
-                  aria-pressed={!placeDraft.private}
-                >
-                  {placeDraft.private ? MEET.intake.privateLabel : MEET.intake.publicLabel}
-                </button>
-              </div>
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
-                <button
-                  type="button"
-                  className="m-btn m-btn-primary"
-                  disabled={placeDraft.text.trim() === ""}
-                  onClick={() => void confirmPlace()}
-                >
-                  {MEET.home.place.confirm}
-                </button>
-                <button
-                  type="button"
-                  className="m-btn m-btn-quiet"
-                  onClick={() => setPlaceDraft(null)}
-                >
-                  {MEET.home.place.cancel}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 記憶装置 §0.6 — そっと置かれるアンテナ候補（一枚・薄く・通知ではない）。
-            押せば place 二態へ・無視（×）すれば消える。圧の装置（既読/バッジ）なし。 */}
-        {candidate !== null && placeDraft === null && (
-          <div className="m-antcand">
-            <div className="m-antcand-head">
-              <span className="m-antcand-eyebrow">{MEET.home.antennaCandidate.eyebrow}</span>
-              {candidate.implicit && (
-                <span className="m-antcand-tag">{MEET.home.antennaCandidate.implicitTag}</span>
-              )}
-              <button
-                type="button"
-                className="m-antcand-x"
-                onClick={dismissCandidate}
-                aria-label={MEET.home.aiWindow.distillSkip}
-              >
-                ×
-              </button>
-            </div>
-            <p className="m-antcand-text">{candidate.text}</p>
-            {candidate.why !== "" && <p className="m-antcand-why">{candidate.why}</p>}
-            <p className="m-note m-antcand-lead">{MEET.home.antennaCandidate.lead}</p>
-            <div className="m-antcand-row">
-              <button type="button" className="m-btn m-btn-primary" onClick={() => placeCandidate(candidate)}>
-                {MEET.home.place.action}
-              </button>
-              <button type="button" className="m-btn m-btn-quiet" onClick={dismissCandidate}>
-                {MEET.home.aiWindow.distillSkip}
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {placedEntries.length > 0 && (
-        <section className="m-section">
-          <p className="m-eyebrow">{MEET.home.place.eyebrowResting}</p>
-          <div className="m-secrow">
-            <h2 className="m-h2">{MEET.home.place.listHeading}</h2>
-            <span className="m-badge">{placedEntries.length}</span>
-          </div>
-          {!connected && (
-            <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
-              {MEET.home.patrol.offline}
-            </p>
-          )}
-          <ul className="m-itemlist m-qlist">
-            {placedEntries.map((e) => (
-              <li key={e.entryId} className="m-q">
-                <Ring
-                  state="resting"
-                  size={20}
-                  className={`m-q-ring ${
-                    e.item.private === false && snapshotHas(snapshot, toPublicView(e.item))
-                      ? "is-wait"
-                      : "is-idle"
-                  }`}
-                />
-                <div className="m-q-body">
-                {editingPlaced === e.entryId ? (
-                  <PlacedEdit
-                    item={e.item}
-                    onSave={(title, text) => void savePlaced(e.entryId, e.item, title, text)}
-                    onCancel={() => setEditingPlaced(null)}
-                  />
-                ) : (
-                  <>
-                    {e.item.title && <p className="m-item-title">{e.item.title}</p>}
-                    <p className="m-item-text">{e.item.text}</p>
-                    <p className="m-note" aria-live="polite">
-                      <span
-                        className={
-                          placedState(e.item) === MEET.home.place.stateWaiting
-                            ? "m-state-on"
-                            : undefined
-                        }
-                      >
-                        {placedState(e.item)}
-                      </span>
-                    </p>
-                    {e.item.private === false &&
-                      snapshotHas(snapshot, toPublicView(e.item)) &&
-                      (() => {
-                        const n = readsOf(e.item);
-                        return n === null ? null : (
-                          <p className="m-note" style={{ marginTop: "0.15rem" }}>
-                            {n > 0 ? MEET.home.presence.reads(n) : MEET.home.presence.noReads}
-                          </p>
-                        );
-                      })()}
-                    <div className="m-item-actions">
-                      <button
-                        type="button"
-                        className="m-link"
-                        onClick={() => setEditingPlaced(e.entryId)}
-                      >
-                        {MEET.memory.edit}
-                      </button>
-                      {e.item.private === false ? (
-                        <button
-                          type="button"
-                          className="m-link"
-                          onClick={() => void setPlacedPrivate(e.entryId, e.item, true)}
-                        >
-                          {MEET.home.place.withdraw}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="m-link"
-                          onClick={() => void setPlacedPrivate(e.entryId, e.item, false)}
-                        >
-                          {MEET.home.place.putBack}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="m-link"
-                        onClick={() => void removePlaced(e.entryId)}
-                      >
-                        {MEET.memory.remove}
-                      </button>
-                    </div>
-                  </>
-                )}
-                </div>
-              </li>
-            ))}
-          </ul>
-          {poolStale &&
-            (displayName !== "" ? (
-              <button
-                type="button"
-                className="m-btn m-btn-quiet m-btn-wide"
-                style={{ marginTop: "0.75rem" }}
-                onClick={() => void updatePool()}
-                disabled={poolBusy}
-              >
-                {MEET.home.place.updatePool}
-              </button>
-            ) : (
-              <p className="m-note" style={{ marginTop: "0.75rem" }}>
-                {MEET.home.place.needName}
-              </p>
-            ))}
-        </section>
-      )}
+      <AntennaSurface />
 
       {/* R2 GOAL — 沈黙の禁止: 下書きリンクの宛先が見つからないとき、その事実を言う */}
       {portDraft !== null &&
@@ -1384,137 +1103,7 @@ export function HomeView() {
         </div>
 
         <div className="m-home-right">
-      {/* R2 GOAL — Dock L2: owner 向け検索。AIが読み、人間には提案と根拠で返す
-          （人間向け他者一覧は出さない — 結果は既存の提案レーンに gate 済みで立つ）。 */}
-      <section className="m-section">
-        <p className="m-eyebrow">{MEET.home.dockSearch.eyebrow}</p>
-        <h2 className="m-h2">{MEET.home.dockSearch.heading}</h2>
-        <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
-          {MEET.home.dockSearch.note}
-        </p>
-        {connected ? (
-          <>
-            <textarea
-              className="m-field"
-              rows={2}
-              value={dockAsk}
-              onChange={(e) => {
-                setDockAsk(e.target.value);
-                setDockNote("");
-              }}
-              placeholder={MEET.home.dockSearch.placeholder}
-            />
-            {dockAsk.trim() !== "" && (
-              <details
-                style={{ marginTop: "0.4rem" }}
-                onToggle={(e) => {
-                  if ((e.target as HTMLDetailsElement).open) void dockBuildPreview();
-                }}
-              >
-                <summary className="m-note" style={{ cursor: "pointer" }}>
-                  {MEET.home.dockSearch.previewFold}
-                </summary>
-                {dockPreview !== null && dockPreview.ask === dockAsk.trim() ? (
-                  <>
-                    <pre
-                      className="m-item-text"
-                      style={{ whiteSpace: "pre-wrap", maxHeight: "14rem", overflow: "auto" }}
-                    >
-                      {dockPreview.bundle.prompt}
-                    </pre>
-                    <p className="m-note">{MEET.home.dock.previewNote}</p>
-                  </>
-                ) : (
-                  <p className="m-note">{MEET.home.dock.previewLead}</p>
-                )}
-              </details>
-            )}
-            <button
-              type="button"
-              className="m-btn m-btn-primary"
-              style={{ marginTop: "0.5rem" }}
-              disabled={dockAsk.trim() === "" || dockBusy}
-              onClick={() => void dockRun()}
-            >
-              {dockBusy ? MEET.home.dockSearch.busy : MEET.home.dockSearch.run}
-            </button>
-            {dockNote !== "" && (
-              <p className="m-note" aria-live="polite" style={{ marginTop: "0.4rem" }}>
-                {dockNote}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="m-note">{MEET.home.dockSearch.offline}</p>
-        )}
-      </section>
-
-      <section className="m-section">
-        <p className="m-eyebrow">{MEET.home.proposals.eyebrow}</p>
-        <div className="m-secrow">
-          <h2 className="m-h2">{MEET.home.proposals.heading}</h2>
-          <span className="m-badge">{received.length}</span>
-        </div>
-        <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
-          {MEET.home.proposals.subnote}
-        </p>
-        {received.length === 0 ? (
-          hasItems && lastPatrolAt !== "" ? (
-            /* 「今日は無い」面 — 沈黙の禁止の一面。証拠（見回り時刻・気配）を添える。 */
-            <section className="m-emptyface" aria-live="polite">
-              <Ring state="resting" size={72} className="m-q-ring is-idle" />
-              <h3>{t("meet.empty.title")}</h3>
-              <p className="m-ev">
-                {t("meet.empty.evPre")}
-                <span className="mono">{fmtHm(lastPatrolAt)}</span>
-                {t("meet.empty.evMid")}
-                <br />
-                {t("meet.empty.evRest")}
-              </p>
-              {participants !== null && (
-                <div className="m-facts">
-                  <span>
-                    {t("meet.empty.herePre")}
-                    <span className="mono">{participants}</span>
-                    {t("meet.empty.herePost")}
-                  </span>
-                </div>
-              )}
-              <p className="m-next">{t("meet.empty.next")}</p>
-            </section>
-          ) : (
-            <div className="m-empty">
-              {hasItems ? MEET.home.proposals.emptyReady : MEET.home.proposals.emptyNoMemory}
-            </div>
-          )
-        ) : (
-          <>
-            <p className="m-note" style={{ margin: "0 0 0.6rem" }}>
-              {MEET.home.proposals.orderNote} {MEET.proposal.talkNote}
-            </p>
-            <ul className="m-itemlist">
-              {received.map((entry) => (
-                <ProposalEntry
-                  key={entry.entryId}
-                  entry={entry}
-                  cardEdges={cardEdges}
-                  poolRefs={poolRefs}
-                  onTalk={talk}
-                  onWithdraw={closeEdge}
-                  onAskAi={connected ? askYourAi : null}
-                  selfItems={rigEntries.map((e) => ({
-                    kind: e.item.kind,
-                    title: e.item.title,
-                    text: e.item.text,
-                  }))}
-                  onReading={reading}
-                  onRemove={removeEntry}
-                />
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
+      <ProposalsSurface />
 
       <BoundaryNote
         lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.order, MEET.boundary.disclosure]}
@@ -1522,6 +1111,6 @@ export function HomeView() {
         </div>
       </div>
       <MemoryWindow />
-    </>
+    </MeetWorkspaceProvider>
   );
 }

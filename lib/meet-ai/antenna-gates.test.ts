@@ -65,12 +65,16 @@ test("AN-3: antenna.ts never writes to the journal / substrate / network", () =>
 
 test("AN-4: candidate ✅ routes through the existing place 二態 (owner confirm), reads journal, stays quiet", () => {
   const src = stripAll(readFileSync(appFile("app/meet/HomeView.tsx"), "utf8"));
+  // ワークスペース化(β) 第1便: アンテナ面の描画は AntennaSurface へ分解した（見た目
+  // 不変・配線も不変）。ハンドラ（placeCandidate）と候補生成（buildAntennaPrompt/
+  // journal）は HomeView に残り、描画（✅ ボタン・候補スロット）は surface を見る。
+  const surf = stripAll(readFileSync(appFile("app/meet/surfaces/AntennaSurface.tsx"), "utf8"));
 
   // ✅ = 既存 place 二態へ載せる（候補から直に memory.create しない）
   assert.ok(/placeCandidate\s*=\s*\(/.test(src), "a candidate-place handler exists");
   assert.ok(/placeCandidate[\s\S]{0,200}setPlaceDraft\(\{/.test(src), "✅ seeds placeDraft (the existing 二態 card)");
   // the candidate render's primary action calls placeCandidate (not a direct write)
-  assert.ok(/onClick=\{\(\)\s*=>\s*placeCandidate\(candidate\)\}/.test(src), "the 立てる button goes through placeCandidate");
+  assert.ok(/onClick=\{\(\)\s*=>\s*placeCandidate\(candidate\)\}/.test(surf), "the 立てる button goes through placeCandidate");
 
   // 候補生成は journal を読む（reading）— 暗黙も明示も同じ owner-✅ 道
   assert.ok(src.includes("buildAntennaPrompt"), "candidates come from the reading prompt");
@@ -78,8 +82,8 @@ test("AN-4: candidate ✅ routes through the existing place 二態 (owner confir
 
   // そっと: 候補スロットに圧の装置（バッジ・既読・presence）を作らない。
   // スロットは Antenna セクション内 — m-antcand から直後の </section> までに限定。
-  const from = src.indexOf("m-antcand");
-  const slot = src.slice(from, src.indexOf("</section>", from));
+  const from = surf.indexOf("m-antcand");
+  const slot = surf.slice(from, surf.indexOf("</section>", from));
   assert.ok(slot.length > 0 && slot.includes("m-antcand-row"), "the candidate slot region is bounded");
   for (const press of ["m-badge", "既読", "未読", "presence", "通知"]) {
     assert.ok(!slot.includes(press), `candidate slot must not carry pressure device: ${press}`);
