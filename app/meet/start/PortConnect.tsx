@@ -29,7 +29,7 @@ export function PortConnect() {
       .catch(() => setCopied("failed"));
   };
 
-  const D = MEET.start.doors.ai;
+  const D = MEET.start.mcp;
   return (
     <div>
       {/* 平易化（ゲート済）: 当たり前の導線が先・技術語（MCP）は最後に小さく降格 */}

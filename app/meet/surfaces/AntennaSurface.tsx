@@ -71,7 +71,6 @@ export function AntennaSurface() {
     ready,
     hasItems,
     displayName,
-    participants,
     candidate,
     placeCandidate,
     dismissCandidate,
@@ -180,11 +179,9 @@ export function AntennaSurface() {
             </p>
           </div>
         )}
-        {participants !== null && (
-          <p className="m-note" aria-live="polite">
-            {MEET.home.presence.participants(participants)}
-          </p>
-        )}
+        {/* 表層語彙統一便 第3手（Hiroto 確定 2026-06-17）: 「いま候補に出ている参加者：0人」は
+            削除（死んだカウンタに見える）。正直さは Run の結果で、気配は RESTING の
+            「今日、このAntennaは◯人のAIに読まれました」が担う。 */}
         {gen.phase === "error" && (
           // last resort only — every normal ending is an entry in the 欄 below
           <p className="m-note" aria-live="polite" style={{ color: "var(--shu-deep)" }}>

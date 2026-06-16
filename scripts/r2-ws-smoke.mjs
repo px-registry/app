@@ -128,20 +128,31 @@ const composerBox = await page.evaluate(() => {
 ok(composerBox !== null && composerBox.top >= 1 && composerBox.right >= 1 && composerBox.radius >= 1,
   `入力欄は四辺の枠＋角丸の箱 (${JSON.stringify(composerBox)})`);
 
-// 11) 案A＋仕上げ便②: Setup は二扉とも details（対称・既定畳み）・見出しは Setup。
+// 11) 表層語彙統一便 第3手（Hiroto 確定 2026-06-17）: Setup は「Antenna と Run の違いが
+//     分かる画面」。二扉（このページで使う／あなたのAIから使う）は退場。lead＋二モード＋
+//     Step1(AI接続・MCP は方法として畳む)＋Step2(Memoryを作る)＋呼び名。
 await page.goto(`${BASE}start/`, { waitUntil: "networkidle" }).catch(() => {});
-ok(await page.locator(".m-doors .m-door").count() === 2, "Setup: 二扉とも details（対称）");
 ok(await page.locator("h1").first().innerText() === "Setup", "Setup 面の見出しが rail と一致（Setup）");
-ok(await page.evaluate(() => [...document.querySelectorAll(".m-door")].every((d) => d.open === false)),
-  "両扉とも既定で畳まれている");
-ok(await page.locator(".m-door #step-key").count() === 1, "3手順は『このページで使う』扉の中（鍵）");
-ok(await page.locator(".m-door #step-intake").count() === 1, "3手順は扉の中（下地）");
-// 沈黙の禁止: Antenna の深リンク #step-key に来たら扉が開いて手順が見える
+ok(await page.locator(".m-door").count() === 0, "旧二扉（.m-door）は退場");
+const setupBody = await page.locator("section.m-section").first().innerText();
+ok(setupBody.includes("置いて待つか、自分のAIで探しに行くか。"), "lead = 置いて待つか／探しに行くか");
+ok(await page.locator(".m-doors .m-card h2").filter({ hasText: /^Antenna$/ }).count() === 1, "モードカード Antenna");
+ok(await page.locator(".m-doors .m-card h2").filter({ hasText: /^Run$/ }).count() === 1, "モードカード Run");
+ok(setupBody.includes("AIをつながなくても立てられます"), "Antenna は AIなしでも立てられる趣旨");
+ok(setupBody.includes("AIをつなぐと、候補やAntennaを読んで、自分から探しに行けます"), "Run は AI接続で可能になる趣旨");
+ok(!setupBody.includes("下の三つ"), "「下の三つ」は退場（AI必須の誤読を断つ）");
+ok(!setupBody.includes("見回"), "Setup 表層に「見回り」は無い");
+// Step は可視カード（旧 PageDoor の details 開きは不要）。MCP は Step1 内の方法として畳む。
+ok((await page.locator("#step-key h2").innerText()).includes("AI接続"), "Step1 = 1. AI接続");
+ok((await page.locator("#step-intake h2").innerText()).includes("Memoryを作る"), "Step2 = 2. Memoryを作る");
+ok(await page.locator("#step-key details summary").filter({ hasText: "あなたのAIからつなぐ" }).count() === 1,
+  "MCP は Step1 内の方法として畳む（独立向きカードでない）");
+ok(await page.locator("#step-intake .m-copyprompt, #step-intake button, #step-intake textarea").count() >= 1,
+  "Step2 に取り込み導線（ColdStartIntake）");
+// 深リンク #step-key は可視カードに直接当たる（details 開き不要）
 await page.goto(`${BASE}start/#step-key`, { waitUntil: "networkidle" }).catch(() => {});
 await page.waitForTimeout(150);
-ok(await page.evaluate(() => document.querySelector("#step-key")?.closest(".m-door")?.open === true),
-  "#step-key 深リンクでその扉が開く（沈黙の禁止）");
-ok(await page.locator("#step-key").isVisible(), "深リンク先の手順が画面に見える");
+ok(await page.locator("#step-key").isVisible(), "#step-key 深リンク先が画面に見える");
 
 // 11b) 表層語彙統一便 第2手 (a)（Hiroto 確定 2026-06-16）: 呼び名カードを Setup 内に追加
 //      （実体は Memory 側 store と共用・データ二重化なし）。警告文「Setupで設定できます。」
