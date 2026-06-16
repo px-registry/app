@@ -122,6 +122,12 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
     モバイルは Hiroto のブラウザ（bot を本番に当てない）。
   - 残課題（次便候補・Hiroto 保留）: 二扉見出し「このページで使う／あなたのAIから使う」→
     Antenna／AI 案（今すぐ必須でない）。connect.saved「保存しました」は未変更（別ボタン・未指摘）。
+- **レイアウト型（layout 体系便・進行中・2026-06-17）**: 全ページ共通の余白スケール／カード3種／
+  対カード grid／読み柱幅／FAB safe area を `meet.css .meet-scope` に一括定義（正本＝
+  `docs/r2/layout-tokens.md`）。**Phase 1 完了**: Setup のみ適用（読み柱880・カード内24px・概念
+  カード等高&recessed・呼び名を手順グループへ）— `[data-page="start"]` 限定で他ページ不変。
+  スクショ r2layout-01..04。**Phase 2（owner Go 後）**: home/Finds/Talk/Memory へ昇格
+  （[data-page=start] 限定を既定へ広げる）。layout/CSS のみ・copy 不変・本番 deploy せず（branch 止め）。
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
   **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
   内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・
