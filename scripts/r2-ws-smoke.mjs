@@ -113,6 +113,31 @@ const stripBelowCanvas = await page.evaluate(() => {
 });
 ok(stripBelowCanvas, "帯は canvas より下（最上部から退いた）");
 
+// 10) 第3手 ①: Antenna 入力欄が「箱」として視認できる（下線一本でない）。
+await page.evaluate(() => localStorage.setItem("pxmeet:theme", "paper"));
+await page.reload({ waitUntil: "networkidle" }).catch(() => {});
+const composerBox = await page.evaluate(() => {
+  const el = document.querySelector(".m-composer");
+  if (!el) return null;
+  const s = getComputedStyle(el);
+  return { top: parseFloat(s.borderTopWidth), right: parseFloat(s.borderRightWidth), radius: parseFloat(s.borderTopLeftRadius) };
+});
+ok(composerBox !== null && composerBox.top >= 1 && composerBox.right >= 1 && composerBox.radius >= 1,
+  `入力欄は四辺の枠＋角丸の箱 (${JSON.stringify(composerBox)})`);
+
+// 11) 第3手 ②（案A）: Setup は二扉のまま・「このページで使う」は details（既定畳み）。
+await page.goto(`${BASE}start/`, { waitUntil: "networkidle" }).catch(() => {});
+ok(await page.locator(".m-doors .m-door").count() === 1, "Setup: このページで使う＝扉(details)");
+ok(await page.locator(".m-doors > .m-card").count() === 1, "Setup: あなたのAIから使う＝同格の扉(保持)");
+ok(await page.evaluate(() => document.querySelector(".m-door")?.open === false), "扉は既定で畳まれている");
+ok(await page.locator(".m-door #step-key").count() === 1, "3手順は扉の中（鍵）");
+ok(await page.locator(".m-door #step-intake").count() === 1, "3手順は扉の中（下地）");
+// 沈黙の禁止: Antenna の深リンク #step-key に来たら扉が開いて手順が見える
+await page.goto(`${BASE}start/#step-key`, { waitUntil: "networkidle" }).catch(() => {});
+await page.waitForTimeout(150);
+ok(await page.evaluate(() => document.querySelector(".m-door")?.open === true), "#step-key 深リンクで扉が開く（沈黙の禁止）");
+ok(await page.locator("#step-key").isVisible(), "深リンク先の手順が画面に見える");
+
 await browser.close();
 console.log(`\nPASS ${pass} / FAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

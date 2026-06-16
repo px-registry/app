@@ -697,6 +697,76 @@ html[data-ws] .m-nav-top {
 .m-card + .m-card {
   margin-top: 0.75rem;
 }
+
+/* ── Setup の扉（第3手 ②・案A 2026-06-16）— 二重框を入れ子で解く ─────────────────
+   二扉は同格の入口のまま（R2 GOAL 保持）。「このページで使う」扉だけ details にして、
+   3手順（鍵→下地→選ぶ）を中へ畳む。開閉は caret が形で語る（新規文言なし）。色は
+   既存トークン経由（VR-1）。 */
+.m-doors {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.m-door {
+  background: var(--card-face);
+  border: 1px solid var(--line);
+  border-top-color: var(--card-top);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+  padding: 1.2rem 1.25rem;
+}
+.m-door-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: relative;
+  padding-right: 1.4rem;
+}
+.m-door-summary::-webkit-details-marker {
+  display: none;
+}
+.m-door-title {
+  font-family: var(--mincho);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: var(--ls-h2);
+  color: var(--ink);
+}
+.m-door-sign {
+  color: var(--text);
+}
+/* caret（工房の節目・m-basis 系譜）— 閉じ ▸ / 開き ▾。形で開閉を語る。 */
+.m-door-summary::after {
+  content: "";
+  position: absolute;
+  top: 0.45rem;
+  right: 0.2rem;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--sub);
+  border-bottom: 1.6px solid var(--sub);
+  transform: rotate(-45deg);
+  transition: transform 0.2s var(--ease);
+}
+.m-door[open] .m-door-summary::after {
+  transform: rotate(45deg);
+}
+.m-doorsteps {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+/* 扉の中の手順は副パネル（card-in-card を避け軽く）— 影を消し地を沈める。 */
+.m-door .m-card {
+  box-shadow: none;
+  background: var(--well);
+  border-color: var(--line-soft);
+}
+.m-doorsteps .m-card + .m-card {
+  margin-top: 0; /* grid gap が間隔を持つ（二重を避ける） */
+}
 .m-empty {
   border: 1px dashed var(--line-deep);
   border-radius: var(--radius-card);
@@ -905,21 +975,24 @@ textarea.m-field {
   min-height: 5.5rem;
 }
 
-/* ── Antenna composer（2026-06-13・px-composer 正本の入力文法を v3 語彙へ翻訳）──
-   箱ではなく一本の線: 透明地・枠なし・下線 hairline だけ。focus は線が朱に
-   寄るだけ（減灯 — ring を出さない）。書く面の静けさは composer の search-home-
-   input と同階級。本文サイズ 16px は iOS zoom 罠のまま維持。 */
+/* ── Antenna composer ────────────────────────────────────────────────────────
+   第3手（Hiroto 指摘 2026-06-16）: 下線一本では「書く場所が書く場所に見えない」——
+   入力欄を入力欄として視認できる箱へ。地の差（--well）＋静かな枠（--well-border）で
+   囲い、書く面を主役にする（まず書く→探しにいく の視線順）。墨/紙両テーマで成立・
+   静止（点滅なし）。focus は枠が朱に寄る静かな印。本文 16px は iOS zoom 罠で維持。
+   （旧・px-composer 正本の hairline 一本は視認性のため退役 — Hiroto 個別指示が勝つ） */
 .m-composer {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--line-deep);
-  border-radius: 0;
-  padding: 0.5rem 0.1rem;
-  min-height: 3.4rem;
+  margin-top: 0.45rem;
+  background: var(--well);
+  border: 1px solid var(--well-border);
+  border-radius: var(--radius-btn);
+  padding: 0.85rem 0.95rem;
+  min-height: 4.6rem;
+  box-shadow: var(--well-inset);
 }
 .m-composer:focus {
-  border-bottom-color: var(--shu-line);
-  box-shadow: none;
+  border-color: var(--shu-line);
+  box-shadow: 0 0 0 3px var(--shu-ring);
 }
 
 .m-chip {
@@ -1748,6 +1821,14 @@ textarea.m-field {
   }
   .m-steps .m-card + .m-card {
     margin-top: 0;
+  }
+  /* 第3手 ②: 二扉は左右の同格（align-start で AI 扉が page 扉の高さに伸びない）。
+     扉の中の3手順は縦積みのまま（一列に収まる）。 */
+  .m-doors {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
   }
 
   /* 進行役 構図 */
