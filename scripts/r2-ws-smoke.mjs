@@ -24,17 +24,18 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 await page.goto(BASE, { waitUntil: "networkidle" }).catch(() => {});
 
-// 1) 器が立つ: rail（toolbar）＋canvas（region）＋4道具（第2手 ②: あなたのAI を外した）
+// 1) 器が立つ: rail（toolbar）＋canvas（region）＋5道具（3面＋2導線 Memory/Setup）
+//    サブページ統一便: 記憶→Memory が仕切り線の下に Setup と並ぶ（道B・3面＋2導線）。
 ok(await page.locator("nav.m-rail .m-rail-inner[role=toolbar]").count() === 1, "rail = role=toolbar");
-ok(await page.locator(".m-rail-item").count() === 4, "rail に場の道具4つ（あなたのAI は FAB へ）");
+ok(await page.locator(".m-rail-item").count() === 5, "rail に3面＋2導線（Memory/Setup・あなたのAI は FAB へ）");
 ok(await page.locator("#m-ws-canvas[role=region]").count() === 1, "canvas = role=region");
 
 // 2) 既定はアンテナ面（data-active＋aria-pressed）— rail は短語（文言実験）
 ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "Antenna", "既定の面=アンテナ");
 ok(await page.locator("#m-ws-canvas .m-composer").count() === 1, "canvas にアンテナの問い欄");
-// rail 短語＝場の道具4つ（Antenna / Finds / Talk / Setup）— あなたのAI は並ばない
+// rail 短語＝3面（Antenna/Finds/Talk）＋2導線（Memory/Setup）— あなたのAI は並ばない
 const railLabels = await page.locator(".m-rail-item .m-rail-label").allInnerTexts();
-ok(JSON.stringify(railLabels) === JSON.stringify(["Antenna", "Finds", "Talk", "Setup"]),
+ok(JSON.stringify(railLabels) === JSON.stringify(["Antenna", "Finds", "Talk", "Memory", "Setup"]),
   `rail 短語 = ${JSON.stringify(railLabels)}`);
 ok(!railLabels.includes("あなたのAI"), "あなたのAI は rail から外れた（司令塔 FAB へ）");
 
@@ -91,7 +92,7 @@ ok(restMark?.includes("◇"), `休む面は ◇ hollow (${restMark})`);
 await page.evaluate(() => localStorage.setItem("pxmeet:theme", "sumi"));
 await page.reload({ waitUntil: "networkidle" }).catch(() => {});
 ok(await page.evaluate(() => document.documentElement.getAttribute("data-theme")) === "sumi", "墨テーマに切替（pxmeet:theme）");
-ok(await page.locator(".m-rail-item").count() === 4, "墨でも rail 4道具が生存");
+ok(await page.locator(".m-rail-item").count() === 5, "墨でも rail 5道具が生存（3面＋2導線）");
 ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "Antenna", "墨でも既定の面=アンテナ");
 const sumiActiveMark = await markOf("true");
 ok(sumiActiveMark?.includes("◆"), `墨でも ◆ の標が状態を語る (${sumiActiveMark})`);
@@ -139,6 +140,32 @@ await page.waitForTimeout(150);
 ok(await page.evaluate(() => document.querySelector("#step-key")?.closest(".m-door")?.open === true),
   "#step-key 深リンクでその扉が開く（沈黙の禁止）");
 ok(await page.locator("#step-key").isVisible(), "深リンク先の手順が画面に見える");
+
+// 12) サブページ統一便（道B・Hiroto 裁定 2026-06-16）: 記憶・Setup も rail を着る。
+//     旧 MeetNav は data-ws で退場。あなたのAI FAB はどのページからでも開く。
+for (const [path, name] of [["start/", "Setup"], ["memory/", "Memory"]]) {
+  await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" }).catch(() => {});
+  ok(await page.locator("nav.m-rail .m-rail-item").count() === 5, `${name}: rail 5道具が立つ`);
+  ok(await page.evaluate(() => document.documentElement.hasAttribute("data-ws")), `${name}: data-ws が立つ（器）`);
+  // 旧 MeetNav は CSS で退場（html[data-ws] が .m-nav/.m-nav-top を隠す）
+  const navShown = await page.evaluate(() => {
+    const n = document.querySelector(".m-nav");
+    return n ? getComputedStyle(n).display !== "none" : false;
+  });
+  ok(!navShown, `${name}: 旧 MeetNav は退場（data-ws で display:none）`);
+  ok(await page.locator(".m-aiwin-fab").count() === 1, `${name}: あなたのAI FAB が右下に出る（どこからでも）`);
+  // その面（導線）が朱で active
+  const activeLabel = await page.locator('.m-rail-item[data-active="true"] .m-rail-label').first().innerText().catch(() => "");
+  ok(activeLabel === name, `${name}: 自ページの導線が active（${activeLabel}）`);
+}
+// サブページの FAB は自前 state で開く（provider 圏外でも司令塔は開く）
+await page.locator(".m-aiwin-fab").click();
+ok(await page.locator("section.m-aiwin").count() === 1, "サブページでも FAB で あなたのAI が開く");
+// 面の道具（Finds）はサブページでは home への導線リンク（/meet/?s=proposals）
+await page.locator(".m-aiwin-min").click().catch(() => {});
+const findsHref = await page.locator(".m-rail-link", { hasText: "Finds" }).first().getAttribute("href").catch(() => "");
+ok(typeof findsHref === "string" && findsHref.includes("/meet/?s=proposals"),
+  `サブページの Finds は home 面への導線リンク（${findsHref}）`);
 
 await browser.close();
 console.log(`\nPASS ${pass} / FAIL ${fail}`);

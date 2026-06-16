@@ -120,3 +120,10 @@ export function useMeetWorkspace(): MeetWorkspaceValue {
   if (v === null) throw new Error("useMeetWorkspace must be used within MeetWorkspaceProvider");
   return v;
 }
+
+// サブページ統一便 — 器（rail＋canvas＋あなたのAI FAB）は home の外（記憶・Setup）でも
+// 立つ。そこには HomeView の巨大 provider が無いので、context は任意で読む（無ければ
+// rail は導線リンクとして・FAB は自前 state で開く）。null = provider 圏外（サブページ）。
+export function useMeetWorkspaceOptional(): MeetWorkspaceValue | null {
+  return useContext(Ctx);
+}

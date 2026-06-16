@@ -1752,6 +1752,11 @@ textarea.m-field {
     min-width: 0;
     max-width: 820px;
   }
+  /* サブページ統一便: 記憶 canvas は主柱/側柱の二段組（.m-mem 8fr/4fr）— 読み柱より
+     広い面が要るので canvas の上限を一段ひろげる（Setup は二扉で 820 のままで足りる）。 */
+  .m-ws-canvas[data-page="memory"] {
+    max-width: 1040px;
+  }
   .m-promise {
     margin-top: var(--section-gap);
   }

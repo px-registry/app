@@ -49,6 +49,10 @@ export const MEET = {
     antenna: "Antenna",
     finds: "Finds",
     talk: "Talk",
+    // サブページ統一便（Hiroto 確定 2026-06-16）: 記憶 → Memory（rail 語彙＝英語短語へ
+    // 揃える）。Memory・Setup はどちらも「面切替」でなく「ルート遷移の導線」— 仕切り線の
+    // 下に2つ並ぶ（rail 構造＝3面＋2導線）。
+    memory: "Memory",
     setup: "Setup",
     // 一行の本質（Hiroto 確定 2026-06-16）— rail/FAB のツールチップ（title）。
     // メニューバーが世界観の指針: 短い名詞＋一行で「その場が何か」を語る。
@@ -57,6 +61,8 @@ export const MEET = {
       finds: "今走らせる探索。",
       talk: "届いた話。",
       ai: "あなたのAI。",
+      // Memory の一行本質（Hiroto 確定 2026-06-16）— 記憶ページの題と同じ register。
+      memory: "あなたの記憶。",
       setup: "鍵と控え。",
     },
   },

@@ -14,7 +14,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MEET, questionPlaceholderByHour } from "@/lib/meet/copy.ts";
-import { MemoryWindow } from "./MemoryWindow.tsx";
 import {
   openMeetMemory,
   openMemJournal,
@@ -191,6 +190,18 @@ export function HomeView() {
     if (text.trim() === "") return;
     setPortDraft({ edgeId: room, text });
     window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  // サブページ統一便 — rail の面の道具をサブページ（記憶・Setup）で押すと /meet/?s=<面>
+  // で home に戻る。ここでその面を開き、URL を片づける（既存 ?room/#draft と同じ作法・
+  // room が併存しないときだけ search を消す）。
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get("s");
+    if (s !== "antenna" && s !== "proposals" && s !== "talk") return;
+    setActiveSurface(s);
+    if (params.get("room") === null) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
   // 下書きが来たら canvas をトーク面へ寄せる（room はトーク面にしか無い・一面）。
   useEffect(() => {
@@ -1118,7 +1129,7 @@ export function HomeView() {
           <span>{t("meet.meter.keys")}</span>
         </div>
       </div>
-      <MemoryWindow />
+      {/* あなたのAI FAB は器（MeetWorkspace）が描く — home/記憶/Setup 共通の司令塔。 */}
     </MeetWorkspaceProvider>
   );
 }

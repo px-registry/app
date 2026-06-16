@@ -35,7 +35,7 @@ import {
   type AgentDeps,
 } from "@/lib/meet-ai";
 import { FocusScope } from "@react-aria/focus";
-import { useMeetWorkspace } from "./MeetWorkspaceContext.tsx";
+import { useMeetWorkspaceOptional } from "./MeetWorkspaceContext.tsx";
 import { PORT_TOOLS } from "@/lib/port/tools.ts";
 import {
   getOrMintOwnerToken,
@@ -68,8 +68,13 @@ export function MemoryWindow() {
   const chat = useMemo(() => openWindowChat(), []);
   const threadRef = useRef<string>("");
 
-  // 窓の開閉は workspace context が握る（rail の窓トグルと FAB が同じ state）。
-  const { windowOpen: open, setWindowOpen: setOpen } = useMeetWorkspace();
+  // 窓の開閉: home（provider 圏内）は workspace context が握る（FAB と同じ state）。
+  // サブページ統一便: 記憶・Setup には provider が無いので、その場合は自前 state で開く
+  // （FAB はどのページからでも開ける — 司令塔は場に依らない）。
+  const ws = useMeetWorkspaceOptional();
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = ws ? ws.windowOpen : localOpen;
+  const setOpen = ws ? ws.setWindowOpen : setLocalOpen;
   const [connected, setConnected] = useState(false);
   const [persist, setPersist] = useState(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);

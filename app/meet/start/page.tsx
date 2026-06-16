@@ -5,6 +5,7 @@ import { KeyConnect } from "./KeyConnect.tsx";
 import { PortConnect } from "./PortConnect.tsx";
 import { PageDoor } from "./PageDoor.tsx";
 import { BoundaryNote } from "../BoundaryNote.tsx";
+import { MeetWorkspace } from "../MeetWorkspace.tsx";
 
 // R1.5 はじめかた — the three steps as a single quiet scroll. Step 2 (cold-start
 // paste-back) is live; step 1 gains the key widget in Slice 3; step 3 links to
@@ -13,7 +14,9 @@ import { BoundaryNote } from "../BoundaryNote.tsx";
 // どちらの扉も同じ部屋（同じ owner token・同じ公開面）に入る。
 export default function MeetStart() {
   return (
-    <>
+    // サブページ統一便（Hiroto 裁定 2026-06-16・道B）: Setup も器（rail＋canvas＋
+    // あなたのAI FAB）を着る — home と同じ世界観。旧 MeetNav は data-ws で退場。
+    <MeetWorkspace page="start">
       <section className="m-section">
         <h1 className="m-h1">{MEET.start.title}</h1>
         <p className="m-lede">{MEET.start.doors.lede}</p>
@@ -72,6 +75,6 @@ export default function MeetStart() {
       </section>
 
       <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai]} />
-    </>
+    </MeetWorkspace>
   );
 }
