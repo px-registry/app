@@ -169,7 +169,13 @@ export function MemoryWindow() {
 
   if (!open) {
     return (
-      <button type="button" className="m-aiwin-fab" onClick={() => setOpen(true)} aria-label={C.open}>
+      <button
+        type="button"
+        className="m-aiwin-fab"
+        onClick={() => setOpen(true)}
+        aria-label={C.open}
+        title={MEET.rail.tip.ai}
+      >
         {/* 接続の点 — つながっていれば灯る（worker-health の系譜・静止）。司令塔 FAB へ
             移設（第2手 ②: rail から あなたのAI を外したのに伴い、接続の印もここへ）。 */}
         <span className="m-aiwin-fab-dot" data-on={connected} aria-hidden="true" />

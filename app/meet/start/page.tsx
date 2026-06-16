@@ -55,14 +55,19 @@ export default function MeetStart() {
                 </div>
               </div>
             </PageDoor>
-          <div className="m-card">
-            <h2 className="m-h2">{MEET.start.doors.ai.heading}</h2>
-            <p className="m-lede" style={{ margin: "0 0 0.6rem" }}>{MEET.start.doors.ai.sign}</p>
-            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>
+          {/* 仕上げ便 ②: 二扉を対称に — 「あなたのAIから使う」も details の扉に
+              （「このページで使う」と同じ畳み・開きの作法）。中に anchor は無いので
+              client の自動開きは不要・素の details で足りる。 */}
+          <details className="m-door">
+            <summary className="m-door-summary">
+              <span className="m-door-title">{MEET.start.doors.ai.heading}</span>
+              <span className="m-door-sign">{MEET.start.doors.ai.sign}</span>
+            </summary>
+            <p style={{ margin: "0.2rem 0 1rem", color: "var(--text)" }}>
               {MEET.start.doors.ai.body}
             </p>
             <PortConnect />
-          </div>
+          </details>
         </div>
       </section>
 

@@ -20,7 +20,9 @@ export const MEET = {
   nav: {
     home: "ホーム",
     memory: "記憶",
-    start: "はじめかた",
+    // 仕上げ便 ①修正（Hiroto 裁定 2026-06-16）: rail＝世界観の指針。サブページの
+    // メニューも rail 語彙へ揃える — はじめかた → Setup（rail.setup と一致）。
+    start: "Setup",
   },
 
   /** 視覚一新 — header toggles. The phase names are the 指示書 §3-2 values
@@ -48,6 +50,15 @@ export const MEET = {
     finds: "Finds",
     talk: "Talk",
     setup: "Setup",
+    // 一行の本質（Hiroto 確定 2026-06-16）— rail/FAB のツールチップ（title）。
+    // メニューバーが世界観の指針: 短い名詞＋一行で「その場が何か」を語る。
+    tip: {
+      antenna: "置いておく話。",
+      finds: "今走らせる探索。",
+      talk: "届いた話。",
+      ai: "あなたのAI。",
+      setup: "鍵と控え。",
+    },
   },
 
   /** 境界の脚注 — 初回は開いて見せ、以降は畳む。 */
@@ -206,12 +217,15 @@ export const MEET = {
      * AIが読み、人間には提案と根拠で返す — 人間向け他者一覧は出さない（spec §12）。
      */
     dockSearch: {
-      eyebrow: "あなたのAI",
-      heading: "探してもらう",
-      /** です調（Hiroto 起草・ゲート済 2026-06-13）— 「接点」は UI から退場（二層命名）。 */
-      note: "あなたのAIが探しに行きます。候補やアンテナを読んで、いま話したい相手を見つけます。",
+      // 墨工房 仕上げ便（Hiroto 確定 2026-06-16）: Finds 面の世界観コピー。
+      // eyebrow は英字意匠（Ask/For you 群と同テクスチャ）、見出しは rail と同じ Finds、
+      // 主動詞は「探してもらう」→「Run」（"今走らせる探索" と呼応・rail 名詞系譜の能動動詞）。
+      eyebrow: "YOUR AI",
+      heading: "探してもらう", // 旧見出し（表示は rail.finds = Finds に集約・キーは保持）
+      /** です調・簡潔版（Hiroto 確定）— 主体反復を畳む。 */
+      note: "候補やアンテナを読み、いま話せる相手を見つけます。",
       placeholder: "どんな人・どんな話を探しますか",
-      run: "探してもらう",
+      run: "Run",
       busy: "探しています…",
       lands: "見つかったものは「AIが見つけた提案」に入ります。",
       offline: "あなたのAIをつなぐと、ここから探してもらえます。",
@@ -323,7 +337,9 @@ export const MEET = {
   },
 
   start: {
-    title: "はじめかた",
+    // 仕上げ便 ①修正: Setup 面の見出しも rail と一致（はじめかた → Setup・本質は
+    // ツールチップ「鍵と控え」）。rail Setup ↔ ページ見出しの食い違いを解消。
+    title: "Setup",
     lede: "三つ済ませば、あとは受け取るだけ。",
     /**
      * R2 二扉化。「このページで使う」「あなたのAIから使う」は同格 — どちらも同じ部屋に入る。

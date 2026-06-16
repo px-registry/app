@@ -64,8 +64,10 @@ export function setWindowPersist(on: boolean): void {
 // script mirrors lib/i18n's LANG_INIT_SCRIPT: resolve before paint, write
 // <html data-theme> — no flash.
 //
-// c12-1 (Hiroto 裁定): the DEFAULT is paper — prefers-color-scheme tracking is
-// gone; only a manually saved pref overrides (保存値 → paper).
+// c12-1 (Hiroto 裁定): prefers-color-scheme tracking is gone; only a manually
+// saved pref overrides.
+// 墨工房 仕上げ便（Hiroto 裁定 2026-06-16）: 既定を paper → **sumi**（墨が世界）。
+// 既存ユーザーの保存値（paper/sumi）は尊重 — 無記名/不正のみ sumi に倒す。
 
 const THEME_KEY = "pxmeet:theme";
 
@@ -80,7 +82,8 @@ export function setThemePref(phase: ThemePhase): void {
 }
 
 // Inline, dependency-free; injected verbatim into the meet layout.
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t='paper';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
+// 既定 sumi: 保存値が paper/sumi ならそれ、無記名/不正は sumi。
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t!=='paper'&&t!=='sumi'){t='sumi';}document.documentElement.setAttribute('data-theme',t);}catch(_){}})();`;
 
 // ── 便4 — 片づけた閉じ札 (edge-keyed; CLOSED cards only) ───────────────────────
 //

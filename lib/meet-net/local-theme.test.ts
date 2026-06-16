@@ -32,15 +32,17 @@ test("LT-1: theme pref round-trips; junk reads as unset", () => {
   assert.equal(getThemePref(), "");
 });
 
-test("LT-2: the init script resolves pref → paper (c12-1: default is paper)", () => {
+test("LT-2: the init script resolves pref → sumi (墨工房 仕上げ: default is sumi)", () => {
   assert.ok(THEME_INIT_SCRIPT.includes("pxmeet:theme"), "reads the stored pref");
   assert.ok(
     !THEME_INIT_SCRIPT.includes("prefers-color-scheme"),
-    "OS-phase tracking is gone — the default phase is always paper",
+    "OS-phase tracking is gone — the default phase is fixed",
   );
-  assert.ok(THEME_INIT_SCRIPT.includes("'paper'"), "unset/junk resolves to paper");
+  // 期待の追従（Hiroto 裁定 2026-06-16）: 既定 paper → sumi（墨が世界）。保存値は尊重。
+  assert.ok(THEME_INIT_SCRIPT.includes("'sumi'"), "unset/junk resolves to sumi");
+  assert.ok(THEME_INIT_SCRIPT.includes("'paper'"), "a saved paper pref is still honoured");
   assert.ok(THEME_INIT_SCRIPT.includes("data-theme"), "writes the html attribute");
-  assert.ok(THEME_INIT_SCRIPT.includes("try{"), "failure stays silent (paper default via CSS)");
+  assert.ok(THEME_INIT_SCRIPT.includes("try{"), "failure stays silent (default via CSS)");
 });
 
 test("LT-3: the theme key lives in the existing pxmeet: prefix (no new lane)", () => {

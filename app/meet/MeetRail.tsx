@@ -21,10 +21,11 @@ import { MEET } from "@/lib/meet/copy.ts";
 import { useMeetWorkspace, type SurfaceKey } from "./MeetWorkspaceContext.tsx";
 
 // glyph(◆/◇)＋配置＋短語の三層で語るので、ラベル単体の完璧な明快さは要らない。
-const SURFACES: { key: SurfaceKey; label: string }[] = [
-  { key: "antenna", label: MEET.rail.antenna },
-  { key: "proposals", label: MEET.rail.finds },
-  { key: "talk", label: MEET.rail.talk },
+// tip = 一行の本質（世界観の指針・ツールチップ）。
+const SURFACES: { key: SurfaceKey; label: string; tip: string }[] = [
+  { key: "antenna", label: MEET.rail.antenna, tip: MEET.rail.tip.antenna },
+  { key: "proposals", label: MEET.rail.finds, tip: MEET.rail.tip.finds },
+  { key: "talk", label: MEET.rail.talk, tip: MEET.rail.tip.talk },
 ];
 
 export function MeetRail() {
@@ -40,6 +41,7 @@ export function MeetRail() {
             key={s.key}
             type="button"
             className="m-rail-item"
+            title={s.tip}
             aria-pressed={activeSurface === s.key}
             aria-controls="m-ws-canvas"
             data-active={activeSurface === s.key}
@@ -52,7 +54,11 @@ export function MeetRail() {
         {/* 節目（composer の section 区切り）— 面の道具と、Setup（導線）を位置で分ける。 */}
         <div className="m-rail-div" role="presentation" aria-hidden="true" />
         {/* Setup（旧 はじめかた）は既存ルートへの導線（canvas 面でない）。 */}
-        <Link className="m-rail-item m-rail-aux m-rail-link" href="/meet/start/">
+        <Link
+          className="m-rail-item m-rail-aux m-rail-link"
+          href="/meet/start/"
+          title={MEET.rail.tip.setup}
+        >
           <span className="m-rail-mark" aria-hidden="true" />
           <span className="m-rail-label">{MEET.rail.setup}</span>
         </Link>

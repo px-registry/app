@@ -42,9 +42,10 @@ export function ProposalsSurface() {
       {/* R2 GOAL — Dock L2: owner 向け検索。AIが読み、人間には提案と根拠で返す
           （人間向け他者一覧は出さない — 結果は既存の提案レーンに gate 済みで立つ）。 */}
       <section className="m-section">
-        {/* 第2手 ①: Finds 面の見出しは一つ（下の結果 H2「Finds」）に集約。検索の入力は
-            eyebrow＋説明文の静かな入口に畳む（長い H2「探してもらう」反復を退ける）。 */}
+        {/* 仕上げ便 ②（Hiroto 確定）: Finds 面は「YOUR AI / Finds / 説明 / 入力 / Run」。
+            面の見出し「Finds」を頭に置き、今走らせる探索（Run）の入口にする。 */}
         <p className="m-eyebrow">{MEET.home.dockSearch.eyebrow}</p>
+        <h2 className="m-h2">{MEET.rail.finds}</h2>
         <p className="m-note" style={{ margin: "0.2rem 0 0.5rem" }}>
           {MEET.home.dockSearch.note}
         </p>
@@ -106,10 +107,10 @@ export function ProposalsSurface() {
       </section>
 
       <section className="m-section">
-        <p className="m-eyebrow">{MEET.home.proposals.eyebrow}</p>
+        {/* 結果欄: 面の見出し Finds は上の入力欄に集約済 — ここは eyebrow＋件数だけ
+            （見出し反復を避ける・仕上げ便 ②）。 */}
         <div className="m-secrow">
-          {/* 第2手 ①: 長い「AIが見つけた提案」を rail と一貫の短語「Finds」へ。 */}
-          <h2 className="m-h2">{MEET.rail.finds}</h2>
+          <p className="m-eyebrow">{MEET.home.proposals.eyebrow}</p>
           <span className="m-badge">{received.length}</span>
         </div>
         <p className="m-note" style={{ margin: "0 0 0.4rem" }}>
