@@ -105,6 +105,23 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   - 検証分担: 無認証401・deploy live・新ID・rollback健在は CC 実測済（tsc0・test613/613・
     ws-smoke55/55）。認証200・サブページ rail・記憶見出し Memory・[Run][＋Antenna]・sumi 既定・
     モバイル下ドック5列・探しにいく成功は Hiroto のブラウザ（bot を本番に当てない）。
+- **表層語彙統一 本番反映（2026-06-16・px-r15 を `98ad83a` へ）**: 語彙セット
+  Antenna/Finds/Talk/Memory/Setup/Run/Trust に寄せ、退場語彙（見回り→Run・話してみる〔見出し/
+  空状態〕・はじめかた→Setup・記憶の下地・記憶で書けます・合図・アンテナ→Antenna）を掃いた仕上げ。
+  4便まとめ反映: `a20e167`（語彙第1手・Trust・Antenna/Talk）＋`36eb8d5`（語彙第2手・警告短語・
+  見回り→Run・Trust締め・呼び名/Memory）＋`57d063a`（Setup に呼び名カード・実体は Memory と
+  共用）＋`98ad83a`（保存ボタン 保存済み・一行）。**migration ゼロ（90e259b↔98ad83a 差分に
+  migrations/functions/.sql 一切なし・D1 非接触・copy/CSS/レイアウトのみ）。**
+  - 新 live deployment ID `9d0069e8-0aee-4187-9422-32d239d3514f`（98ad83a）。
+    **rollback 座標 = 直前の `af569c39-6872-4cf5-9c9e-fdd724e83422`（90e259b・サブページ rail 統一）**。
+  - 設計: 呼び名は Setup の `#name` カードと Memory の profile が**同一 store（openMeetMemory の
+    profile.displayName）を共用**（データ二重化なし・intro 保全）。警告「呼び名が未設定です。
+    Setupで設定できます。」の着地を Setup#name に揃えた（Hiroto 確定 (a)）。Trust に holds 行を新設。
+  - 検証分担: 無認証401・deploy live・新ID・rollback健在は CC 実測済（tsc0・test613/613・
+    ws-smoke59/59・実機の語彙描画＋呼び名共用 round-trip）。認証200・実機の各面文言・sumi・
+    モバイルは Hiroto のブラウザ（bot を本番に当てない）。
+  - 残課題（次便候補・Hiroto 保留）: 二扉見出し「このページで使う／あなたのAIから使う」→
+    Antenna／AI 案（今すぐ必須でない）。connect.saved「保存しました」は未変更（別ボタン・未指摘）。
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
   **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
   内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・
