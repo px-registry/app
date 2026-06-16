@@ -149,7 +149,8 @@ test("M-7: the Antenna 面 verbs are [Run] [＋Antenna]; the 聞く-era wording 
   // Finds と一貫）／アンテナを立てる→＋Antenna（置いて待つを「＋」で記号化）。
   assert.equal(MEET.home.receive, "Run", "the generate button = Run (今動かす)");
   assert.equal(MEET.home.place.action, "＋Antenna", "the waiting verb = ＋Antenna (置いて待つ)");
-  assert.equal(MEET.home.place.confirmHeading, "アンテナを立てる", "confirm card keeps the full verb");
+  // 期待の追従（Hiroto 確定 2026-06-16・表層語彙統一便）: アンテナ → Antenna（退場語彙）。
+  assert.equal(MEET.home.place.confirmHeading, "Antennaを立てる", "confirm card keeps the full verb (Antenna)");
   assert.equal(MEET.home.place.heading, "Antenna", "ブランド語昇格 (2026-06-13)");
   // 時間帯 placeholder v1 — ゲート済 verbatim ＋帯写像（朝/昼/夜/深夜）
   assert.equal(
