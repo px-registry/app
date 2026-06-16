@@ -112,10 +112,28 @@
   --ls-brand: 0.28em;
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
 
+  /* ── レイアウト型（layout 体系便・Hiroto Go 2026-06-17）─────────────────────────
+     一箇所に定義し、各ページがこれを参照する（個別マジックナンバーで詰めない）。
+     8 の倍数の余白スケール／読み柱幅／カード3種／FAB クリアランス。これらは色を持たない
+     ので VR-1（色リテラル）非対象。詳細は docs/r2/layout-tokens.md。 */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+  --space-7: 56px;
+  --space-8: 64px;
+  --card-pad: var(--space-3); /* カード内パディング統一（24px）*/
+  --card-gap: var(--space-2); /* 対カード・手順カード間（16px）*/
+  --stack: var(--space-2); /* カード内の縦リズム（見出し→本文→部品）*/
+  --ws-canvas-max: 880px; /* 読み柱の標準幅（rail の右）*/
+  --ws-canvas-wide: 1040px; /* Memory 二段組だけが参照する例外 */
+  --fab-clear: 72px; /* あなたのAI FAB の本文クリアランス（safe area）*/
+
   --radius-card: 14px;
   --radius-btn: 10px;
-  /* c9-4: ONE vertical rhythm for desktop section seams (rail/promise) */
-  --section-gap: 56px;
+  /* c9-4: ONE vertical rhythm for desktop section seams（scale に載せ替え・値は不変 56px）*/
+  --section-gap: var(--space-7);
   --inset-b: env(safe-area-inset-bottom, 0px);
 
   min-height: 100dvh;
@@ -698,6 +716,27 @@ html[data-ws] .m-nav-top {
   margin-top: 0.75rem;
 }
 
+/* ── カード3種（layout 体系便・Hiroto Go 2026-06-17）────────────────────────────────
+   既定 .m-card＝番号カード（実体・白い card 面＋shadow-1）。
+   概念カード＝静か: 沈めた地（--well）＋ hairline（--line-soft・0.07）＋ 影なし＋ごく薄い
+   inset（--well-inset・0.03）。muddy にせず、形でなく面の沈みで「説明」を語る。
+   フィールドカード＝入力面: 実体面のまま意味づけ（入力を持つ働く面）。
+   色は全てトークン参照（VR-1 維持）。Phase 1 は Setup のみに適用（[data-page=start] で限定）。 */
+.m-card--concept {
+  background: var(--well);
+  border-color: var(--line-soft);
+  box-shadow: var(--well-inset);
+}
+.m-card--field {
+  /* 実体面のまま（番号カードと同じ raise）— 役割の違いは「入力を持つ」点で語る。 */
+}
+
+/* Phase 1: 読み柱 880・カード内 24px・対カード等高は Setup に限定して適用する
+   （他ページは Phase 2 で同じ型へ昇格。ここでは [data-page=start] 配下だけが変わる）。 */
+.m-ws-canvas[data-page="start"] .m-card {
+  padding: var(--card-pad);
+}
+
 /* ── Setup の扉（第3手 ②・案A 2026-06-16）— 二重框を入れ子で解く ─────────────────
    二扉は同格の入口のまま（R2 GOAL 保持）。「このページで使う」扉だけ details にして、
    3手順（鍵→下地→選ぶ）を中へ畳む。開閉は caret が形で語る（新規文言なし）。色は
@@ -705,7 +744,12 @@ html[data-ws] .m-nav-top {
 .m-doors {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--card-gap);
+}
+/* 隣接カードの margin-top は gap が担う — grid/flex の gap と二重にしない
+   （グリッド時は cell 内オフセット＝等高/上揃え崩れの原因になる）。 */
+.m-doors > .m-card + .m-card {
+  margin-top: 0;
 }
 .m-door {
   background: var(--card-face);
@@ -756,7 +800,7 @@ html[data-ws] .m-nav-top {
 .m-doorsteps {
   margin-top: 1rem;
   display: grid;
-  gap: 0.75rem;
+  gap: var(--card-gap);
 }
 /* 扉の中の手順は副パネル（card-in-card を避け軽く）— 影を消し地を沈める。 */
 .m-door .m-card {
@@ -1632,7 +1676,9 @@ textarea.m-field {
     padding-right: clamp(24px, 5vw, 68px);
   }
   .m-main {
-    padding-bottom: 4.5rem; /* no bottom tab bar at this width */
+    /* FAB クリアランスをトークン化（値は 72px のまま不変＝他ページの見た目に差は出ない）。
+       あなたのAI FAB（右下固定）の裏に末尾コンテンツが隠れない safe area。 */
+    padding-bottom: calc(var(--fab-clear) + var(--inset-b)); /* no bottom tab bar at this width */
   }
   /* c9-4 縦の銘撤去に伴いヒーロー下端を一段詰める */
   .m-hero {
@@ -1750,12 +1796,17 @@ textarea.m-field {
   .m-ws-canvas {
     flex: 1 1 auto;
     min-width: 0;
-    max-width: 820px;
+    max-width: 820px; /* Phase 2 で var(--ws-canvas-max) へ昇格（他ページ込み）。今は不変。 */
+  }
+  /* layout 体系便 Phase 1（Hiroto Go 2026-06-17）: 読み柱 880 を Setup だけに先行適用。
+     他ページ（820）は Phase 2 で同トークンへ昇格する（Phase 1 は Setup 以外不変）。 */
+  .m-ws-canvas[data-page="start"] {
+    max-width: var(--ws-canvas-max);
   }
   /* サブページ統一便: 記憶 canvas は主柱/側柱の二段組（.m-mem 8fr/4fr）— 読み柱より
-     広い面が要るので canvas の上限を一段ひろげる（Setup は二扉で 820 のままで足りる）。 */
+     広い面が要るので canvas の上限を一段ひろげる（例外を1トークンに固定）。 */
   .m-ws-canvas[data-page="memory"] {
-    max-width: 1040px;
+    max-width: var(--ws-canvas-wide);
   }
   .m-promise {
     margin-top: var(--section-gap);
@@ -1827,13 +1878,17 @@ textarea.m-field {
   .m-steps .m-card + .m-card {
     margin-top: 0;
   }
-  /* 第3手 ②: 二扉は左右の同格（align-start で AI 扉が page 扉の高さに伸びない）。
-     扉の中の3手順は縦積みのまま（一列に収まる）。 */
+  /* layout 体系便（Hiroto Go 2026-06-17）: 対カード（概念 Antenna/Run）は等高・上揃え。
+     align-items: stretch で2枚を等高に、子を flex-column にして内容を上から流す（上揃え）。 */
   .m-doors {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.25rem;
-    align-items: start;
+    gap: var(--card-gap);
+    align-items: stretch;
+  }
+  .m-doors > .m-card {
+    display: flex;
+    flex-direction: column;
   }
 
   /* 進行役 構図 */

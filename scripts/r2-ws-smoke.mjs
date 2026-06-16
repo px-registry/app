@@ -154,13 +154,38 @@ await page.goto(`${BASE}start/#step-key`, { waitUntil: "networkidle" }).catch(()
 await page.waitForTimeout(150);
 ok(await page.locator("#step-key").isVisible(), "#step-key 深リンク先が画面に見える");
 
-// 11b) 表層語彙統一便 第2手 (a)（Hiroto 確定 2026-06-16）: 呼び名カードを Setup 内に追加
-//      （実体は Memory 側 store と共用・データ二重化なし）。警告文「Setupで設定できます。」
-//      の着地点（#name）。深リンクで画面に見える。
+// 11b) 呼び名カード（#name）— layout 体系便 Phase 1: 孤立 section をやめ、手順グループ
+//      （.m-doorsteps）の中にフィールドカードとして並ぶ。実体は Memory 側 store と共用。
 await page.goto(`${BASE}start/#name`, { waitUntil: "networkidle" }).catch(() => {});
 await page.waitForTimeout(150);
-ok(await page.locator("#name .m-card h2").filter({ hasText: "呼び名" }).count() === 1, "Setup に呼び名カード（#name）");
+ok(await page.locator("#name h2").filter({ hasText: "呼び名" }).count() === 1, "Setup に呼び名カード（#name）");
 ok(await page.locator("#name input.m-field").count() === 1, "呼び名カードに入力欄");
+ok(await page.locator(".m-doorsteps #name.m-card--field").count() === 1,
+  "呼び名は手順グループ内のフィールドカード（孤立 section でない）");
+
+// 11c) layout 型（Hiroto Go 2026-06-17）— 概念カード等高・recessed・読み柱 880。
+await page.goto(`${BASE}start/`, { waitUntil: "networkidle" }).catch(() => {});
+await page.waitForTimeout(200);
+const concepts = page.locator(".m-doors .m-card--concept");
+ok(await concepts.count() === 2, "概念カードは2枚（Antenna/Run・recessed）");
+const bb0 = await concepts.nth(0).boundingBox();
+const bb1 = await concepts.nth(1).boundingBox();
+ok(bb0 && bb1 && Math.abs(bb0.height - bb1.height) < 2, `概念カード2枚が等高（${Math.round(bb0?.height)}≈${Math.round(bb1?.height)}）`);
+ok(bb0 && bb1 && Math.abs(bb0.y - bb1.y) < 2, "概念カード2枚が上揃え");
+// recessed: 概念カードは shadow 無し（番号カードは shadow-1 あり）— 面の沈みで静かに語る
+const shadowConcept = await concepts.nth(0).evaluate((el) => getComputedStyle(el).boxShadow);
+const shadowStep = await page.locator("#step-key").evaluate((el) => getComputedStyle(el).boxShadow);
+ok(shadowConcept !== shadowStep, "概念=recessed と 番号=実体 で面が違う（box-shadow 差）");
+// 読み柱 880（Setup の canvas）
+const canvasMax = await page.locator("#m-ws-canvas").evaluate((el) => getComputedStyle(el).maxWidth);
+ok(canvasMax === "880px", `Setup 読み柱 = 880px（${canvasMax}）`);
+// カード内 24px パディング
+const padStep = await page.locator("#step-key").evaluate((el) => getComputedStyle(el).paddingLeft);
+ok(padStep === "24px", `Setup カード内パディング = 24px（${padStep}）`);
+// FAB は右下固定・本文クリアランス（.m-main 下余白 ≥ FAB クリアランス）
+ok(await page.locator(".m-aiwin-fab").count() === 1, "あなたのAI FAB が右下に出る");
+const fabFixed = await page.locator(".m-aiwin-fab").evaluate((el) => getComputedStyle(el).position);
+ok(fabFixed === "fixed", "FAB は固定（右下）");
 ok(await page.locator("#name").isVisible(), "#name 深リンク先の呼び名カードが画面に見える");
 // 警告文（home の !ready）の名前行リンクは Setup#name へ向く
 await page.goto(BASE, { waitUntil: "networkidle" }).catch(() => {});

@@ -33,7 +33,9 @@ export function NameField() {
   }, [store, displayName]);
 
   return (
-    <div className="m-card">
+    // layout 体系便（Phase 1）: フィールドカード（入力面）＋深リンク着地点 #name。
+    // Setup 専用部品なので id をここに置く（孤立 section を畳み、手順グループに並べる）。
+    <div className="m-card m-card--field" id="name">
       <h2 className="m-h2">{MEET.profile.heading}</h2>
       <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
         {MEET.profile.note}

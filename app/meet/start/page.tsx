@@ -20,35 +20,37 @@ export default function MeetStart() {
         <h1 className="m-h1">{MEET.start.title}</h1>
         <p className="m-lede">{MEET.start.lead}</p>
 
-        {/* 二つのモード — 何ができるかを先に示す（向きカードでなく概念カード）。 */}
+        {/* 二つのモード — 概念カード（静か・recessed）。何ができるかを先に示す。 */}
         <div className="m-doors">
-          <div className="m-card">
+          <div className="m-card m-card--concept">
             <h2 className="m-h2">{MEET.start.modes.antenna.heading}</h2>
-            <p style={{ margin: "0.3rem 0 0", color: "var(--text)" }}>
+            <p style={{ margin: "var(--space-1) 0 0", color: "var(--text)" }}>
               {MEET.start.modes.antenna.body}
             </p>
           </div>
-          <div className="m-card">
+          <div className="m-card m-card--concept">
             <h2 className="m-h2">{MEET.start.modes.run.heading}</h2>
-            <p style={{ margin: "0.3rem 0 0", color: "var(--text)" }}>
+            <p style={{ margin: "var(--space-1) 0 0", color: "var(--text)" }}>
               {MEET.start.modes.run.body}
             </p>
           </div>
         </div>
 
-        {/* 準備の手順 — AI接続（任意・Run の前提）→ Memory を作る。 */}
-        <div className="m-doorsteps" style={{ marginTop: "1.25rem" }}>
+        {/* 準備の手順 — AI接続（任意・Run の前提）→ Memory を作る → 呼び名。
+            layout 体系便: 呼び名は孤立 section をやめ、この手順グループに並べる（フィールド
+            カード・#name はここに着地）。縦リズムは grid gap（--card-gap）が持つ。 */}
+        <div className="m-doorsteps" style={{ marginTop: "var(--card-gap)" }}>
           <div className="m-card" id="step-key">
             <h2 className="m-h2 m-stepnum">{MEET.start.step1.heading}</h2>
-            <p style={{ margin: "0 0 0.4rem", color: "var(--text)" }}>{MEET.start.step1.body}</p>
-            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step1.run}</p>
+            <p style={{ margin: "0 0 var(--space-1)", color: "var(--text)" }}>{MEET.start.step1.body}</p>
+            <p style={{ margin: "0 0 var(--stack)", color: "var(--text)" }}>{MEET.start.step1.run}</p>
             <KeyConnect />
             {/* AI接続の二つ目の方法 — あなたのAIからつなぐ（MCP）。向きカードでなく方法として畳む。 */}
-            <details style={{ marginTop: "0.9rem" }}>
+            <details style={{ marginTop: "var(--stack)" }}>
               <summary className="m-note" style={{ cursor: "pointer" }}>
                 {MEET.start.mcp.summary}
               </summary>
-              <div style={{ marginTop: "0.6rem" }}>
+              <div style={{ marginTop: "var(--space-1)" }}>
                 <PortConnect />
               </div>
             </details>
@@ -56,17 +58,14 @@ export default function MeetStart() {
 
           <div className="m-card" id="step-intake">
             <h2 className="m-h2 m-stepnum">{MEET.start.step2.heading}</h2>
-            <p style={{ margin: "0 0 0.4rem", color: "var(--text)" }}>{MEET.start.step2.body}</p>
-            <p style={{ margin: "0 0 0.9rem", color: "var(--text)" }}>{MEET.start.step2.why}</p>
+            <p style={{ margin: "0 0 var(--space-1)", color: "var(--text)" }}>{MEET.start.step2.body}</p>
+            <p style={{ margin: "0 0 var(--stack)", color: "var(--text)" }}>{MEET.start.step2.why}</p>
             <ColdStartIntake />
           </div>
-        </div>
-      </section>
 
-      {/* 呼び名は初期設定として Setup の一部（#name・警告文の着地点）。実体は Memory 側 store と
-          共用（NameField・データ二重化なし）。 */}
-      <section className="m-section" id="name">
-        <NameField />
+          {/* 呼び名（フィールドカード・#name）— 実体は Memory 側 store と共用（NameField）。 */}
+          <NameField />
+        </div>
       </section>
 
       <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.holds, MEET.boundary.ai]} />
