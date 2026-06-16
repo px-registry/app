@@ -462,17 +462,7 @@ html[data-ws] .m-nav-top {
 .m-rail-item[data-active="true"] .m-rail-mark::before {
   content: "\25C6"; /* ◆ 今 — filled = いまひらいている面 */
 }
-/* 接続の点（worker-health の系譜）— つながっていれば灯る・静止。 */
-.m-rail-stat {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--sub);
-}
-.m-rail-stat[data-on="true"] {
-  background: var(--ok);
-}
-/* 節目 — mobile の下ドックでは出さない（5道具の等列＝既存 P3 先例を保つ）。 */
+/* 節目 — mobile の下ドックでは出さない（4道具の等列＝既存 P3 先例を保つ）。 */
 .m-rail-div {
   display: none;
 }
@@ -1821,6 +1811,9 @@ textarea.m-field {
   right: 18px;
   bottom: calc(18px + var(--inset-b));
   z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--ui);
   font-size: 12px;
   letter-spacing: var(--ls-wide);
@@ -1833,6 +1826,25 @@ textarea.m-field {
   cursor: pointer;
 }
 .m-aiwin-fab:hover { background: linear-gradient(180deg, var(--shu-hot) 0%, var(--shu-deep) 100%); }
+/* 接続の点（worker-health の系譜）— 司令塔 FAB へ移設。つながっていれば灯る・静止。
+   未接続は伏せ色（btn 面の上なので --line で淡く）。色は既存トークン経由（新色なし）。 */
+.m-aiwin-fab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--btn-fill-border);
+}
+.m-aiwin-fab-dot[data-on="true"] {
+  background: var(--ok);
+}
+/* 第2手 ③: モバイルでは rail が下ドック（fixed bottom）— 司令塔 FAB／窓を
+   ドックの上へ浮かせて被りを解く（デスクトップは rail が左柱なので干渉しない）。 */
+@media (max-width: 63.99rem) {
+  .m-aiwin-fab,
+  .m-aiwin {
+    bottom: calc(var(--inset-b) + 66px);
+  }
+}
 
 .m-aiwin {
   position: fixed;

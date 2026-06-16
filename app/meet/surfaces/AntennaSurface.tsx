@@ -92,10 +92,9 @@ export function AntennaSurface() {
   return (
     <>
       <section className="m-section">
+        {/* 第2手 ①: rail に既に Antenna があるので canvas の見出し反復を畳む——
+            eyebrow「ASK」だけ残し、長い H2 反復は退ける（言葉を減らす・rail と一貫）。 */}
         <p className="m-eyebrow">{MEET.home.place.eyebrowAsk}</p>
-        <div className="m-secrow">
-          <h2 className="m-h2">{MEET.home.place.heading}</h2>
-        </div>
         <textarea
           className="m-field m-composer"
           rows={2}

@@ -83,9 +83,10 @@ test("VR-13: the rail speaks state with the ◇/◆ glyph (theme-independent)", 
   // the active fill rides 朱 (a token), so paper↔sumi both carry it
   const markActive = c.slice(c.indexOf('.m-rail-item[data-active="true"] .m-rail-mark'));
   assert.ok(/color:\s*var\(--shu\)/.test(markActive), "the ◆ mark colours via --shu token");
-  // the connection dot lights with --ok (worker-health 系譜・静止)
-  assert.ok(/\.m-rail-stat\[data-on="true"\]\s*\{\s*background:\s*var\(--ok\)/.test(c),
-    "the connection dot lights with --ok");
+  // the connection dot lights with --ok (worker-health 系譜・静止)。第2手 ②: rail から
+  // あなたのAI を外したので、接続の点は司令塔 FAB へ移設した。
+  assert.ok(/\.m-aiwin-fab-dot\[data-on="true"\]\s*\{\s*background:\s*var\(--ok\)/.test(c),
+    "the connection dot lights with --ok (on the FAB)");
 });
 
 test("VR-6: --faint never colours text (rules & ornament only)", () => {

@@ -664,7 +664,8 @@ export function SignalsSection({
     <section className="m-section">
       <p className="m-eyebrow">{MEET.home.signals.eyebrow}</p>
       <div className="m-secrow">
-        <h2 className="m-h2">{MEET.home.signals.heading}</h2>
+        {/* 第2手 ①: 長い「あなたへの『話してみる』」を rail と一貫の短語「Talk」へ。 */}
+        <h2 className="m-h2">{MEET.rail.talk}</h2>
         <span className="m-badge">{incoming.length + outgoingPairs.length}</span>
       </div>
       <p className="m-note" style={{ margin: "0 0 0.5rem" }}>
