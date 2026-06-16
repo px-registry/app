@@ -126,8 +126,12 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   対カード grid／読み柱幅／FAB safe area を `meet.css .meet-scope` に一括定義（正本＝
   `docs/r2/layout-tokens.md`）。**Phase 1 完了**: Setup のみ適用（読み柱880・カード内24px・概念
   カード等高&recessed・呼び名を手順グループへ）— `[data-page="start"]` 限定で他ページ不変。
-  スクショ r2layout-01..04。**Phase 2（owner Go 後）**: home/Finds/Talk/Memory へ昇格
-  （[data-page=start] 限定を既定へ広げる）。layout/CSS のみ・copy 不変・本番 deploy せず（branch 止め）。
+  スクショ r2layout-01..04。**Phase 2 完了（2026-06-17）**: 土台トークン（読み柱880・カード内
+  24px・gap・FAB safe-area）を全ページへ昇格（[data-page=start] 限定を解放）。カード3種は適合
+  箇所のみ＝概念は Setup の Antenna/Run だけ、feed/list 面（RESTING/proposals/threads/Memory list）
+  は既存 m-item/m-proposal/m-q で3種に押し込めず（新 list/feed パターンは未追加）。before/after
+  スクショ r2layout-before-*／-after-*。Setup 回帰なし。layout/CSS のみ・copy 不変・本番 deploy
+  せず（branch 止め）。**本番反映は owner Go 待ち（copy+layout まとめ・rollback 9d0069e8）。**
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
   **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
   内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・

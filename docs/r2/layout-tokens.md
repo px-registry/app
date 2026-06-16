@@ -41,9 +41,16 @@
 - **Phase 1（適用済・2026-06-17）**: Setup（`/meet/start/`）のみ。読み柱 880・カード内 24px・
   対カード等高は `[data-page="start"]` 配下に限定（他ページ不変）。呼び名は孤立 section をやめ
   手順グループ（`.m-doorsteps`）内のフィールドカードへ（#name 着地点）。
-- **Phase 2（owner Go 後）**: 同じ型を home / Finds / Talk / Memory へ昇格。
-  `[data-page="start"]` 限定の読み柱880・24px パディングを既定 `.m-ws-canvas`/`.m-card` へ広げ、
-  各ページの概念/番号/フィールドに modifier を付ける。
+- **Phase 2（適用済・2026-06-17）**: 土台トークンを全ページへ昇格。
+  - 読み柱 880 を既定 `.m-ws-canvas` へ（Memory のみ `--ws-canvas-wide` 1040）。カード内 24px を
+    既定 `.m-card` へ。Phase 1 の `[data-page="start"]` 限定スコープは解放・撤去。
+  - **カード3種は適合箇所のみ**: 概念カードは Setup の Antenna/Run だけ（他ページに概念カードは
+    無い）。番号カード＝Setup の手順／フィールドカード＝呼び名。**feed/list 面**（Antenna の
+    RESTING 一覧・Finds の proposals・Talk のスレッド・Memory のカード一覧）は `.m-card` を使わず
+    `m-item`／`m-proposal`／`m-q`／`m-itemlist` 等の既存クラスで、**3種に 1:1 で対応させない**
+    （無理に概念/番号/field へ押し込めない）。広い読み柱（880）にそのまま収まるため、**新規の
+    list/feed パターンは追加していない**（必要が出たら STOP して提案する）。
+- **本番反映**: 未（copy 再編＋layout をまとめて・owner Go 後に Phase 0 で rollback 9d0069e8 提示）。
 
 ## 制約
 
