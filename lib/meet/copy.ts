@@ -81,7 +81,9 @@ export const MEET = {
     // 主動詞（Hiroto 確定）: 結果を約束せず行為だけを名指す。探すのであって、
     // つながるとは言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
     // 2026-06-13 Hiroto 指定（期待の追従）: ひらがな「探しにいく」へ。
-    receive: "探しにいく",
+    // 墨工房 文言 第3手（Hiroto 確定 2026-06-16）: 「探しにいく」→「Run」。
+    // Finds の Run と一貫＝「今走らせる」。receive と dock は別機構だが体験は Run で統一。
+    receive: "Run",
     // 便3 改名（Hiroto ゲート済・最重要）: 問いを置く → アンテナ。
     // 機能名=アンテナ／主ボタン=アンテナを立てる。
     // 見出しは 2026-06-13 ブランド語へ昇格: 今日のアンテナ → Antenna（英語 eyebrow 群と同テクスチャ）。
@@ -90,7 +92,9 @@ export const MEET = {
       eyebrowAsk: "Ask",
       eyebrowResting: "Resting",
       heading: "Antenna",
-      action: "アンテナを立てる",
+      // 第3手（Hiroto 確定）: 「アンテナを立てる」→「＋Antenna」。置いて待つを「＋」で
+      // 記号化（[Run]＝今動かす／[＋Antenna]＝置いて待つ の対句）。confirmHeading は別キーで存置。
+      action: "＋Antenna",
       confirmHeading: "アンテナを立てる",
       // 第9便 B: 「探し続け」は実態（開くたびの見回り）に合わせて言い直した。
       confirmNote:
@@ -152,7 +156,8 @@ export const MEET = {
       heading: "あなたへの「話してみる」",
       /** 第9便 D — 役割の一行（相手からの合図が届く場所）。 */
       subnote: "あなたのアンテナや候補を相手のAIが見つけたとき、ここに合図が届きます。",
-      empty: "いまのところ、届いている「話してみる」はありません。",
+      // 第3手（Hiroto 確定）: Talk＝届いた話の空状態を一言で（最短・世界観の簡潔）。
+      empty: "まだありません。",
       incoming: (name: string): string => `${name}さんが「話してみる」を押しました。`,
       talkBack: "こちらも話してみる",
       mutual: "おたがいが「話してみる」を押しました。",

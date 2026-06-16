@@ -144,9 +144,12 @@ test("M-6c: the candidate wording replaced 公開 in the meet copy", () => {
 // ブランド語 Antenna へ昇格／twoTenses ヘルパー文は退場 — 説明は placeholder
 // （時間帯 v1・ゲート済4本）へ畳まれた。
 
-test("M-7: the generate verb is 探しにいく; the 聞く-era wording is extinct", () => {
-  assert.equal(MEET.home.receive, "探しにいく", "the generate button names the act (ひらがな指定)");
-  assert.equal(MEET.home.place.action, "アンテナを立てる", "the waiting verb (便3 改名)");
+test("M-7: the Antenna 面 verbs are [Run] [＋Antenna]; the 聞く-era wording is extinct", () => {
+  // 期待の追従（Hiroto 確定 2026-06-16・墨工房 文言 第3手）: 探しにいく→Run（今動かす・
+  // Finds と一貫）／アンテナを立てる→＋Antenna（置いて待つを「＋」で記号化）。
+  assert.equal(MEET.home.receive, "Run", "the generate button = Run (今動かす)");
+  assert.equal(MEET.home.place.action, "＋Antenna", "the waiting verb = ＋Antenna (置いて待つ)");
+  assert.equal(MEET.home.place.confirmHeading, "アンテナを立てる", "confirm card keeps the full verb");
   assert.equal(MEET.home.place.heading, "Antenna", "ブランド語昇格 (2026-06-13)");
   // 時間帯 placeholder v1 — ゲート済 verbatim ＋帯写像（朝/昼/夜/深夜）
   assert.equal(
