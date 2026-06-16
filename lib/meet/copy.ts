@@ -102,7 +102,9 @@ export const MEET = {
       business: "ビジネス",
       confirm: "この内容で立てる",
       cancel: "やめる",
-      listHeading: "立てているアンテナ",
+      // 仕上げ便（Hiroto 確定 2026-06-16）: RESTING 欄の見出しを世界観の名詞へ。
+      // tip「Antenna=置いておく話」と一語で響き、Resting（休んで待つ）の含みに合う。
+      listHeading: "置いた話",
       stateWaiting: "待っています。",
       stateNotOut: "まだ候補に出ていません。「候補を更新する」で出ます。",
       stateStillOut: "「出さない」にしました——候補からは「候補を更新する」で下がります。",
