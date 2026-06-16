@@ -157,6 +157,8 @@ for (const [path, name] of [["start/", "Setup"], ["memory/", "Memory"]]) {
   // その面（導線）が朱で active
   const activeLabel = await page.locator('.m-rail-item[data-active="true"] .m-rail-label').first().innerText().catch(() => "");
   ok(activeLabel === name, `${name}: 自ページの導線が active（${activeLabel}）`);
+  // ①: ページ題 h1 が rail と一致（Setup→"Setup" / Memory→"Memory"・世界観の英語短語）
+  ok(await page.locator("h1").first().innerText() === name, `${name}: ページ題 h1 が rail と一致（${name}）`);
 }
 // サブページの FAB は自前 state で開く（provider 圏外でも司令塔は開く）
 await page.locator(".m-aiwin-fab").click();

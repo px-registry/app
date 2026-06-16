@@ -661,6 +661,11 @@ export function MemoryPanel() {
 
   return (
     <>
+      {/* サブページ統一便 ①（Hiroto 裁定 2026-06-16・Q2）: ページ題を Setup と対称に
+          h1「Memory」へ（世界観＝簡潔な英語短語・rail/canvas aria-label の Memory と一致）。
+          温度ある日本語「あなたの記憶」は見出しから外し、節の boundary 一行（記憶はこの
+          端末の中だけ…）が温度と意味を担う。 */}
+      <h1 className="m-h1 m-pagetitle">{MEET.rail.memory}</h1>
       {/* 第6便構図: flat zones — DOM keeps the mobile order (名前→記憶→候補
           →整理→やくそく); the desktop grid places 主柱=記憶 / 側柱=残り.
           Layout only. */}
@@ -740,7 +745,8 @@ export function MemoryPanel() {
       </section>
 
       <section className="m-section m-mem-memory">
-        <h2 className="m-h2">{MEET.memory.title}</h2>
+        {/* h2「あなたの記憶」は page 題 h1「Memory」へ昇格・統合（①）。主柱は boundary
+            一行から始まる（温度＝記憶はこの端末の中だけ…）。 */}
         <p className="m-note" style={{ margin: "0 0 0.75rem" }}>
           {MEET.memory.boundary}
         </p>
