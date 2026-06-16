@@ -92,6 +92,19 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
     **rail の世界観が home 専用でサブページが旧 MeetNav を着ていた**のが真因（実機 artifact で確定）。
   - 検証分担: 無認証401・deploy live は CC 実測済。認証200・rail4道具・紙↔墨・FAB・「探しにいく成功」・
     IDB 前進は Hiroto のブラウザ（鍵・合鍵は端末／bot を本番に当てると owner token を mint し気配を曇らせる）。
+- **サブページ rail 統一 本番反映（2026-06-16・px-r15 を `90e259b` へ・道B）**: home だけでなく
+  記憶・Setup もワークスペース器（rail＋canvas＋あなたのAI FAB）を着る＝世界観完全一貫。
+  3便まとめ反映: `8fc004b`（文言第3手 [Run]/[＋Antenna]/Talk「まだありません。」）＋
+  `52a0eef`（rail 統一・旧 MeetNav 退場〔消費者面〕・Memory 仕切り下・`?s=` 往復・FAB どこからでも）＋
+  `90e259b`（記憶ページ題 → h1「Memory」）。**migration ゼロ（4a98ce9↔90e259b 差分に
+  migrations/functions/.sql 一切なし・D1 非接触・copy/CSS/レイアウトのみ・incremental 同系譜）。**
+  - 新 live deployment ID `af569c39-6872-4cf5-9c9e-fdd724e83422`（90e259b）。
+    **rollback 座標 = 直前の `00d541a6-a7df-4541-bf85-6c17318945cb`（4a98ce9・墨工房 仕上げ）**。
+  - 設計: rail を context-optional＋route-aware に（home＝面切替ボタン／サブpage＝`/meet/?s=` 導線）。
+    host（進行役・別世界）は据置＝旧 MeetNav のまま（Hiroto 裁定 Q1・消費者面のみ統一）。
+  - 検証分担: 無認証401・deploy live・新ID・rollback健在は CC 実測済（tsc0・test613/613・
+    ws-smoke55/55）。認証200・サブページ rail・記憶見出し Memory・[Run][＋Antenna]・sumi 既定・
+    モバイル下ドック5列・探しにいく成功は Hiroto のブラウザ（bot を本番に当てない）。
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
   **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
   内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・
