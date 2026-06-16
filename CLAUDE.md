@@ -82,7 +82,14 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
     書込で throw → errorCode "unknown"）。HEAD が storage 層を作り直し済み（**IndexedDB VERSION 5→7**・
     onupgradeneeded で既存ストア不触＝データ消失なし）＝cutover が修正。D1・鍵・CORS は無関係（実測 200）。
   - **rollback 座標（即戻し）**: 旧 live deployment ID `94c0613a-97c7-45f8-b139-79ad5860a055`（commit 4e04651）。
-    新 live `2bca88bb-...`（24641ff）。戻すなら Cloudflare ダッシュボード rollback。
+    戻すなら Cloudflare ダッシュボード rollback。
+- **墨工房 仕上げ 本番反映（2026-06-16・px-r15 を `4a98ce9` へ）**: sumi 既定／Finds=YOUR AI・Run／
+  Setup 食い違い解消（nav・見出し→Setup）／二扉対称／「立てているアンテナ」→「置いた話」。
+  migration ゼロ（24641ff↔4a98ce9 一致・D1 非接触・incremental 同系譜）。
+  - 新 live deployment ID `00d541a6-a7df-4541-bf85-6c17318945cb`（4a98ce9）。
+    **rollback 座標 = 直前の `2bca88bb-0379-4409-8126-200d3c878df9`（24641ff・墨工房 cutover）**。
+  - ① 診断の学び: cutover 後「Setup/nav が旧型」は反映漏れ/hydration/キャッシュでなく、
+    **rail の世界観が home 専用でサブページが旧 MeetNav を着ていた**のが真因（実機 artifact で確定）。
   - 検証分担: 無認証401・deploy live は CC 実測済。認証200・rail4道具・紙↔墨・FAB・「探しにいく成功」・
     IDB 前進は Hiroto のブラウザ（鍵・合鍵は端末／bot を本番に当てると owner token を mint し気配を曇らせる）。
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
