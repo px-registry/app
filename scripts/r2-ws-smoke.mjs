@@ -56,6 +56,31 @@ ok(before === "Antenna" && after !== before && after !== null, `ArrowDown で ro
 // Escape は窓側で扱う — rail では何も壊さない（フォーカスが rail 内に留まる）
 ok(await page.evaluate(() => document.activeElement?.classList.contains("m-rail-item")), "roving 後もフォーカスは rail 内");
 
+// 7) 工房語彙（便: composer の UI 語彙）— ◇/◆ の標が状態を「形」で語る。
+//    ::before の生成内容を読む（命名問題の解の核・aria-hidden の装い）。
+const markOf = (active) =>
+  page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    return getComputedStyle(el, "::before").content;
+  }, `.m-rail-item[data-active="${active}"] .m-rail-mark`);
+const activeMark = await markOf("true");
+const restMark = await markOf("false");
+ok(activeMark?.includes("◆"), `今ひらいている面は ◆ filled (${activeMark})`);
+ok(restMark?.includes("◇"), `休む面は ◇ hollow (${restMark})`);
+ok(await page.locator(".m-rail-aux .m-rail-stat").count() === 1, "あなたのAI に接続の点がある");
+
+// 8) theme 非依存（墨=黒・紙でも成立）— 墨へ切替えて骨格＋標が生き残る。
+await page.evaluate(() => localStorage.setItem("pxmeet:theme", "sumi"));
+await page.reload({ waitUntil: "networkidle" }).catch(() => {});
+ok(await page.evaluate(() => document.documentElement.getAttribute("data-theme")) === "sumi", "墨テーマに切替（pxmeet:theme）");
+ok(await page.locator(".m-rail-item").count() === 5, "墨でも rail 5道具が生存");
+ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "Antenna", "墨でも既定の面=アンテナ");
+const sumiActiveMark = await markOf("true");
+ok(sumiActiveMark?.includes("◆"), `墨でも ◆ の標が状態を語る (${sumiActiveMark})`);
+await page.getByRole("button", { name: "AIが見つけた提案" }).click();
+ok(await page.locator("#m-ws-canvas").getByText("探してもらう").count() >= 1, "墨でも面切替が canvas に効く");
+
 await browser.close();
 console.log(`\nPASS ${pass} / FAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

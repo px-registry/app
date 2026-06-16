@@ -69,6 +69,25 @@ test("VR-5: the sumi phase overrides the same token block", () => {
   }
 });
 
+// ── VR-13 (工房語彙便・墨=黒): rail が ◇/◆ で状態を「形」で語る ─────────────────
+//
+// 命名問題の解の核（px-composer の UI 語彙の移植）。rail の標は色でなく形で語る——
+// ◇ hollow = 休む面 / ◆ filled = 今ひらいている面。色は既存トークン経由（新色なし）
+// なので紙でも墨でも成立する（theme 非依存）。接続の点は --ok で灯る。静止である
+// こと（VR-4 が点滅・glow を別途見張る）。この形が消えたら命名問題が逆戻りする。
+test("VR-13: the rail speaks state with the ◇/◆ glyph (theme-independent)", () => {
+  const c = css();
+  // hollow ◇ resting / filled ◆ active — escaped code points, not literals
+  assert.ok(c.includes("\\25C7"), "rail mark rests as ◇ (hollow)");
+  assert.ok(c.includes("\\25C6"), "the active surface fills the mark to ◆");
+  // the active fill rides 朱 (a token), so paper↔sumi both carry it
+  const markActive = c.slice(c.indexOf('.m-rail-item[data-active="true"] .m-rail-mark'));
+  assert.ok(/color:\s*var\(--shu\)/.test(markActive), "the ◆ mark colours via --shu token");
+  // the connection dot lights with --ok (worker-health 系譜・静止)
+  assert.ok(/\.m-rail-stat\[data-on="true"\]\s*\{\s*background:\s*var\(--ok\)/.test(c),
+    "the connection dot lights with --ok");
+});
+
 test("VR-6: --faint never colours text (rules & ornament only)", () => {
   // block-wise: any `color: var(--faint)` must belong to a ring selector
   const blocks = css().split("}");

@@ -415,10 +415,13 @@ html[data-ws] .m-nav-top {
   grid-auto-columns: 1fr;
 }
 .m-rail-item {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
   width: 100%;
   text-align: center;
-  padding: 0.65rem 0.2rem 0.75rem;
+  padding: 0.5rem 0.2rem 0.6rem;
   font-size: 0.68rem;
   letter-spacing: var(--ls-chip);
   color: var(--sub);
@@ -428,13 +431,50 @@ html[data-ws] .m-nav-top {
   text-decoration: none;
   cursor: pointer;
   font-family: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .m-rail-item[data-active="true"] {
   color: var(--ink);
   border-top-color: var(--shu);
+}
+.m-rail-label {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ── 工房語彙（便: composer の UI 語彙）— ◇/◆ の標が状態を形で語る ───────────────
+   色は既存トークン経由（墨=黒・新色なし・紙でも成立）。静止（VR-4: 点滅・glow なし）。 */
+.m-rail-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--sub);
+}
+.m-rail-mark::before {
+  content: "\25C7"; /* ◇ 休 — hollow = この面はいま閉じている */
+}
+.m-rail-item[data-active="true"] .m-rail-mark {
+  color: var(--shu);
+}
+.m-rail-item[data-active="true"] .m-rail-mark::before {
+  content: "\25C6"; /* ◆ 今 — filled = いまひらいている面 */
+}
+/* 接続の点（worker-health の系譜）— つながっていれば灯る・静止。 */
+.m-rail-stat {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sub);
+}
+.m-rail-stat[data-on="true"] {
+  background: var(--ok);
+}
+/* 節目 — mobile の下ドックでは出さない（5道具の等列＝既存 P3 先例を保つ）。 */
+.m-rail-div {
+  display: none;
 }
 
 /* header right cluster: theme + language */
@@ -1585,18 +1625,46 @@ textarea.m-field {
     gap: 2px;
   }
   .m-rail-item {
+    flex-direction: row;
+    align-items: center;
+    gap: 9px;
     text-align: left;
     border-top: none;
     border-left: 2px solid transparent;
-    padding: 0.55rem 0.85rem;
+    padding: 0.5rem 0.85rem;
     font-size: 13px;
     border-radius: 8px;
+  }
+  .m-rail-label {
     white-space: normal;
+    overflow: visible;
+  }
+  /* hover = dashed（仮の触れ）／select = solid 朱（今ひらいている面）— composer の
+     「fill でなく ring」grammar。fill は退け、◆ の標と 朱 の縁で語る。 */
+  .m-rail-item:hover {
+    border-left-style: dashed;
+    border-left-color: var(--line-deep);
+    color: var(--ink);
   }
   .m-rail-item[data-active="true"] {
+    border-left-style: solid;
     border-left-color: var(--shu);
-    background: var(--current-wash);
+    background: none;
     color: var(--ink);
+  }
+  .m-rail-item[data-active="true"]:hover {
+    border-left-color: var(--shu);
+  }
+  /* 節目 — 縦 rail では細い一本（面の道具と窓／導線を分ける）。 */
+  .m-rail-div {
+    display: block;
+    height: 1px;
+    background: var(--line-soft);
+    margin: 9px 10px;
+  }
+  /* aux 道具（窓・導線）は副次 — 標を一段しずめる（composer の dashed=任意の系譜）。 */
+  .m-rail-aux .m-rail-mark {
+    opacity: 0.7;
   }
   .m-ws-canvas {
     flex: 1 1 auto;
