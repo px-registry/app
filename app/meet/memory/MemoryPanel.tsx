@@ -680,11 +680,18 @@ export function MemoryPanel() {
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <input
               className="m-field"
+              style={{ flex: 1, minWidth: 0 }}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder={MEET.profile.placeholder}
             />
-            <button type="button" className="m-btn m-btn-quiet" onClick={saveName}>
+            {/* ボタンは縮ませず一行で（保存済み が折れない・NameField と同じ作法）。 */}
+            <button
+              type="button"
+              className="m-btn m-btn-quiet"
+              style={{ flexShrink: 0, whiteSpace: "nowrap" }}
+              onClick={saveName}
+            >
               {savedName ? MEET.profile.saved : MEET.profile.save}
             </button>
           </div>

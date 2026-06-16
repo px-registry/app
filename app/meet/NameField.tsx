@@ -41,11 +41,18 @@ export function NameField() {
       <div style={{ display: "flex", gap: "0.5rem" }}>
         <input
           className="m-field"
+          style={{ flex: 1, minWidth: 0 }}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder={MEET.profile.placeholder}
         />
-        <button type="button" className="m-btn m-btn-quiet" onClick={() => void save()}>
+        {/* ボタンは縮ませず一行で（narrow row で「保存済／み」と折れない・Hiroto 指摘）。 */}
+        <button
+          type="button"
+          className="m-btn m-btn-quiet"
+          style={{ flexShrink: 0, whiteSpace: "nowrap" }}
+          onClick={() => void save()}
+        >
           {saved ? MEET.profile.saved : MEET.profile.save}
         </button>
       </div>
