@@ -100,12 +100,14 @@ await page.getByRole("button", { name: "Finds" }).click();
 ok(await page.locator("#m-ws-canvas h2").filter({ hasText: /^Finds$/ }).count() === 1, "墨でも面切替が canvas に効く（Finds 見出し）");
 
 // 9) 計器の帯（格下げ）— canvas 最上部の pill は退場、フッター際の薄い一行へ。
-//    緑ドット（自動見回り）と「鍵はこの端末の中」は保持・位置だけ静かに。
+//    緑ドット（自動 Run）と所有の約束「鍵はこの端末にあります」は保持・位置だけ静かに。
+//    期待の追従（Hiroto 確定 2026-06-16・表層語彙統一便 第2手）: 見回り→Run・「鍵は
+//    この端末の中にあります」→「鍵はこの端末にあります」。
 ok(await page.locator(".m-hero-bare").count() === 0, "canvas 最上部の帯（hero-bare）は退場");
 ok(await page.locator(".m-meterstrip").count() === 1, "帯はフッター際の薄い一行（m-meterstrip）へ");
-ok(await page.locator(".m-meterstrip .m-pulse").count() === 1, "緑ドット（自動見回りの印）は保持");
-ok((await page.locator(".m-meterstrip .m-meter").innerText()).includes("鍵はこの端末の中"),
-  "所有の約束「鍵はこの端末の中」は保持");
+ok(await page.locator(".m-meterstrip .m-pulse").count() === 1, "緑ドット（自動 Run の印）は保持");
+ok((await page.locator(".m-meterstrip .m-meter").innerText()).includes("鍵はこの端末にあります"),
+  "所有の約束「鍵はこの端末にあります」は保持");
 // 帯はフッター際（BoundaryNote より下）— canvas より下に座る
 const stripBelowCanvas = await page.evaluate(() => {
   const c = document.querySelector("#m-ws-canvas");

@@ -953,7 +953,7 @@ export function MemoryPanel() {
       </section>
 
       <div className="m-mem-foot">
-        <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.disclosure]} />
+        <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.holds, MEET.boundary.ai, MEET.boundary.disclosure]} />
       </div>
       </div>
     </>

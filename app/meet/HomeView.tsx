@@ -1099,9 +1099,15 @@ export function HomeView() {
         )}
       </MeetWorkspace>
       {/* 境界の開示は常時可視（憲法・どの面からも読める）。 */}
-      {/* 表層語彙統一便: spec 順（記憶/持つもの → 非ranking → あなたのAI → テスト開示）。 */}
+      {/* 表層語彙統一便 第2手: 記憶/預からない → 持つもの → 非ranking → あなたのAI → テスト開示。 */}
       <BoundaryNote
-        lines={[MEET.boundary.memory, MEET.boundary.order, MEET.boundary.ai, MEET.boundary.disclosure]}
+        lines={[
+          MEET.boundary.memory,
+          MEET.boundary.holds,
+          MEET.boundary.order,
+          MEET.boundary.ai,
+          MEET.boundary.disclosure,
+        ]}
       />
       {/* 計器の帯（格下げ後）— フッター際の薄い一行。緑ドット＝自動見回りの稼働印・
           「鍵はこの端末の中」＝所有の約束。静かに添えるだけ（説教にしない）。 */}

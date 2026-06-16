@@ -284,7 +284,9 @@ test("M-12: c18 文言 — the gated refusal lines + pair-scoped sent, verbatim"
   assert.equal(MEET.home.signals.notInPool, "この相手は、いまは候補に出ていません。");
   assert.equal(MEET.home.signals.nameFirst, "先に呼び名を決めてください。");
   assert.equal(MEET.proposal.talkSent, "この相手には「話してみる」を伝えてあります。");
-  assert.equal(MEET.receive.nameWhere, "記憶で書けます", "the reused link wording stands");
+  // 期待の追従（Hiroto 確定 2026-06-16・表層語彙統一便 第2手）: 「記憶で書けます」退場 →
+  // 「Setupで設定できます。」（リンク先は呼び名フィールドの在る /meet/memory/#name のまま）。
+  assert.equal(MEET.receive.nameWhere, "Setupで設定できます。", "the name-row link wording (Setup)");
 });
 
 test("M-12b: both send surfaces read the result and branch on the codes", () => {

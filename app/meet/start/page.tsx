@@ -74,7 +74,7 @@ export default function MeetStart() {
         </div>
       </section>
 
-      <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.ai]} />
+      <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.holds, MEET.boundary.ai]} />
     </MeetWorkspace>
   );
 }

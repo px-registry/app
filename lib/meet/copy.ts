@@ -107,7 +107,7 @@ export const MEET = {
       // 第9便 B: 「探し続け」は実態（開くたびの見回り）に合わせて言い直した。
       // 表層語彙統一便（Hiroto 確定 2026-06-16）: アンテナ → Antenna（退場語彙）。
       confirmNote:
-        "「求めている」の項目になります。立てる＝あなたのAIが、あなたがここを開くたびに見回ります。相手のAIもあなたのAntennaを見つけられます。",
+        "「求めている」の項目になります。立てる＝あなたのAIが、あなたがここを開くたびにRunします。ほかの人のAIもあなたのAntennaを見つけられます。",
       titleLabel: "一言タイトル（短縮案・直せます）",
       textLabel: "Antennaの本文",
       /** 0012（Hiroto ゲート済「□ ビジネス」）— チェック一個・説明文なし。
@@ -126,35 +126,38 @@ export const MEET = {
       putBack: "出すに戻す",
       withdraw: "候補から下げる",
       updatePool: "候補を更新する",
-      needName: "候補に出すには、先に記憶ページで「候補に出すときの名前」を決めてください。",
+      needName: "先に「呼び名」を決めてください。",
     },
     proposals: {
       /** 視覚一新 — v3正本の eyebrow（言語によらず英字の意匠）。 */
       eyebrow: "Found by your AI",
       /** 第9便 命名ゲート: 探しに行く＋見回りの結末がすべてここに並ぶ。 */
       heading: "AIが見つけた提案",
-      // 表層語彙統一便（Hiroto 確定 2026-06-16）: 主体だけを言う簡潔版（探しに行く/見回り
-      // を本文から退ける・表面は短く）。
-      subnote: "あなたのAIが見つけたものが、ここに並びます。",
+      // 表層語彙統一便 第2手（Hiroto 確定 2026-06-16）: 主動詞 Run を明示
+      // （探しに行く/見回り を退け、Run で見つけたものが並ぶ、と言う）。
+      subnote: "あなたのAIがRunで見つけたものが、ここに並びます。",
       /** 空状態は二分岐: 記憶未整備 / 整備済みでまだ探していない（第9便 A）。 */
       emptyNoMemory: "まだ提案はありません。記憶の下地ができたら、ここに届きます。",
       emptyReady: "まだ何もありません。見つけてほしいことを書いて「探しに行く」と、あなたのAIがここに提案を並べます。",
       noneToday: "今日は無い、という日もあります。",
       orderNote: "新しく届いた順です。順番に意味はありません。",
-      modelNote: (label: string): string => `${label} が読みました`,
+      // 表層語彙統一便 第2手（Hiroto 確定）: モデル名の生々しさを畳む — 常に「あなたのAI」。
+      modelNote: (_label: string): string => "あなたのAIが読みました",
       manualLabel: "探しに行きました",
-      patrolLabel: (q: string): string => `Antenna「${q}」の見回り`,
+      // 見回り退場（Hiroto 確定）: 自動巡回の概念語は Run へ。
+      patrolLabel: (q: string): string => `Antenna「${q}」のRun`,
       rawShow: "そのままの返事を見る",
       removeEntry: "この回を消す",
       /** provenance gate (第3便 A) — 法の遵守は構造で裏打ちする。 */
       provenanceNote: (n: number): string =>
         `実在の相手に結べない提案は表示していません（${n}枚）。`,
     },
-    /** 第9便 B — 見回り（owner の端末・owner の鍵でのみ走る）。 */
+    /** 第9便 B — 自動巡回（owner の端末・owner の鍵でのみ走る）。
+     *  見回り退場（Hiroto 確定 2026-06-16）: 自動巡回の概念語を Run へ統一。 */
     patrol: {
-      running: "見回り中…",
-      last: (hhmm: string): string => `最後の見回り：${hhmm}`,
-      offline: "見回りは、この端末でAIがつながっているときに動きます。",
+      running: "Run中…",
+      last: (hhmm: string): string => `前回のRun：${hhmm}`,
+      offline: "Runは、この端末でAIがつながっているときに動きます。",
     },
     /** 第9便 C — 気配（事実の表示・判定なし・一覧なし）。 */
     presence: {
@@ -167,9 +170,8 @@ export const MEET = {
       // （YOUR AI と同テクスチャ）。
       eyebrow: "FOR YOU",
       heading: "あなたへの「話してみる」",
-      // 表層語彙統一便（Hiroto 確定 2026-06-16）: Talk＝届いた話の役割を一行で。
-      // 「合図」「アンテナ」を退け、Antenna／Talk（届く）で言う。
-      subnote: "相手のAIが、あなたのAntennaや候補を見つけたとき、ここに届きます。",
+      // 表層語彙統一便 第2手（Hiroto 確定 2026-06-16）: 「相手のAI」→「ほかの人のAI」。
+      subnote: "ほかの人のAIが、あなたのAntennaや候補を見つけたとき、ここに届きます。",
       // 第3手→統一便（Hiroto 確定）: Talk＝届いた話の空状態（届く相手＝Talk の語に寄せる）。
       empty: "まだ届いていません。",
       incoming: (name: string): string => `${name}さんが「話してみる」を押しました。`,
@@ -335,17 +337,20 @@ export const MEET = {
   },
 
   receive: {
-    needKey: "AIがまだつながっていません。",
-    needMemory: "記憶の下地がまだありません。",
-    needName: "候補に出すときの名前がまだありません。",
-    /** c12-7 (Hiroto ゲート済): 名前行の導線 — 記入欄は記憶画面にある。 */
-    nameWhere: "記憶で書けます",
+    // 表層語彙統一便 第2手（Hiroto 確定 2026-06-16・verbatim）: 警告は短い状態語へ。
+    // 「記憶の下地」「記憶で書けます」退場・Memory/Setup に寄せる。
+    needKey: "AI未接続",
+    needMemory: "Memory未作成",
+    needName: "呼び名が未設定です。",
+    /** 名前行の導線（Hiroto 確定）。注: 呼び名フィールドは Memory ページ（#name）に在る
+     *  ため、リンク先は /meet/memory/#name のまま（着地は実フィールド＝正直）。 */
+    nameWhere: "Setupで設定できます。",
     // 表層語彙統一便（Hiroto 確定 2026-06-16）: はじめかた → Setup（退場語彙）。
     toStart: "Setupへ",
     busy: "あなたのAIが読んでいます…",
     /** 二態の対句のです調（Hiroto 起草・ゲート済 2026-06-13）— 行ごと差し替え。
-     *  表層語彙統一便: アンテナ → Antenna。 */
-    noKeyLoop: "AIをつながなくても、Antennaを立てておけば、見つけてもらえます。",
+     *  表層語彙統一便: アンテナ → Antenna・読点を一つ落として締める。 */
+    noKeyLoop: "AIをつながなくても、Antennaを立てておけば見つけてもらえます。",
     /** プール0件の短絡（第3便 A）: 生成せず、正直にこの2行。 */
     poolEmptyNote: "いまは候補に出ている参加者がいません。",
     errors: {
@@ -391,7 +396,7 @@ export const MEET = {
         copied: "コピーしました",
         copyFailed: "コピーできませんでした。",
         caution: "これはあなた専用の合鍵入りのURLです。人に渡さないでください。",
-        hint: "つないだら、チャットで「PXで見回って」と頼んでみてください。",
+        hint: "つないだら、チャットで「PXでRunして」と頼んでみてください。",
       },
     },
     step1: {
@@ -435,19 +440,22 @@ export const MEET = {
     /** c15-4 (Hiroto ゲート済): 取り込みの二択。既定は破壊的でない「追加」。 */
     addMode: "既存の記憶に追加する",
     replaceMode: "すべて置き換える",
-    done: "記憶の下地ができました。",
+    // 表層語彙統一便 第2手（Hiroto 確定）: 「記憶の下地」退場 → Memory へ寄せる。
+    done: "Memoryができました。",
     redo: "貼り直す",
   },
 
   profile: {
-    heading: "候補に出すときの名前",
-    note: "候補や「話してみる」に添える呼び名です。本名でなくてかまいません。",
+    // 表層語彙統一便 第2手（Hiroto 確定・verbatim）: 長い見出しを短い道具語へ。
+    heading: "呼び名",
+    note: "候補やTalkに添える名前です。本名でなくてかまいません。",
     placeholder: "例：あや、カフェの人",
     save: "保存",
     saved: "保存しました",
-    /** 第7便 B — ひとこと紹介（任意・~60字・保存して候補に出して初めて公開）。 */
-    introLabel: "ひとこと紹介（任意）",
-    introNote: "候補や提案に添える、あなたの一言です。AIに下書きを頼めます。",
+    /** 第7便 B — ひとこと（任意・~60字・保存して候補に出して初めて公開）。
+     *  表層語彙統一便 第2手（Hiroto 確定）: 「ひとこと紹介（任意）」→「ひとこと」。 */
+    introLabel: "ひとこと",
+    introNote: "候補に添える一言です。あなたのAIに下書きできます。",
     introPlaceholder: "例：手を動かす場づくりが好きです",
     introDraft: "AIに下書きを頼む",
     introBusy: "あなたのAIが書いています…",
@@ -456,9 +464,11 @@ export const MEET = {
 
   memory: {
     title: "あなたの記憶",
-    boundary: "記憶はこの端末の中だけにあります。PXは預かりません。",
-    empty: "まだ記憶がありません。Setupの手順でつくれます。",
-    addItem: "項目を足す",
+    // 表層語彙統一便 第2手（Hiroto 確定・verbatim）: 締めた本文・Memory/Setup へ寄せる。
+    boundary: "記憶はこの端末だけ。PXは預かりません。",
+    empty: "まだMemoryはありません。Setupで作成できます。",
+    // ボタンは「項目を足す」より「記憶を足す」が明確（Hiroto 確定）。
+    addItem: "記憶を足す",
     edit: "直す",
     remove: "消す",
     save: "保存",
@@ -515,10 +525,12 @@ export const MEET = {
   },
 
   publish: {
-    heading: "AIの候補に出す",
+    // 表層語彙統一便 第2手（Hiroto 確定）: 「AIの候補に出す」→「候補に出す」（簡潔）。
+    heading: "候補に出す",
     body: (n: number): string =>
       `「出す」にした項目（${n}件）を、ほかの参加者のAIが読む候補に入れます。人間の一覧には出ません。`,
-    needName: "先に「候補に出すときの名前」を決めてください。",
+    // 呼び名へ寄せる（Hiroto 確定）。
+    needName: "先に「呼び名」を決めてください。",
     none: "「出す」にした項目がまだありません。項目の「出さない」を押すと変わります。",
     action: "候補に出す",
     update: "候補を更新する",
@@ -582,10 +594,12 @@ export const MEET = {
   // 預からない）は意味で保持: 「PXが持つのは…だけ」「点数も順位もつけません」「提案を
   // つくるのは…あなたのAI」。HomeView の並びは memory→order→ai→disclosure（spec 順）。
   boundary: {
-    memory:
-      "記憶はこの端末にあります。PXが持つのは、あなたが候補に出すと決めた項目と、届いたTalkだけです。",
-    ai: "提案をつくるのは、あなたの鍵で動く、あなたのAIです。",
+    // 表層語彙統一便 第2手（Hiroto 確定・verbatim）: Trust 本文をさらに締める。
+    // 記憶＝預からない を一行、持つもの＝候補と届いたTalk だけを別行（holds）に分ける。
+    memory: "記憶はこの端末だけ。PXは預かりません。",
+    holds: "PXが持つのは、あなたが候補に出すと決めた項目と、届いたTalkだけです。",
     order: "PXは点数も順位もつけません。",
+    ai: "提案をつくるのは、あなたの鍵で動く、あなたのAIです。",
     disclosure:
       "テスト中は、候補・届いた提案・読みの記録を確認する場合があります。連絡先やメモは読みません。",
   },

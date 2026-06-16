@@ -138,7 +138,8 @@ test("VR-9 (c12/便3): gated copy — placeholder, name-row link", async () => {
   ] as const) {
     assert.ok(MEET.home.question[key].trim() !== "", `${key} is set`);
   }
-  assert.equal(MEET.receive.nameWhere, "記憶で書けます");
+  // 期待の追従（Hiroto 確定 2026-06-16・表層語彙統一便 第2手）: 「記憶で書けます」退場。
+  assert.equal(MEET.receive.nameWhere, "Setupで設定できます。");
 });
 
 // ── VR-10 (c14→便B): 他人に読める書き方 — the coldstart prompt translates AT INTAKE
