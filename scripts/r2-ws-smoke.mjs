@@ -29,18 +29,22 @@ ok(await page.locator("nav.m-rail .m-rail-inner[role=toolbar]").count() === 1, "
 ok(await page.locator(".m-rail-item").count() === 5, "rail に道具5つ");
 ok(await page.locator("#m-ws-canvas[role=region]").count() === 1, "canvas = role=region");
 
-// 2) 既定はアンテナ面（data-active＋aria-pressed）
+// 2) 既定はアンテナ面（data-active＋aria-pressed）— rail は短語（文言実験 第1手）
 ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "Antenna", "既定の面=アンテナ");
 ok(await page.locator("#m-ws-canvas .m-composer").count() === 1, "canvas にアンテナの問い欄");
+// rail 短語が並ぶ（Antenna / Finds / Talk / あなたのAI / Setup）— ellipsis 切れ解消
+const railLabels = await page.locator(".m-rail-item .m-rail-label").allInnerTexts();
+ok(JSON.stringify(railLabels) === JSON.stringify(["Antenna", "Finds", "Talk", "あなたのAI", "Setup"]),
+  `rail 短語 = ${JSON.stringify(railLabels)}`);
 
-// 3) rail で提案面へ切替 → canvas が変わる（Dock 検索の見出し）
-await page.getByRole("button", { name: "AIが見つけた提案" }).click();
+// 3) rail で提案面（Finds）へ切替 → canvas が変わる（Dock 検索の見出しは canvas のまま）
+await page.getByRole("button", { name: "Finds" }).click();
 ok(await page.locator("#m-ws-canvas").getByText("探してもらう").count() >= 1, "提案面: Dock 検索が canvas に開く");
 ok(await page.locator("#m-ws-canvas .m-composer").count() === 0, "提案面: アンテナの問い欄は消える（一面）");
 
-// 4) トーク面へ切替
-await page.getByRole("button", { name: "あなたへの「話してみる」" }).click();
-ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "あなたへの「話してみる」", "トーク面に切替");
+// 4) トーク面（Talk）へ切替
+await page.getByRole("button", { name: "Talk" }).click();
+ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "Talk", "トーク面に切替");
 
 // 5) あなたのAI 窓トグル（floating 窓が開く）
 ok(await page.locator(".m-aiwin").count() === 0, "窓は既定で閉じ（FAB のみ）");
@@ -78,8 +82,23 @@ ok(await page.locator(".m-rail-item").count() === 5, "墨でも rail 5道具が�
 ok(await page.locator('.m-rail-item[data-active="true"]').first().innerText() === "Antenna", "墨でも既定の面=アンテナ");
 const sumiActiveMark = await markOf("true");
 ok(sumiActiveMark?.includes("◆"), `墨でも ◆ の標が状態を語る (${sumiActiveMark})`);
-await page.getByRole("button", { name: "AIが見つけた提案" }).click();
+await page.getByRole("button", { name: "Finds" }).click();
 ok(await page.locator("#m-ws-canvas").getByText("探してもらう").count() >= 1, "墨でも面切替が canvas に効く");
+
+// 9) 計器の帯（格下げ）— canvas 最上部の pill は退場、フッター際の薄い一行へ。
+//    緑ドット（自動見回り）と「鍵はこの端末の中」は保持・位置だけ静かに。
+ok(await page.locator(".m-hero-bare").count() === 0, "canvas 最上部の帯（hero-bare）は退場");
+ok(await page.locator(".m-meterstrip").count() === 1, "帯はフッター際の薄い一行（m-meterstrip）へ");
+ok(await page.locator(".m-meterstrip .m-pulse").count() === 1, "緑ドット（自動見回りの印）は保持");
+ok((await page.locator(".m-meterstrip .m-meter").innerText()).includes("鍵はこの端末の中"),
+  "所有の約束「鍵はこの端末の中」は保持");
+// 帯はフッター際（BoundaryNote より下）— canvas より下に座る
+const stripBelowCanvas = await page.evaluate(() => {
+  const c = document.querySelector("#m-ws-canvas");
+  const s = document.querySelector(".m-meterstrip");
+  return c && s ? s.getBoundingClientRect().top > c.getBoundingClientRect().top : false;
+});
+ok(stripBelowCanvas, "帯は canvas より下（最上部から退いた）");
 
 await browser.close();
 console.log(`\nPASS ${pass} / FAIL ${fail}`);

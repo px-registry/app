@@ -1043,36 +1043,10 @@ export function HomeView() {
 
   return (
     <MeetWorkspaceProvider value={ws}>
-      {/* 発表準備・便A: 毎日の画面の最上部からヒーロー二行＋リード文を退去する
-          （宣言は状態表示でない — 毎日開くツールの最上部に置くと説教になる）。
-          計器の帯だけを最上部へ繰り上げる。ヒーローコピー（meet.hero.*）は削除せず
-          copy に残し、LP・二扉ページの宣言として存置する。 */}
-      <section className="m-hero m-hero-bare">
-        {/* 計器行 — the patrol fact, now the first thing on the daily home */}
-        <div className="m-meter" role="status">
-          <span className="m-live">
-            <span className="m-pulse" aria-hidden="true" />
-            {patrolBusy ? (
-              MEET.home.patrol.running
-            ) : lastPatrolAt !== "" ? (
-              <span>
-                {t("meet.meter.lastPre")}
-                <span className="mono">{fmtHm(lastPatrolAt)}</span>
-              </span>
-            ) : (
-              t("meet.meter.auto")
-            )}
-          </span>
-          {lastPatrolAt !== "" && (
-            <>
-              <span className="m-sep" aria-hidden="true" />
-              <span>{t("meet.meter.auto")}</span>
-            </>
-          )}
-          <span className="m-sep" aria-hidden="true" />
-          <span>{t("meet.meter.keys")}</span>
-        </div>
-      </section>
+      {/* 墨工房 文言実験 第1手（Hiroto 裁定 2026-06-16）: 計器の帯を canvas 最上部から
+          退かす（工房では計器は常時主張せず静かに添える）。帯は home の状態（見回り・接続）
+          を映すので home が描き続ける——フッター際の薄い一行へ格下げ（下部 m-meterstrip）。
+          緑ドットと「鍵はこの端末の中」は保持・位置だけ静かに（所有の約束は消さない）。 */}
       {/* 器（rail＋canvas 主役）: rail で面を選ぶと canvas に大きく開く（C裁定一面）。
           二柱対等（旧 .m-home）を canvas 主役＋rail 脇役へ役割転換。 */}
       <MeetWorkspace>
@@ -1117,6 +1091,33 @@ export function HomeView() {
       <BoundaryNote
         lines={[MEET.boundary.memory, MEET.boundary.ai, MEET.boundary.order, MEET.boundary.disclosure]}
       />
+      {/* 計器の帯（格下げ後）— フッター際の薄い一行。緑ドット＝自動見回りの稼働印・
+          「鍵はこの端末の中」＝所有の約束。静かに添えるだけ（説教にしない）。 */}
+      <div className="m-meterstrip">
+        <div className="m-meter" role="status">
+          <span className="m-live">
+            <span className="m-pulse" aria-hidden="true" />
+            {patrolBusy ? (
+              MEET.home.patrol.running
+            ) : lastPatrolAt !== "" ? (
+              <span>
+                {t("meet.meter.lastPre")}
+                <span className="mono">{fmtHm(lastPatrolAt)}</span>
+              </span>
+            ) : (
+              t("meet.meter.auto")
+            )}
+          </span>
+          {lastPatrolAt !== "" && (
+            <>
+              <span className="m-sep" aria-hidden="true" />
+              <span>{t("meet.meter.auto")}</span>
+            </>
+          )}
+          <span className="m-sep" aria-hidden="true" />
+          <span>{t("meet.meter.keys")}</span>
+        </div>
+      </div>
       <MemoryWindow />
     </MeetWorkspaceProvider>
   );

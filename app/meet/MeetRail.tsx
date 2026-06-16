@@ -19,10 +19,12 @@ import { useToolbar } from "@react-aria/toolbar";
 import { MEET } from "@/lib/meet/copy.ts";
 import { useMeetWorkspace, type SurfaceKey } from "./MeetWorkspaceContext.tsx";
 
+// 墨工房 文言実験 第1手: rail は短語（MEET.rail）— canvas の見出しとは別系統。
+// glyph(◆/◇)＋配置＋短語の三層で語るので、ラベル単体の完璧な明快さは要らない。
 const SURFACES: { key: SurfaceKey; label: string }[] = [
-  { key: "antenna", label: MEET.home.place.heading },
-  { key: "proposals", label: MEET.home.proposals.heading },
-  { key: "talk", label: MEET.home.signals.heading },
+  { key: "antenna", label: MEET.rail.antenna },
+  { key: "proposals", label: MEET.rail.finds },
+  { key: "talk", label: MEET.rail.talk },
 ];
 
 export function MeetRail() {
@@ -60,10 +62,10 @@ export function MeetRail() {
           {/* 接続の点 — つながっていれば灯る（worker-health の系譜・静止）。 */}
           <span className="m-rail-stat" data-on={connected} aria-hidden="true" />
         </button>
-        {/* はじめかたは既存ルートへの導線（canvas 面でない）。 */}
+        {/* Setup（旧 はじめかた）は既存ルートへの導線（canvas 面でない）。 */}
         <Link className="m-rail-item m-rail-aux m-rail-link" href="/meet/start/">
           <span className="m-rail-mark" aria-hidden="true" />
-          <span className="m-rail-label">{MEET.nav.start}</span>
+          <span className="m-rail-label">{MEET.rail.setup}</span>
         </Link>
       </div>
     </nav>

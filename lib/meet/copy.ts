@@ -37,6 +37,19 @@ export const MEET = {
   /** 視覚一新 — footer mark (the registry's existing name, quiet). */
   footerKk: "PX Registry KK",
 
+  /** 墨工房 文言実験 第1手（Hiroto 裁定 2026-06-16）— rail の短語。
+   *  これは「命名の最終」ではなく、墨の工房で言葉がどこまで減らせるかの実験
+   *  （glyph ◆/◇ ＋ outline ring ＋ 色ドットが意味を語る今、説明見出しを短語へ）。
+   *  canvas の見出し（home.proposals.heading 等）とは別系統：rail だけを短語にする
+   *  ——道具は短語・状態は glyph・順序は配置の三層で語る。window は あなたのAI を
+   *  据置（rail 内で一つだけ日本語＝所有格のアクセント・意図的）。 */
+  rail: {
+    antenna: "Antenna",
+    finds: "Finds",
+    talk: "Talk",
+    setup: "Setup",
+  },
+
   /** 境界の脚注 — 初回は開いて見せ、以降は畳む。 */
   boundaryTitle: "PXのやくそく",
 
