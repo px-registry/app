@@ -130,8 +130,19 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   24px・gap・FAB safe-area）を全ページへ昇格（[data-page=start] 限定を解放）。カード3種は適合
   箇所のみ＝概念は Setup の Antenna/Run だけ、feed/list 面（RESTING/proposals/threads/Memory list）
   は既存 m-item/m-proposal/m-q で3種に押し込めず（新 list/feed パターンは未追加）。before/after
-  スクショ r2layout-before-*／-after-*。Setup 回帰なし。layout/CSS のみ・copy 不変・本番 deploy
-  せず（branch 止め）。**本番反映は owner Go 待ち（copy+layout まとめ・rollback 9d0069e8）。**
+  スクショ r2layout-before-*／-after-*。Setup 回帰なし。layout/CSS のみ・copy 不変。
+- **本番反映（2026-06-17・px-r15 を `8c4efc0` へ）**: copy 再編＋layout をまとめて反映。積載＝
+  rail統一→Memory h1→表層語彙→Setup再編→呼び名カード→layout Phase1/2。**migration ゼロ
+  （98ad83a↔8c4efc0 差分に migrations/functions/.sql 一切なし・D1 非接触・copy/CSS/layout のみ）。**
+  - 新 live deployment ID `0ef4646b-2be1-4066-8ad4-90a63177a0bc`（8c4efc0）。
+    **rollback 座標 = 直前の `9d0069e8-0aee-4187-9422-32d239d3514f`（98ad83a・表層語彙統一）**。
+  - STEP 1 ゲート（CC 実測 9/9）: Setup の「あなたのAIからつなぐ」展開→接続URL（伏せ形）＋
+    「接続URLをコピー」描画＋コピー動作。スクショ r2layout-mcp-open-viewport/full。
+  - 検証分担: 無認証401・deploy live・新ID・rollback健在・_headers(HTML no-cache/即時 revalidate・
+    /_next immutable) は CC 実測済（deploy 前 tsc0・test613/613・ws-smoke75/75・実機 MCP 9/9）。
+    認証200・各面の実機（Setup/Antenna/Finds/Talk/Memory 表示・MCP 開閉・Run/+Antenna・sumi・
+    モバイル）は Hiroto のブラウザ（bot を本番に当てない）。**初回はテスターに Ctrl+F5 周知**
+    （既にキャッシュ済み端末向け・新規端末は _headers の no-cache で即取得）。
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
   **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
   内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・
