@@ -710,10 +710,11 @@ html[data-ws] .m-nav-top {
   border-top-color: var(--card-top);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-1);
-  padding: 1.2rem 1.25rem;
+  /* layout 体系便 Phase 2（Hiroto Go 2026-06-17）: カード内 24px を全ページへ昇格。 */
+  padding: var(--card-pad);
 }
 .m-card + .m-card {
-  margin-top: 0.75rem;
+  margin-top: var(--card-gap);
 }
 
 /* ── カード3種（layout 体系便・Hiroto Go 2026-06-17）────────────────────────────────
@@ -731,11 +732,8 @@ html[data-ws] .m-nav-top {
   /* 実体面のまま（番号カードと同じ raise）— 役割の違いは「入力を持つ」点で語る。 */
 }
 
-/* Phase 1: 読み柱 880・カード内 24px・対カード等高は Setup に限定して適用する
-   （他ページは Phase 2 で同じ型へ昇格。ここでは [data-page=start] 配下だけが変わる）。 */
-.m-ws-canvas[data-page="start"] .m-card {
-  padding: var(--card-pad);
-}
+/* Phase 2: 読み柱 880・カード内 24px は全ページへ昇格済（.m-card / .m-ws-canvas が直接参照）。
+   Phase 1 の [data-page="start"] 限定スコープは解放した。 */
 
 /* ── Setup の扉（第3手 ②・案A 2026-06-16）— 二重框を入れ子で解く ─────────────────
    二扉は同格の入口のまま（R2 GOAL 保持）。「このページで使う」扉だけ details にして、
@@ -1793,14 +1791,10 @@ textarea.m-field {
   .m-rail-aux .m-rail-mark {
     opacity: 0.7;
   }
+  /* layout 体系便 Phase 2（Hiroto Go 2026-06-17）: 読み柱 880 を全ページへ昇格。 */
   .m-ws-canvas {
     flex: 1 1 auto;
     min-width: 0;
-    max-width: 820px; /* Phase 2 で var(--ws-canvas-max) へ昇格（他ページ込み）。今は不変。 */
-  }
-  /* layout 体系便 Phase 1（Hiroto Go 2026-06-17）: 読み柱 880 を Setup だけに先行適用。
-     他ページ（820）は Phase 2 で同トークンへ昇格する（Phase 1 は Setup 以外不変）。 */
-  .m-ws-canvas[data-page="start"] {
     max-width: var(--ws-canvas-max);
   }
   /* サブページ統一便: 記憶 canvas は主柱/側柱の二段組（.m-mem 8fr/4fr）— 読み柱より
