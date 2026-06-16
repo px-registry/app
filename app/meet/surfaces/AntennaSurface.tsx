@@ -140,8 +140,8 @@ export function AntennaSurface() {
         {!ready && (
           <div className="m-empty" style={{ marginTop: "0.75rem", textAlign: "left" }}>
             {/* c12-4: each row carries its own 導線 — the key/memory rows land
-                on their はじめかた step, the name row lands on the 記憶 name
-                field (it lives there, not on はじめかた). */}
+                on their Setup step; the name row lands on Setup の呼び名カード
+                (#name)（(a) 2026-06-16: 着地を Setup に揃えた・実体は Memory と共用）。 */}
             <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
               {!connected && (
                 <li>
@@ -159,8 +159,10 @@ export function AntennaSurface() {
               )}
               {displayName === "" && (
                 <li>
+                  {/* (a)（Hiroto 確定 2026-06-16）: 文面が Setup と言う以上、着地も Setup へ。
+                      Setup 内の呼び名カード（#name）は Memory と同じ store を共用。 */}
                   {MEET.receive.needName}{" "}
-                  <Link className="m-rowlink" href="/meet/memory/#name">
+                  <Link className="m-rowlink" href="/meet/start/#name">
                     {MEET.receive.nameWhere}
                   </Link>
                 </li>

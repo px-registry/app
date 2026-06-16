@@ -6,6 +6,7 @@ import { PortConnect } from "./PortConnect.tsx";
 import { PageDoor } from "./PageDoor.tsx";
 import { BoundaryNote } from "../BoundaryNote.tsx";
 import { MeetWorkspace } from "../MeetWorkspace.tsx";
+import { NameField } from "../NameField.tsx";
 
 // R1.5 はじめかた — the three steps as a single quiet scroll. Step 2 (cold-start
 // paste-back) is live; step 1 gains the key widget in Slice 3; step 3 links to
@@ -72,6 +73,13 @@ export default function MeetStart() {
             <PortConnect />
           </details>
         </div>
+      </section>
+
+      {/* 表層語彙統一便 第2手 (a)（Hiroto 確定 2026-06-16）: 呼び名は初期設定として Setup の
+          一部 — 警告文「Setupで設定できます。」の着地点（#name）。実体は Memory 側 store と
+          共用（NameField・データ二重化なし）。Memory ページの呼び名編集はそのまま残る。 */}
+      <section className="m-section" id="name">
+        <NameField />
       </section>
 
       <BoundaryNote lines={[MEET.boundary.memory, MEET.boundary.holds, MEET.boundary.ai]} />

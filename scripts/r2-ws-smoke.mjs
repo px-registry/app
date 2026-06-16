@@ -143,6 +143,20 @@ ok(await page.evaluate(() => document.querySelector("#step-key")?.closest(".m-do
   "#step-key 深リンクでその扉が開く（沈黙の禁止）");
 ok(await page.locator("#step-key").isVisible(), "深リンク先の手順が画面に見える");
 
+// 11b) 表層語彙統一便 第2手 (a)（Hiroto 確定 2026-06-16）: 呼び名カードを Setup 内に追加
+//      （実体は Memory 側 store と共用・データ二重化なし）。警告文「Setupで設定できます。」
+//      の着地点（#name）。深リンクで画面に見える。
+await page.goto(`${BASE}start/#name`, { waitUntil: "networkidle" }).catch(() => {});
+await page.waitForTimeout(150);
+ok(await page.locator("#name .m-card h2").filter({ hasText: "呼び名" }).count() === 1, "Setup に呼び名カード（#name）");
+ok(await page.locator("#name input.m-field").count() === 1, "呼び名カードに入力欄");
+ok(await page.locator("#name").isVisible(), "#name 深リンク先の呼び名カードが画面に見える");
+// 警告文（home の !ready）の名前行リンクは Setup#name へ向く
+await page.goto(BASE, { waitUntil: "networkidle" }).catch(() => {});
+const nameHref = await page.locator('a.m-rowlink[href*="#name"]').first().getAttribute("href").catch(() => "");
+ok(typeof nameHref === "string" && nameHref.includes("/meet/start/#name"),
+  `警告の呼び名リンクは Setup へ（${nameHref}）`);
+
 // 12) サブページ統一便（道B・Hiroto 裁定 2026-06-16）: 記憶・Setup も rail を着る。
 //     旧 MeetNav は data-ws で退場。あなたのAI FAB はどのページからでも開く。
 for (const [path, name] of [["start/", "Setup"], ["memory/", "Memory"]]) {
