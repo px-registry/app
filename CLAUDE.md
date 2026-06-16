@@ -75,6 +75,16 @@ npx wrangler pages deploy out --project-name px-r15 --branch stage-r15-five-test
   不足新文は STOP④・「世界中」は UI 不可=ブランド層）／Antenna 見出し・探しにいく（ひらがな）対ボタン・
   時間帯 placeholder v1。**能動側テーマ語は空席（命名台帳・設計役）— 観察項目: テスターが
   「探してもらう」をどう言い換えるか**。
+- **墨工房 cutover（2026-06-16・本番反映＝px-r15 を `24641ff` へ）**: ワークスペース器＋墨テーマ
+  composer UI 語彙（◆/◇・outline ring・色ドット）＋rail 短語（Antenna/Finds/Talk/Setup・あなたのAI は
+  FAB）＋入力欄を箱に＋Setup 案A（二扉＋details 入れ子）。**migration ゼロ（live↔HEAD 完全一致・D1 非接触）。**
+  - 旧 live `4e04651` の「探しにいく」失敗の真因＝**旧 storage 層の例外**（LLM は 200 成功・shelf.add=IndexedDB
+    書込で throw → errorCode "unknown"）。HEAD が storage 層を作り直し済み（**IndexedDB VERSION 5→7**・
+    onupgradeneeded で既存ストア不触＝データ消失なし）＝cutover が修正。D1・鍵・CORS は無関係（実測 200）。
+  - **rollback 座標（即戻し）**: 旧 live deployment ID `94c0613a-97c7-45f8-b139-79ad5860a055`（commit 4e04651）。
+    新 live `2bca88bb-...`（24641ff）。戻すなら Cloudflare ダッシュボード rollback。
+  - 検証分担: 無認証401・deploy live は CC 実測済。認証200・rail4道具・紙↔墨・FAB・「探しにいく成功」・
+    IDB 前進は Hiroto のブラウザ（鍵・合鍵は端末／bot を本番に当てると owner token を mint し気配を曇らせる）。
 - **次便 = 記憶装置（合流点）**: 指示書 `C:\Users\User\Desktop\PX_MEMORY_DEVICE_thread_v0.1.md`。
   **設計対話から・実装は Hiroto Go・フレッシュセッション推奨**。合流する既存部品: port 六道具の
   内側再利用（常駐対話窓=UI規格同格原則）・0013 パスフレーズ封緘（鍵部品は本番稼働済）・
