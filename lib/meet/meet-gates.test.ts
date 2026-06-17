@@ -165,10 +165,9 @@ test("M-7: the Antenna 面 verbs are [Run] [＋Antenna]; the 聞く-era wording 
     MEET.home.question.placeholderEvening,
     "今夜は、どんな話ができる人がいたらいいですか。",
   );
-  assert.equal(
-    MEET.home.question.placeholderNight,
-    "静かな時間ですね。気になっていることを、書き置きしておきませんか。",
-  );
+  // 期待の追従（copy 微修正便・Hiroto 2026-06-17）: 夜だけ誘い語尾「〜しませんか」だったのを、
+  // 他の時間帯と同じ問い形へ。PX UI 憲法（押しつけない・短く）。
+  assert.equal(MEET.home.question.placeholderNight, "今日は何を始めますか？");
   assert.equal(questionPlaceholderByHour(7), MEET.home.question.placeholderMorning);
   assert.equal(questionPlaceholderByHour(13), MEET.home.question.placeholderDaytime);
   assert.equal(questionPlaceholderByHour(20), MEET.home.question.placeholderEvening);

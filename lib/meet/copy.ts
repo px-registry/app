@@ -84,7 +84,7 @@ export const MEET = {
       placeholderEvening: "今夜は、どんな話ができる人がいたらいいですか。",
       // 深夜文は 2026-06-13 言い換え（黄・傾きA）: Claude の深夜挨拶の声と離す
       // （敬意は保つ — 真似ない、が原則）。「書き置き」はアンテナ=留守中も働く札の比喩。
-      placeholderNight: "静かな時間ですね。気になっていることを、書き置きしておきませんか。",
+      placeholderNight: "今日は何を始めますか？",
     },
     // 主動詞（Hiroto 確定）: 結果を約束せず行為だけを名指す。探すのであって、
     // つながるとは言わない。「今日は無い」が返っても嘘にならない名前。英語化する日は "Go find"。
@@ -138,12 +138,12 @@ export const MEET = {
       subnote: "あなたのAIがRunで見つけたものが、ここに並びます。",
       /** 空状態は二分岐: 記憶未整備 / 整備済みでまだ探していない（第9便 A）。 */
       emptyNoMemory: "まだ提案はありません。Memoryができたら、ここに届きます。",
-      emptyReady: "まだ何もありません。見つけてほしいことを書いて「探しに行く」と、あなたのAIがここに提案を並べます。",
+      emptyReady: "まだありません。Runで見つけたものがここに並びます。",
       noneToday: "今日は無い、という日もあります。",
       orderNote: "新しく届いた順です。順番に意味はありません。",
       // 表層語彙統一便 第2手（Hiroto 確定）: モデル名の生々しさを畳む — 常に「あなたのAI」。
       modelNote: (_label: string): string => "あなたのAIが読みました",
-      manualLabel: "探しに行きました",
+      manualLabel: "Run",
       // 見回り退場（Hiroto 確定）: 自動巡回の概念語は Run へ。
       patrolLabel: (q: string): string => `Antenna「${q}」のRun`,
       rawShow: "そのままの返事を見る",
@@ -291,7 +291,7 @@ export const MEET = {
       title: "あなたのAI",
       /** 便b 候補（要 Hiroto 確認・STOP④）— 窓の招き・未接続・初見・開閉の語。 */
       placeholder: "話しかけてみてください。記憶のこと、探したい人のこと。",
-      offline: "あなたのAIをつなぐと、ここで話せます。",
+      offline: "AIをつなぐと使えます。",
       intro: "あなたのAIです。記憶を読み、いっしょに探せます。",
       open: "あなたのAIをひらく",
       minimize: "閉じる",
@@ -665,8 +665,8 @@ export const MEET = {
     talk: "Talkを始める",
     /** c18: ペア単位の状態だと読める形（カード単位でない — edge単位化は R2）。 */
     talkSent: "Talkを始めたいと伝えてあります。",
-    talkNote: "押すと、相手にTalkが届きます。連絡先はまだ伝わりません。",
-    mutualNote: "おたがいが押したら、連絡のメモを交換できます。",
+    talkNote: "連絡先はまだ伝わりません。",
+    mutualNote: "Talkが始まると、連絡のメモを交換できます。",
     /** 第7便 D — basisItemId の項目1件だけを開く折りたたみ。 */
     basisShow: "相手の候補から",
     readings: {

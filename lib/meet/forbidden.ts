@@ -30,6 +30,11 @@ export const FORBIDDEN_TERMS: readonly string[] = [
   // 退場（Hiroto 2026-06-17・命名ゲート通過）: 旧「話してみる」→ Talk 語へ統一。
   // 「押した/誘導/説明」型でなく「状態を静かに示す」型へ（PX UI 憲法: ユーザーへの信頼）。
   "話してみる",
+  // copy 微修正便（Hiroto 2026-06-17）: 「話せる」（peer presence 風味）・「見回り」（自動巡回の旧概念語→Run）
+  // を user-facing から恒久排除。いずれも現状 copy 値には無く、コメントは scan が strip するので安全。
+  // ※「下地」は Memory 移行語として文脈依存が残るため今回は追加しない（Hiroto 指定）。
+  "話せる",
+  "見回り",
   // JA — labour / employment-placement safety
   "採用",
   "推薦",
