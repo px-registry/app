@@ -9,7 +9,7 @@
 //
 // Imports は top-level lib/ への相対（Pages の esbuild は @ alias を持たない — _meet.ts と同じ）。
 
-import { json, type MeetEnv, isAllowedWriteOrigin } from "./_meet.ts";
+import { json, type MeetEnv, isAllowedWriteOrigin, MAX_CIPHERTEXT_B64 } from "./_meet.ts";
 import { readSession, type AuthEnv } from "./_auth.ts";
 import { isPublicEncJwk, parseEncPub } from "../lib/meet-crypto/keys.ts";
 import {
@@ -20,17 +20,22 @@ import {
   validPubStr,
   verifyMeshSig,
   mintOwnerRef,
+  mintPayloadId,
   MAX_MESH_PUB,
   MAX_LABEL,
   MESH_TS_SKEW_MS,
 } from "../lib/meet-crypto/mesh.ts";
 
+/** Phase B handoff: 72h hard TTL / chunk 上限（≒768KB bundle）。 */
+export const HANDOFF_TTL_HOURS = 72;
+export const MAX_HANDOFF_CHUNKS = 64;
+
 // 純粋ロジック（形ガード・署名検証・上限）は lib/meet-crypto/mesh.ts に住み、ここで re-export。
 // このファイルには D1/identity を要すヘルパー（verifySignedRequest / activeEpoch / rotateEpoch /
 // sessionHandle …）だけを足す。
 export { json, isAllowedWriteOrigin, isPublicEncJwk, parseEncPub };
-export { isOwnerRef, isDeviceId, isMeshPayloadId, isB64, validPubStr, verifyMeshSig, mintOwnerRef };
-export { MAX_MESH_PUB, MAX_LABEL, MESH_TS_SKEW_MS };
+export { isOwnerRef, isDeviceId, isMeshPayloadId, isB64, validPubStr, verifyMeshSig, mintOwnerRef, mintPayloadId };
+export { MAX_MESH_PUB, MAX_LABEL, MESH_TS_SKEW_MS, MAX_CIPHERTEXT_B64 };
 
 // MeshEnv は BOARD（D1）＋ AUTH/AUTH_SECRET（passkey session 検証）を持つ。
 // bootstrap の identity root は **passkey session**（ownerToken ではない・A.1 裁定 2026-06-17）。

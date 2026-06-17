@@ -39,8 +39,9 @@ function ok(r: MeshHttpResult): r is MeshHttpResult & { data: Record<string, unk
   return r.ok && r.data !== null && r.data.ok === true;
 }
 
-/** device_sig 署名つきの要求エンベロープを組む（dataStr を直接署名＝再直列化ずれを避ける）。 */
-async function signedBody(deviceId: string, sigPriv: JsonWebKey, data: unknown): Promise<{
+/** device_sig 署名つきの要求エンベロープを組む（dataStr を直接署名＝再直列化ずれを避ける）。
+ *  Phase B（handoff）も同じ署名形を使う — export して共有。 */
+export async function signedRequest(deviceId: string, sigPriv: JsonWebKey, data: unknown): Promise<{
   dataStr: string;
   ts: number;
   deviceId: string;
@@ -89,18 +90,18 @@ export async function ensureRegistered(label = ""): Promise<MeshIdentityV1 | nul
   if (res.data.existing === true) return null;
 
   // private 鍵と身元は端末にだけ保管（登録成功後・サーバ authoritative の owner_ref を使う）。
-  await openMeshDevice().set({ sig: keys.sig, enc: keys.enc });
+  await openMeshDevice().set({ deviceId, sig: keys.sig, enc: keys.enc });
   await openMeshEpochs().put({ epoch: 1, pub: epoch1.pub, priv: epoch1.priv });
   await idStore.set(ownerRef, deviceId);
   return { entryId: "self", ownerRef, deviceId };
 }
 
-/** 自分の接続済み端末一覧（署名つき）。身元/鍵が無ければ null（mock 表示）。 */
+/** 自分の接続済み端末一覧（署名つき）。身元（=registered）/鍵が無ければ null（mock 表示）。 */
 export async function loadDevices(): Promise<MeshDeviceView[] | null> {
   const id = await openMeshIdentity().get();
   const dev = await openMeshDevice().get();
   if (id === null || dev === null) return null;
-  const body = await signedBody(id.deviceId, dev.sig.priv, {});
+  const body = await signedRequest(dev.deviceId, dev.sig.priv, {});
   const res = await meshPost("/api/mesh/devices", body);
   if (!ok(res) || !Array.isArray(res.data.devices)) return null;
   const out: MeshDeviceView[] = [];
@@ -128,7 +129,7 @@ export async function revokeDevice(targetDeviceId: string): Promise<{ ok: boolea
   const dev = await openMeshDevice().get();
   if (id === null || dev === null) return { ok: false };
   const next = await mintEncKeyPair();
-  const body = await signedBody(id.deviceId, dev.sig.priv, {
+  const body = await signedRequest(dev.deviceId, dev.sig.priv, {
     targetDeviceId,
     newEpochPub: encPubToString(next.pub),
   });

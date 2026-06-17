@@ -349,17 +349,26 @@ HandoffBundleV1 = {
 QR は **pairing nonce だけでは不足**。QR 自身に新端末の公開鍵まで載せ、**それを信頼起点**にする：
 ```
 HandoffQRV1 = {
-  sessionId,           // この handoff セッション id
+  v: 1,
+  did,                 // 新端末 device_id（device-add / 宛先に使う）
+  sid,                 // この handoff セッション id（sessionId）
   nonce,               // 短命 pairing nonce
-  newDeviceEncPub,     // ★新端末の device_enc 公開鍵（束はこれ宛に封緘する）
-  newDeviceSigPub,     // ★新端末の device_sig 公開鍵（または fingerprint）
-  expiry,              // QR の失効時刻（短命）
+  encPub,              // ★新端末の device_enc 公開鍵（束はこれ宛に封緘する）
+  sigPub,              // ★新端末の device_sig 公開鍵（QR 署名の検証鍵）
+  exp,                 // QR の失効時刻（epoch ms・短命）
   name?,               // 任意の端末名（表示用）
+  sig,                 // ★新端末 sig priv による QR 署名（{did,sid,nonce,encPub,exp} を縛る）
 }
 ```
-- **既存端末は QR 内の `newDeviceEncPub` へ handoff bundle を封緘する**（QR を読んだ事実が信頼起点）。
+- **QR は新端末が自分の sig priv で署名する**（裁定 B-1 条件2）。既存端末は **sigPub で QR 署名を検証**してから受理
+  — 形・期限・署名のいずれかが破れたら拒否（差し替え／改竄／失効を弾く）。
+- **既存端末は QR 内の `encPub` へ handoff bundle を封緘する**（QR を読んだ事実が信頼起点）。
 - **server から後取得した公開鍵を handoff の信頼起点にしない**（rogue 公開鍵の差し込みを断つ）。
-  device-add 登録時の sig_pub/enc_pub は QR の値と**一致検証**する。
+  device-add 登録時の sig_pub/enc_pub は QR の値（client が一致使用）。
+
+> ✅ **Phase B 実装済み（2026-06-17・裁定 B-1）**: possession は **sig（fetch/ack を device_sig 署名・サーバ検証）
+> ＋ enc（QR encPub 封緘ゆえ enc_priv 保有者だけが復号）**。client は復号成功後にだけ ack。
+> **`proof_hash` 列は足さない**（server-verifiable enc-possession は Phase B の load-bearing でない）。
 
 ### 5.2 手順（port-once）
 ```

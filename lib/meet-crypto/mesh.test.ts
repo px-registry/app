@@ -5,6 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   mintDeviceKeys,
@@ -19,6 +20,8 @@ import {
   isDeviceId,
   isMeshPayloadId,
   validPubStr,
+  buildHandoffQR,
+  parseHandoffQR,
 } from "./mesh.ts";
 import { mintEncKeyPair, parseEncPub, encPubToString } from "./keys.ts";
 
@@ -76,4 +79,59 @@ test("DM-crypto 6: jwkFingerprint is deterministic 64-hex over public coords", a
   const f2 = await jwkFingerprint(sig.pub);
   assert.equal(f1, f2, "deterministic");
   assert.match(f1, /^[0-9a-f]{64}$/, "sha-256 hex");
+});
+
+// ── Phase B: QR 束縛 handoff（verdict G1）─────────────────────────────────────────
+
+async function newDeviceQR(now: number, ttlMs = 72 * 3600 * 1000, name?: string) {
+  const keys = await mintDeviceKeys();
+  const did = mintDeviceId();
+  const qr = await buildHandoffQR(did, encPubToString(keys.enc.pub), encPubToString(keys.sig.pub), keys.sig.priv, now + ttlMs, name);
+  return { keys, did, qr };
+}
+
+test("DM-handoff 1: build → parse round-trip（形・期限・QR 署名すべて通る）", async () => {
+  const now = 1_700_000_000_000;
+  const { did, qr } = await newDeviceQR(now, 72 * 3600 * 1000, "MacBook");
+  const parsed = await parseHandoffQR(JSON.stringify(qr), now);
+  assert.notEqual(parsed, null, "valid QR parses");
+  assert.equal(parsed?.did, did);
+  assert.equal(parsed?.name, "MacBook");
+  assert.equal(parsed?.encPub, qr.encPub, "封緘宛先 encPub は QR の値");
+});
+
+test("DM-handoff 2: 期限切れ QR は拒否（null）", async () => {
+  const now = 1_700_000_000_000;
+  const { qr } = await newDeviceQR(now, -1000); // exp は now より前
+  assert.equal(await parseHandoffQR(JSON.stringify(qr), now), null, "expired QR refused");
+});
+
+test("DM-handoff 3: QR 署名改竄は拒否（encPub 差し替え → 署名不一致）", async () => {
+  const now = 1_700_000_000_000;
+  const a = await newDeviceQR(now);
+  const b = await newDeviceQR(now);
+  // server/network が encPub を別端末の鍵に差し替えた想定 — QR 署名が合わなくなる。
+  const tampered = { ...a.qr, encPub: b.qr.encPub };
+  assert.equal(await parseHandoffQR(JSON.stringify(tampered), now), null, "swapped encPub fails QR signature");
+  // sig 自体の改竄も拒否。
+  const tamperedSig = { ...a.qr, sig: b.qr.sig };
+  assert.equal(await parseHandoffQR(JSON.stringify(tamperedSig), now), null, "swapped signature refused");
+});
+
+test("DM-handoff 4: sigPub 差し替え（別鍵での検証）は拒否", async () => {
+  const now = 1_700_000_000_000;
+  const a = await newDeviceQR(now);
+  const b = await newDeviceQR(now);
+  const swapped = { ...a.qr, sigPub: b.qr.sigPub }; // 別鍵で検証 → a.sig は通らない
+  assert.equal(await parseHandoffQR(JSON.stringify(swapped), now), null, "verifying with a foreign sigPub fails");
+});
+
+test("DM-handoff 5: handoff は QR encPub にだけ封緘する（server 後取得鍵を信頼起点にしない・G1）", () => {
+  const src = readFileSync(new URL("../meet-mesh/handoff.ts", import.meta.url), "utf8");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(/parseEncPub\(\s*qr\.encPub\s*\)/.test(code), "封緘宛先は QR encPub");
+  // recipient の公開鍵を server から後取得する経路を持たない（差し替え不可の構造的担保）。
+  assert.ok(!/meshGet/.test(code), "no meshGet (server-fetched key) in handoff");
+  assert.ok(!/getEpochPub/.test(code), "no getEpochPub for the recipient in handoff");
+  assert.ok(!/enckey/i.test(code), "no enckey fetch in handoff");
 });

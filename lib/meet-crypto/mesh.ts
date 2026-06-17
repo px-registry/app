@@ -130,3 +130,85 @@ export async function verifyMeshSig(
     return false;
   }
 }
+
+// ── Phase B: QR 束縛 handoff（verdict G1）─────────────────────────────────────────
+// QR は新端末が作り、自分の sig priv で {did,sid,nonce,encPub,exp} を署名する。
+// 既存端末は **QR 内の encPub** へ bundle を封緘する（server 後取得鍵を信頼起点にしない）。
+// QR 署名で「この QR は encPub/sigPub の保有者が作った」を縛る（差し替え検知）。
+
+export type HandoffQRV1 = {
+  v: 1;
+  did: string; // 新端末 device_id（dev_…）
+  sid: string; // session id（16 hex）
+  nonce: string; // pairing nonce（32 hex）
+  encPub: string; // 新端末 enc 公開 JWK（封緘宛先）
+  sigPub: string; // 新端末 sig 公開 JWK（QR 署名の検証鍵）
+  exp: number; // 失効時刻（epoch ms）
+  name?: string;
+  sig: string; // ECDSA over handoffQRSignBytes（sigPub で検証）
+};
+
+/** QR 署名の対象（最低 sessionId/nonce/encPub/expiry＋did を縛る）。 */
+export function handoffQRSignBytes(did: string, sid: string, nonce: string, encPub: string, exp: number) {
+  return new TextEncoder().encode(`pxmesh-handoff-qr:${did}\n${sid}\n${nonce}\n${encPub}\n${exp}`);
+}
+
+async function signHandoffQR(sigPriv: JsonWebKey, did: string, sid: string, nonce: string, encPub: string, exp: number): Promise<string> {
+  const key = await crypto.subtle.importKey("jwk", sigPriv, ECDSA_GEN, false, ["sign"]);
+  const sig = await crypto.subtle.sign(ECDSA_SIGN, key, handoffQRSignBytes(did, sid, nonce, encPub, exp));
+  return bytesToB64(new Uint8Array(sig));
+}
+
+async function verifyHandoffQRSig(sigPubJwk: JsonWebKey, sigB64: string, did: string, sid: string, nonce: string, encPub: string, exp: number): Promise<boolean> {
+  try {
+    const key = await crypto.subtle.importKey("jwk", sigPubJwk, ECDSA_IMPORT, false, ["verify"]);
+    return await crypto.subtle.verify(ECDSA_VERIFY, key, b64ToBytes(sigB64), handoffQRSignBytes(did, sid, nonce, encPub, exp));
+  } catch {
+    return false;
+  }
+}
+
+/** 新端末側: 自分の鍵で署名した QR を作る（exp は呼び出し側が now+TTL で渡す）。 */
+export async function buildHandoffQR(
+  did: string,
+  encPub: string,
+  sigPub: string,
+  sigPriv: JsonWebKey,
+  exp: number,
+  name?: string,
+): Promise<HandoffQRV1> {
+  const sid = hex(crypto.getRandomValues(new Uint8Array(8)));
+  const nonce = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const sig = await signHandoffQR(sigPriv, did, sid, nonce, encPub, exp);
+  const base: HandoffQRV1 = { v: 1, did, sid, nonce, encPub, sigPub, exp, sig };
+  return name ? { ...base, name: name.slice(0, MAX_LABEL) } : base;
+}
+
+/**
+ * 既存端末側: QR を検証して受理する。形・期限・**QR 署名（sigPub で検証）**をすべて通って初めて返す。
+ * server から後取得した鍵は一切使わない — 信頼起点は QR の中身だけ。失効・改竄は null。
+ */
+export async function parseHandoffQR(s: string, now: number): Promise<HandoffQRV1 | null> {
+  let v: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(s);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    v = parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (v.v !== 1) return null;
+  if (!isDeviceId(v.did)) return null;
+  if (typeof v.sid !== "string" || !/^[0-9a-f]{16}$/.test(v.sid)) return null;
+  if (typeof v.nonce !== "string" || !/^[0-9a-f]{32}$/.test(v.nonce)) return null;
+  if (!validPubStr(v.encPub) || !validPubStr(v.sigPub)) return null;
+  if (typeof v.exp !== "number" || !Number.isFinite(v.exp) || v.exp <= now) return null; // 失効
+  if (!isB64(v.sig)) return null;
+  const sigPubJwk = parseEncPub(v.sigPub);
+  if (sigPubJwk === null) return null;
+  const okSig = await verifyHandoffQRSig(sigPubJwk, v.sig, v.did, v.sid, v.nonce, v.encPub, v.exp);
+  if (!okSig) return null; // 署名改竄
+  const name = typeof v.name === "string" ? v.name.slice(0, MAX_LABEL) : undefined;
+  const out: HandoffQRV1 = { v: 1, did: v.did, sid: v.sid, nonce: v.nonce, encPub: v.encPub, sigPub: v.sigPub, exp: v.exp, sig: v.sig };
+  return name ? { ...out, name } : out;
+}

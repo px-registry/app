@@ -10,9 +10,12 @@ import type { KeyedBackend } from "./backend.ts";
 /** 身元 singleton: この端末の owner_ref と device_id。 */
 export type MeshIdentityV1 = { entryId: "self"; ownerRef: string; deviceId: string };
 
-/** device 鍵 singleton: sig(ECDSA)/enc(ECDH) の公開＋秘密（秘密は端末のみ）。 */
+/** device 鍵 singleton: device_id ＋ sig(ECDSA)/enc(ECDH) の公開＋秘密（秘密は端末のみ）。
+ *  device_id は鍵と同時に決まる（handoff の新端末は identity 確定前に署名 fetch するため、
+ *  ここに device_id を持つ）。 */
 export type MeshDeviceKeysV1 = {
   entryId: "self";
+  deviceId: string;
   sig: { pub: JsonWebKey; priv: JsonWebKey };
   enc: { pub: JsonWebKey; priv: JsonWebKey };
 };
