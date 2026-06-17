@@ -123,6 +123,8 @@ effective = min(KV:MESH_MODE, MESH_MODE_CAP)   # 弱い方が勝つ（cap を超
     ack / revoke / owner purge / expired cleanup / dual-read は gate 経路に **そもそも含めない**（flag に左右されない）。
 - **capability 表示の正直さ B**: `register`・`devices` 応答に `mode`・`writeAllowed` を同梱（server authoritative）。
   client（`SyncSection`）は `writeAllowed=false` のとき**「同期中」と言わない**（per-device label を抑止）＋ off 状態の一行を出す。
+  - **API contract（Go2 review 明記事項）**: **breaking 変更なし**。`register`/`devices` 応答に **additive な capability field**
+    （`mode`: "off"|"allowlist"|"on"・`writeAllowed`: bool）を追加した。既存 client は無視して従来どおり動く（後方互換）。
   → off 文言 `MEET.sync.offState` = **「同期はまだ有効ではありません。」**（Hiroto 確定 2026-06-18・命名ゲート通過・own-side・裏事情を説明しない）。
 - **検証（local/dev）**: endpoint smoke `scripts/r2-mesh-write-gate-smoke.mjs <al-deny|off|on|al-allow>`（26 検査）。
   bootstrap allowlist 外 handle→403・偽装 session→401・偽装 owner_ref 無視 も含む。
