@@ -96,11 +96,25 @@ check("E stale epoch put は 409", r.status === 409 && r.body?.error === "stale_
 // F) revoke は ACK 待ち集合から外す: 新 put → D2 ACK（2/3）→ D3 revoke → 残 active 2/2 で purge
 r = await putSelf(D1, 1, o1EpochPub); const pidF = r.body.payloadId;
 await ack(D2, [pidF]); check("F D2 ACK 後 D3 視点で残る（D3 未・revoke 前）", (await fetchN(D3)) === 1);
+// device-targeted（handoff）未配送を D3 に積む — revoke で purge されることを後で確認。
+{
+  const hs = await seal(pubStr(D3.encPub), MARKER + "::handoff");
+  await post("/api/mesh/handoff/put", await signed(D1.deviceId, D1.sigPriv, { toDevice: D3.deviceId, chunks: [{ ix: 0, of: 1, ...hs }] }));
+}
 // rotate に新 epoch pub が要る（revoke は rotate も行う）
 r = await post("/api/mesh/revoke", await signed(D1.deviceId, D1.sigPriv, { targetDeviceId: D3.deviceId, newEpochPub: await mintEpochPub() }));
 check("F D3 revoke 200", r.body?.ok === true, JSON.stringify(r));
 await ack(D2, [pidF]); // 再 ACK で purge 判定（active 2 == ack 2＝D1 自動+D2）
 check("F revoke 後 残 active 全 ACK で purge（D2 視点 0）", (await fetchN(D2)) === 0);
+
+// F2) revoked device は relay を読めない/ack できない（held を取れない・old key でも）
+r = await post("/api/mesh/relay/fetch", await signed(D3.deviceId, D3.sigPriv, {}));
+check("F2 revoked D3 の relay fetch は 401", r.status === 401, JSON.stringify(r));
+r = await ack(D3, [pidF]);
+check("F2 revoked D3 の relay ack は 401", r.status === 401, JSON.stringify(r));
+r = await post("/api/mesh/handoff/fetch", await signed(D3.deviceId, D3.sigPriv, {}));
+check("F2 revoked D3 の handoff fetch も 401", r.status === 401, JSON.stringify(r));
+console.log(`D3=${D3.deviceId}`); // bash: to_device=D3 の handoff が purge されたか確認
 
 // G) owner purge（exit-safe）: 新 epoch で put → D2 受信 → owner purge → D2 0
 //    revoke で epoch が 2 に上がっているので、現行 active epoch を GET で取り直す。
@@ -125,5 +139,5 @@ check("H peer F1 が受信（送信者 D1 は audience 外）", (await fetchN(F1
 check("H 送信者 D1 は peer payload を受信しない", (await fetchN(D1)) === 0);
 
 console.log(`MARKER=${MARKER}`);
-console.log(`\nPASS ${20 - failures}/20  (FAIL ${failures})`);
+console.log(`\nPASS ${23 - failures}/23  (FAIL ${failures})`);
 process.exit(failures === 0 ? 0 : 1);

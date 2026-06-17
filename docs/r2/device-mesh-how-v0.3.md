@@ -323,6 +323,14 @@ DELETE FROM r15_mesh_ack WHERE payload_id NOT IN (SELECT payload_id FROM r15_mes
   **expired は fetch で返さない**（取得不可）。後続で hard delete。
 - relay は cache であって**蓄積場でない**ことを `expires_at` で機械的に保証（numbers §gate）。
 
+> ✅ **TTL 14日の意味（裁定確定 2026-06-17・docs 固定）**：delta/talk の 14日は **配送窓**であって
+> **恒久保管ではない**。trade-off：
+> - 端末が最大 ~14日オフラインでも relay から追いつける。
+> - 暗号文の配送 cache は最大 14日サーバに残る（それ以上は残さない）。
+> - **14日を超えてオフラインだった端末は relay からは追いつけない** → その場合は **handoff（§5）/ 再同期 /
+>   owner backup（§3.6）**側で戻す。
+> UI 露出はまだ不要（観測されたら正直な一行で・presence にしない）。
+
 ### 4.7 per-device 配送状態（不変条件・STOP-E 裁定確定）
 - 状態は `r15_mesh_ack` に**端末ごと**＝最初の1台 ack で他端末が取り逃さない。
 - この状態は **purge 判定の内部資料**。fetch/put の応答にも、peer にも、UI の presence にも**出さない**。
@@ -435,11 +443,23 @@ type MemJournalRecordV2 = MemJournalRecordV1 & {
 ```
 
 ### 6.4 fold（順序非依存で収束）＋ 🟥 新 invariant（判定しない柱）
-既存 fold をそのまま使える（評価順を hlc に揃えるだけ）：
+既存 fold をそのまま使える：
 - **忘却 = forget event**（tombstone・物理削除しない）。`foldForgottenIds` が最新 event=forget を集約。
-- **訂正 = supersede chain**。`foldSupersededIds` が非 head を除外。
-- **surface/forget の競合**：同一 targetRef に複数端末から surface/forget が来たら **hlc 最新が勝つ**。
-- 収束保証：2端末が同じ record 集合に達すれば fold 結果は**同一**（CRDT 的・順序非依存の union＋last-writer-by-hlc）。
+- **訂正 = supersede chain**。`foldSupersededIds` が非 head を除外（**targetId / supersedes 関係で順序非依存に fold**）。
+- **surface/forget の競合**：同一 targetRef は **timeline キー最新が勝つ**（forget wins は fold の規則）。
+- 収束保証：2端末が同じ record 集合に達すれば fold 結果は**同一**（CRDT 的・順序非依存の union＋last-writer）。
+
+> ✅ **G3 順序材料の裁定確定（Phase C.1・2026-06-17・docs 実装整合）**：
+> - **現 Phase C/C.1 は `createdAt + recordId` を横断 timeline の決定的順序材料として許容**する
+>   （両端末で同値→同順→収束。journal V2 churn なし）。Talk timeline は `(at, entryId)`（同系）。
+> - **HLC module（`lib/meet-mesh/hlc.ts`）は実装・隔離済みで、因果順序が load-bearing になる将来のための機構**
+>   として保持（hlc があれば merge は hlc 優先・`createdAt` は補助/表示に降りる）。per-record HLC stamping は
+>   今は載せない（owner 自身の記憶では load-bearing でない）。
+> - **supersede / forget は targetId / tombstone 関係で順序非依存に fold**（到着順でない）。
+> - **HLC / createdAt / recordId / at いずれも timeline 収束専用**。ranking / matching / candidate quality に
+>   **一切流入させない**（下の不変＋ import 隔離テスト）。
+> ※ これは HOW v0.3 の「origin+hlc+recordId」に対する明示の Phase C 裁定（Hiroto 2026-06-17）。
+>   v0.3 どおりに戻すなら mesh delta に per-record HLC を載せる（別便）。
 
 > ✅ **新 invariant（裁定確定 2026-06-17・「判定しない」柱の延長）**：
 > dual-read（legacy＋mesh）と横断 merge の **時刻 / HLC / seq の順序材料は、timeline 収束専用**。
