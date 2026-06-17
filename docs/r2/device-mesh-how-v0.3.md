@@ -1,5 +1,9 @@
-# PX Device Mesh — Phase 0.5 HOW（実装前・草案 v0.3）
+# PX Device Mesh — Phase 0.5 HOW（実装 Phase A 着手・草案 v0.4）
 
+> **v0.4（2026-06-17）**: Phase A 実装＋**A.1 裁定**（bootstrap の identity root = passkey session・§3.4）。
+> register は passkey session 必須・`owner_ref` は handle に束ねる・`ownerToken` は補助 ID（一方向ハッシュのみ）。
+> UI 文言: 一覧の同期は状態 label「同期中」／pauseThis 確認は「同期を止める」／noDevice は一覧を隠す（§12）。
+>
 > **v0.3（2026-06-17）**: GPT crypto verdict ＝ **条件付き PASS**。5条件を §13 に**受け入れゲート**として
 > 焼き込み、関係する設計節（§2.4 expires_at/epoch・§3.5 rotation 順・§4.2 stale-epoch 拒否・§4.6 TTL 列・
 > §5.1b QR 束）を verdict 拘束へ更新。**次＝Hiroto STOP #0 → 実装発注書**（crypto/server 実装は未着手）。
@@ -193,9 +197,12 @@ WebCrypto の都合上 device key は **sig（ECDSA）と enc（ECDH）の2鍵**
 - **device key**：端末初期化で `device_sig`/`device_enc` を生成（`mintEncKeyPair` 流用＋ECDSA 生成を追加）。
   **private は IndexedDB のみ**（新 store `meshdevice`）。公開2鍵だけ device-add 時にサーバへ。
 - **content epoch keypair**：最初の端末が `mintEncKeyPair()` で epoch=1 を生成。private は IndexedDB（新 store `meshepoch`、複数 epoch を保持＝過去の暗号文も読める）。public を `r15_owner_epoch` に publish。
-- `owner_ref`：owner の安定公開 id。**epoch pub には縛らない**（rotation で壊れるため）。
-  導出案 = 初回端末で乱数 mint（不透明 16–32 hex）し `r15_owner` に登録、以後不変。
-  handle と束ねる場合は passkey assertion で `r15_owner.handle` に結ぶ（任意）。
+- `owner_ref`：owner の安定公開 id（不透明 32 hex）。**epoch pub には縛らない**（rotation で壊れるため）。
+  **サーバが mint し handle に束ねる**（A.1・§3.4）。以後不変。
+- `r15_owner.participant_ref` 列：**公開面 ref → owner_ref の写像補助**であり、**participantRef の昇格ではない**。
+  `ownerToken` の一方向ハッシュで埋める（任意・空可）。**backfill はしない**。公開面（pool/edge）との統合は
+  **Phase D / legacy 統合で別裁定**。三語は固定：`owner_ref`=身元/Mesh 正本／`participantRef`=公開面の識別子／
+  `device_id`=個別端末。
 
 > ✅ **STOP-A 裁定確定（2026-06-17）**：`owner_ref` を**新設**（既存非破壊）。`participantRef` を
 > owner_ref に昇格**しない**・本番生データの **backfill しない**。三語の役割を固定する：
@@ -216,13 +223,23 @@ WebCrypto の都合上 device key は **sig（ECDSA）と enc（ECDH）の2鍵**
 
 ### 3.4 device 追加（device-add）の認可
 新端末を owner の集合へ入れる瞬間は、**他人を混ぜない**ためのゲートが要る。二経路：
-1. **passkey 経由（初端末・または信頼端末ゼロからの再構築）**：passkey assertion（既存 `/api/auth/verify`）で
-   本人確認 → サーバが当該 handle/owner_ref 下に device_pub 登録を許可。
+1. **passkey 経由（初端末・または信頼端末ゼロからの再構築）**：**passkey session が identity root**。
+   register は `__px_session`（HMAC 署名 cookie・`/api/auth/verify` 後に発行）から handle を解決し、
+   `owner_ref` を **handle に束ねて** mint/lookup。**session が無ければ register は 401**
+   （production path で passkey なしの owner 作成は不成立）。
 2. **既存端末の署名経由（通常の増設）**：既存信頼端末が「add device {new sig_pub,new enc_pub}」を
    `device_sig` で署名 → サーバは署名を検証して登録。`added_by` に認可端末を記録。
 
 いずれも **content private はサーバを通らない**。サーバは「この公開鍵を持つ端末を owner 集合に入れてよい」
 という**認可の事実**だけを受ける。
+
+> ✅ **A.1 裁定確定（2026-06-17・bootstrap の identity root）**：
+> - **`owner_ref` は passkey-authenticated handle に紐づく**（`r15_owner.handle`）。register は session 必須。
+> - **`ownerToken` は identity root にしない** — 端末ローカル補助 ID。サーバへ来ても **bearer 相当**として扱い、
+>   **raw 保存しない・log に出さない・一方向ハッシュ（`deriveParticipantRef`=SHA-256）でのみ** `participant_ref`
+>   （公開面の写像補助）に使う。production auth root にしない。
+> - 受け入れ条件（A.1）: first owner/device が passkey owner に紐づく／passkey なしの register は
+>   production path で 401／tsc・test・build・ws-smoke・backend smoke green／本番 D1・deploy・main 非接触。
 
 ### 3.5 epoch rotation 手順（端末除去・定期巻き直し・verdict G2 拘束順）
 verdict G2 の順序を**この順で**踏む（前後させない）：
@@ -578,8 +595,9 @@ iPhone を外しますか？
 
 ### 一覧・入口・状態（確定トークン）
 - セクション見出し：`Sync`／接続ボタン：`端末をつなぐ`／一覧見出し：`接続済みの端末`／現端末印：`この端末`
-- per-端末トグル：`同期` / `同期しない`
+- 同期状態は **label「同期中」**（旧「同期」ボタンは action に見えて弱い・Hiroto 確定 2026-06-17）。off は `同期しない`。
 - 自分側の状態（§4.7）：`未送信` / `送信中` / `送った` / `送れませんでした` / `この端末に同期済み`
+- noDevice（既存端末なし）面では**端末一覧を隠す**（一覧との矛盾を消す・確定コピーは据置）。
 
 ### 連結フロー（確定 2026-06-17・`MEET.sync` ＋ SyncSection 反映済み）
 ```
@@ -607,7 +625,7 @@ QRの期限が切れたか、承認が完了しませんでした。もう一度
 〔この端末の同期を止める〕
 この端末への同期を止めます。
 この端末にまだ届いていない内容は削除されます。すでにこの端末やほかの端末に保存された内容は、それぞれの端末に残ります。
-（go/cancel は確定トークン流用: [同期しない][やめる]）
+[同期を止める] [やめる]   ← go は「同期を止める」（停止操作を名指す・Hiroto 確定 2026-06-17）
 ```
 > 足場での mock 状態機械: idle→[端末をつなぐ]→qr→[QRを表示]→approve→[追加する]→done／[やめる]→failed→
 > [もう一度QRを表示]→qr。qr→[復帰コードで戻る]→noDevice。実 QR・承認・配送は crypto/relay＝赤のため

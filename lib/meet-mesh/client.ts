@@ -21,9 +21,9 @@ import {
 } from "../meet-memory/index.ts";
 import {
   mintDeviceKeys,
-  mintOwnerRef,
   mintDeviceId,
   signMesh,
+  isOwnerRef,
 } from "../meet-crypto/mesh.ts";
 import { encPubToString, mintEncKeyPair } from "../meet-crypto/keys.ts";
 
@@ -54,8 +54,10 @@ async function signedBody(deviceId: string, sigPriv: JsonWebKey, data: unknown):
 
 /**
  * この端末を Mesh に bootstrap する（冪等）。既に身元があればそれを返す。
- * 無ければ device 鍵＋epoch=1 を生成し、公開鍵だけをサーバへ登録（private は端末に保管）。
- * label は端末名（owner 表示・任意）。失敗時 null（fail-closed・UI は mock 表示に留まる）。
+ * identity root = passkey session（サーバが handle に owner_ref を束ねる・A.1）。session が無ければ
+ * register は 401 → null（UI は mock 表示に留まる＝sign-in 前の正直な無状態）。
+ * 無ければ device 鍵＋epoch=1 を生成し、**公開鍵だけ**をサーバへ送る（private は端末に保管）。
+ * ownerToken は補助 ID として同送するだけ（サーバが一方向ハッシュで participant_ref 写像に使う）。
  */
 export async function ensureRegistered(label = ""): Promise<MeshIdentityV1 | null> {
   const idStore = openMeshIdentity();
@@ -63,15 +65,13 @@ export async function ensureRegistered(label = ""): Promise<MeshIdentityV1 | nul
   if (existing !== null) return existing;
 
   const ownerToken = getOrMintOwnerToken();
-  const ownerRef = mintOwnerRef();
   const deviceId = mintDeviceId();
   const keys = await mintDeviceKeys();
   // epoch=1 の content keypair（enc と同形の ECDH P-256）。
   const epoch1 = await mintEncKeyPair();
 
   const res = await meshPost("/api/mesh/register", {
-    ownerToken,
-    ownerRef,
+    ownerToken, // 補助のみ — サーバは handle（passkey）を identity root に使う
     device: {
       deviceId,
       sigPub: encPubToString(keys.sig.pub),
@@ -80,9 +80,15 @@ export async function ensureRegistered(label = ""): Promise<MeshIdentityV1 | nul
     },
     epochPub: encPubToString(epoch1.pub),
   });
-  if (!ok(res)) return null;
+  if (!ok(res)) return null; // 401 passkey_required 含む → mock のまま
 
-  // private 鍵と身元は端末にだけ保管（登録成功後）。
+  const ownerRef = typeof res.data.ownerRef === "string" && isOwnerRef(res.data.ownerRef) ? res.data.ownerRef : null;
+  if (ownerRef === null) return null;
+  // existing:true = この handle は既に別端末で bootstrap 済み → この端末は handoff（Phase B）で
+  // 合流すべき（register は 2 台目を登録しない）。未登録のまま身元を保存しない。
+  if (res.data.existing === true) return null;
+
+  // private 鍵と身元は端末にだけ保管（登録成功後・サーバ authoritative の owner_ref を使う）。
   await openMeshDevice().set({ sig: keys.sig, enc: keys.enc });
   await openMeshEpochs().put({ epoch: 1, pub: epoch1.pub, priv: epoch1.priv });
   await idStore.set(ownerRef, deviceId);

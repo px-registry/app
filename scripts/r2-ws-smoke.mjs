@@ -233,6 +233,7 @@ ok(await page.locator("#step-sync button", { hasText: "端末をつなぐ" }).co
 ok(await page.locator("#step-sync").getByText("接続済みの端末").count() === 1, "「接続済みの端末」一覧見出し");
 ok(await page.locator("#step-sync .m-badge").filter({ hasText: "この端末" }).count() === 1, "現端末に「この端末」印");
 ok(await page.locator("#step-sync .m-sync-row").count() >= 2, "一覧にモック端末が並ぶ");
+ok(await page.locator("#step-sync .m-sync-state").filter({ hasText: "同期中" }).count() >= 1, "同期状態は label「同期中」（action でなく状態）");
 // 自分側の事実のみ（STOP-E）— 相手の状態（既読/届いた/入力中）は画面に無い
 const syncText = await page.locator("#step-sync").innerText();
 ok(!/既読|届きました|入力中|オンライン/.test(syncText), "Sync 面に presence（相手の状態）は無い");
@@ -248,6 +249,7 @@ await page.locator("#step-sync button", { hasText: "復帰コードで戻る" })
 ok(await page.locator('#step-sync [role="dialog"]').getByText("接続済みの端末がありません。").count() === 1, "既存端末なしの面");
 ok(await page.locator('#step-sync [role="dialog"]').getByText("MemoryとTalkの履歴は戻せません", { exact: false }).count() === 1, "控えなしは履歴戻らない（正直文言）");
 ok(await page.locator("#step-sync button", { hasText: "新しく始める" }).count() === 1, "[新しく始める]");
+ok(await page.locator("#step-sync .m-sync-row").count() === 0, "noDevice 面では端末一覧を隠す（一覧との矛盾を消す）");
 await page.locator("#step-sync button", { hasText: "新しく始める" }).click();
 
 // 端末をつなぐ → QRを表示 → 承認の問い
@@ -270,10 +272,11 @@ ok(await page.locator('#step-sync [role="dialog"]').getByText("AIキーはまだ
 ok(await page.locator("#step-sync .m-sync-row").count() === rowsBefore + 1, "接続完了で一覧に端末が1台増える");
 await page.locator("#step-sync", { hasText: "つながりました。" }).getByText("あとで").click();
 
-// この端末の同期を止める（この端末のトグル → 確認）
-await page.locator("#step-sync .m-sync-row", { hasText: "この端末" }).getByText("同期", { exact: true }).click();
+// この端末の同期を止める（この端末の「同期中」label → 確認）
+await page.locator("#step-sync .m-sync-row", { hasText: "この端末" }).getByText("同期中", { exact: true }).click();
 ok(await page.locator('#step-sync [role="dialog"]').getByText("この端末への同期を止めます。").count() === 1, "この端末の同期を止める 確認");
 ok(await page.locator('#step-sync [role="dialog"]').getByText("それぞれの端末に残ります", { exact: false }).count() === 1, "止めても各端末に残る（正直文言）");
+ok(await page.locator('#step-sync [role="dialog"] button', { hasText: "同期を止める" }).count() === 1, "確認ボタンは「同期を止める」（設定値でなく停止操作）");
 await page.locator('#step-sync [role="dialog"] button', { hasText: "やめる" }).click();
 
 // 端末を外す（別端末＝二態の other 文）

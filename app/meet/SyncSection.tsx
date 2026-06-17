@@ -93,13 +93,6 @@ export function SyncSection() {
       if (id !== null) await refresh();
     })();
   };
-  const toggleDevice = (dev: MeshDevice): void => {
-    if (dev.here) {
-      setPauseOpen(true); // この端末の同期を止めるのは確認を挟む
-      return;
-    }
-    setDevices((d) => d.map((x) => (x.id === dev.id ? { ...x, syncing: !x.syncing } : x)));
-  };
   const confirmPause = (): void => {
     // 同期の persistence opt-in（local）。relay の停止は Phase C。
     setDevices((d) => d.map((x) => (x.here ? { ...x, syncing: false } : x)));
@@ -128,43 +121,56 @@ export function SyncSection() {
         {S.connect}
       </button>
 
-      <h3 className="m-h2" style={{ marginTop: "var(--stack)" }}>
-        {S.listHeading}
-      </h3>
-      <ul style={{ listStyle: "none", padding: 0, margin: "var(--space-1) 0 0" }}>
-        {devices.map((dev) => (
-          <li
-            key={dev.id}
-            className="m-sync-row"
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "var(--space-1) 0" }}
-          >
-            <span style={{ flex: 1, minWidth: 0 }}>
-              {dev.label}
-              {dev.here ? (
-                <span className="m-badge" style={{ marginLeft: "0.5rem" }}>
-                  {S.thisDevice}
+      {/* noDevice（既存端末なし）面では一覧を隠す — 一覧との矛盾を避ける（Hiroto 確定）。 */}
+      {step !== "noDevice" ? (
+        <>
+          <h3 className="m-h2" style={{ marginTop: "var(--stack)" }}>
+            {S.listHeading}
+          </h3>
+          <ul style={{ listStyle: "none", padding: 0, margin: "var(--space-1) 0 0" }}>
+            {devices.map((dev) => (
+              <li
+                key={dev.id}
+                className="m-sync-row"
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "var(--space-1) 0" }}
+              >
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  {dev.label}
+                  {dev.here ? (
+                    <span className="m-badge" style={{ marginLeft: "0.5rem" }}>
+                      {S.thisDevice}
+                    </span>
+                  ) : null}
                 </span>
-              ) : null}
-            </span>
-            <button
-              type="button"
-              className="m-btn m-btn-quiet"
-              style={{ whiteSpace: "nowrap" }}
-              onClick={() => toggleDevice(dev)}
-            >
-              {dev.syncing ? S.syncOn : S.syncOff}
-            </button>
-            <button
-              type="button"
-              className="m-btn m-btn-quiet"
-              style={{ whiteSpace: "nowrap" }}
-              onClick={() => setRemoveTarget(dev)}
-            >
-              {S.remove.action}
-            </button>
-          </li>
-        ))}
-      </ul>
+                {/* 同期状態は label「同期中」（旧「同期」ボタンは action に見えて弱い）。
+                    この端末だけ、押すと「同期を止める」確認へ（pauseThis）。他端末は静的 label。 */}
+                {dev.here ? (
+                  <button
+                    type="button"
+                    className="m-btn m-btn-quiet m-sync-state"
+                    style={{ whiteSpace: "nowrap" }}
+                    onClick={() => setPauseOpen(true)}
+                  >
+                    {dev.syncing ? S.syncingLabel : S.syncOff}
+                  </button>
+                ) : (
+                  <span className="m-badge m-sync-state" style={{ whiteSpace: "nowrap" }}>
+                    {dev.syncing ? S.syncingLabel : S.syncOff}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="m-btn m-btn-quiet"
+                  style={{ whiteSpace: "nowrap" }}
+                  onClick={() => setRemoveTarget(dev)}
+                >
+                  {S.remove.action}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       {/* QR 手引き（この端末をつなぐ・確定コピー・mock） */}
       {step === "qr" ? (
