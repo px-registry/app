@@ -32,16 +32,43 @@
   env は **`MESH_MODE_CAP=allowlist` ＋ `KV:MESH_MODE=off`**（→ effective=off・relay/handoff/device/register は 403/no-op）。legacy lane 不変。
   🔴 Hiroto Go ＋ full review（Claude＋GPT）＋ `AUTH_SECRET` 設定済・`ALLOW_DEV_SECRET` 不在の確認。
   deploy コマンドは px-r15 の正規手順（CLAUDE.md「デプロイ（px-r15）」§）。**新 deployment ID を記録**。
-- **Go3 — cutover flip（5 人限定）**: 「7」で集めた値を env に入れてから **`KV:MESH_MODE=allowlist`**（→ effective=allowlist）。
-  - 5 人だけ新規 Talk/Memory delta が mesh lane に乗り始める（§E）。**新 deployment/flip を記録**。
+- **Go3 — cutover 起動（3 段・Hiroto 確定 2026-06-18）**。各段とも 🔴 Hiroto Go。
+  - **Go3a — bootstrap register window**: 5 人の passkey handle だけが register でき、owner_ref を mint/collect する。
+    ```
+    MESH_MODE_CAP=allowlist
+    KV:MESH_MODE=allowlist
+    MESH_BOOTSTRAP_ALLOWLIST=5人のpasskey handle
+    MESH_OWNER_ALLOWLIST=空、または未投入
+    ```
+    期待: bootstrap allowlist 内 tester は register 可／外は 403／owner_ref は mint される／**content mesh write はまだ不可**
+    （relay/handoff/device は owner_ref allowlist 外として denied）／dual-read・cleanup・safety path は維持。
+    収集: §7 の手順で 5 件の owner_ref を D1 から読む。
+  - **Go3b — owner_ref allowlist redeploy**: Go3a で mint された owner_ref を env allowlist に投入する（**env 更新＝redeploy＋review＝Hiroto Go**）。
+    ```
+    MESH_MODE_CAP=allowlist
+    KV:MESH_MODE=allowlist
+    MESH_BOOTSTRAP_ALLOWLIST=5人
+    MESH_OWNER_ALLOWLIST=5人のowner_ref
+    ```
+  - **Go3c — tester mesh write activation**: 5 人 tester だけに mesh write を実際に許可し、round-trip / dual-read / exit-safe を確認。
+    確認: tester owner_ref は write allowed／allowlist 外は denied・fallback／Talk mesh send／Memory delta／handoff／Sync／
+    purge／owner purge／revoke／no presence／no plaintext／no private key／fallback-to-legacy。
 - **global on は別 Go**（`MESH_MODE_CAP=on` ＋ `KV:MESH_MODE=on`）。本パックの射程外。
 
 ## 5. 各 Go の rollback 手順（正本 §F.1・§G）
 - **Go1 直後（本番書き込みが一切無い場合のみ）**: 5 表 DROP（§A 記載の `DROP TABLE r15_mesh_ack; … r15_owner;`）。
   ※**本番データが入った後は DROP を rollback と呼ばない**（§G）。
 - **Go2**: Cloudflare ダッシュボードで**直前 deployment ID（`0ef4646b…`）へ rollback** ＋ `KV:MESH_MODE=off` 確認。legacy lane 維持。
-- **Go3 緊急停止**: **`KV:MESH_MODE=off`**（即時・再 deploy 不要）→ legacy-only 書き込みへ戻る。cleanup/safety（ack/purge/revoke/expired/dual-read）は止めない（§G）。
+- **Go3a / Go3b / Go3c のどの段でも緊急停止**: **`KV:MESH_MODE=off`**（即時・再 deploy 不要）。cleanup/safety は止めない。
   - **flag OFF は write だけ止める**（実装・smoke 実証済）。既存 mesh payload は TTL で自然消滅（delta 14日 / handoff 72h）。
+- **mesh data が入った後の rollback 正本（Hiroto 確定 2026-06-18）**: pre-mesh deploy へは戻さない。代わりに:
+  ```
+  mesh-read capable artifact を維持
+  write OFF（KV:MESH_MODE=off）
+  dual-read 維持
+  legacy-only write
+  data は消さない
+  ```
 
 ## 6. env / KV values（初回本番構成・§B.0）
 ```
@@ -59,13 +86,13 @@ mesh:mode = off        # Go2。Go3 で allowlist。緊急停止で off。
 ## 7. tester 5 人の owner_ref / bootstrap handle 収集手順（2 段・要 Hiroto 裁定の sub-sequencing）
 - **bootstrap handle（Go2 前に確定可）**: 5 人の **passkey account handle**（sign-in 済みの handle）。これを `MESH_BOOTSTRAP_ALLOWLIST` に入れる。
   - 収集元: passkey 登録時の handle（owner が sign-in に使うアカウント識別子）。client 申告でなく session が持つ値と一致する必要がある。
-- **owner_ref（register で mint・Go3 で確定）**: owner_ref は register 時にサーバが mint するため**事前に分からない**（chicken-egg）。
-  - 手順（案・要 Hiroto 確定）: Go3 で `KV:MESH_MODE=allowlist` にすると **bootstrap handle の 5 人だけ register 可**になる →
-    5 人が register（owner_ref mint）→ admin が D1 から 5 件の owner_ref を読む
-    （`wrangler d1 execute px-app-board --remote --command "SELECT handle, owner_ref FROM r15_owner WHERE handle IN (…5 handle…)"`・metadata read・presence/content を含まない）→
-    `MESH_OWNER_ALLOWLIST` に 5 owner_ref を入れて再 deploy → **content write が開く**。
-  - ⇒ Go3 は実質 **Go3a（register 開放・owner_ref 収集）→ Go3b（owner allowlist 投入・content 開放）** の 2 段。
-    **この 2 段 sequencing は Go 対話で Hiroto 裁定が要る**（本パックの未決事項）。
+- **owner_ref（register で mint・Go3a で確定）**: owner_ref は register 時にサーバが mint するため**事前に分からない**（chicken-egg）。
+  - 手順（Hiroto 確定 2026-06-18・3 段）:
+    **Go3a** `KV:MESH_MODE=allowlist` で **bootstrap handle の 5 人だけ register 可** → 5 人が register（owner_ref mint）→
+    admin が D1 から 5 件の owner_ref を読む
+    （`wrangler d1 execute px-app-board --remote --command "SELECT handle, owner_ref FROM r15_owner WHERE handle IN (…5 handle…)"`・metadata read・presence/content を含まない）。
+    **Go3b** `MESH_OWNER_ALLOWLIST` に 5 owner_ref を入れて redeploy（env 更新＋review＝Hiroto Go）。
+    **Go3c** content write が開く → round-trip / dual-read / exit-safe 確認（§4 Go3c）。
 
 ## 8. smoke commands
 - **local gate smoke**（本番非接触・26 検査）: `node scripts\r2-mesh-write-gate-smoke.mjs <al-deny|off|on|al-allow>`
@@ -92,7 +119,14 @@ mesh:mode = off        # Go2。Go3 で allowlist。緊急停止で off。
 - 🟥 camera/QR scanner・Phase D（edge_note mesh 化）は本パックの射程外（実装しない）。
 - いずれも **本パックは docs/report のみ**。Go 対話で Hiroto Go を得るまで本番に触れない。
 
-### 未決（Go 対話で要 Hiroto 裁定）
-1. Go3 の 2 段 sequencing（Go3a register 開放→owner_ref 収集→Go3b owner allowlist 投入）＝「7」。
-2. prod の現 migration 適用状態（「3」で `migrations list --remote` を実行して 0015 のみ pending を確認）。
-3. tester 5 人の passkey handle の確定（`MESH_BOOTSTRAP_ALLOWLIST` の中身）。
+### 解決済み（Hiroto 確定 2026-06-18）
+- **Go3 sequencing = Go3a（bootstrap register window）→ Go3b（owner_ref allowlist redeploy）→ Go3c（mesh write activation）**（§4・§7）。各段とも Hiroto Go。
+- **mesh data 後の rollback 正本 = mesh-read capable artifact 維持・write OFF・dual-read 維持・legacy-only write・data 消さない**（§5）。
+- **production deployment id / commit / rollback coordinate は「観測値」**。**Go 直前に必ず再取得**して Go 時点の正本にする（§2）。
+
+### Go 直前に Hiroto 側で要るもの
+1. 5 人 tester の passkey handle（`MESH_BOOTSTRAP_ALLOWLIST` の中身）。
+2. Go3a で owner_ref を収集する手順の了承。
+3. Go3b で owner_ref allowlist を入れて redeploy する了承。
+4. Go1 / Go2 / Go3(a/b/c) の各 Go 判断。
+5. Go 直前の production coordinate 再取得。

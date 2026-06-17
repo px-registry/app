@@ -164,10 +164,14 @@ effective = min(KV:MESH_MODE, MESH_MODE_CAP)   # 弱い方が勝つ（cap を超
   legacy lane 維持（mesh は休眠のまま）。pre-mesh deploy へ戻せる段（mesh データ前）。
 - secrets: `AUTH_SECRET` が production に設定済みであること（§D）。`ALLOW_DEV_SECRET` は **置かない**。
 
-### Go3 — cutover 起動（mesh 書き込み ON・最初は 5 人限定）
-- 操作: `KV:MESH_MODE=allowlist`（cap=allowlist・`MESH_OWNER_ALLOWLIST`=5 人）→ **effective=allowlist**。
-  allowlist の 5 人だけ新規 Talk/Memory delta が mesh lane に乗り始める。
-- **🔴 Hiroto Go ＋ full review（Claude＋GPT）後**にだけ flip。
+### Go3 — cutover 起動（mesh 書き込み ON・最初は 5 人限定・**3 段**・Hiroto 確定 2026-06-18）
+owner_ref は register で mint される（chicken-egg）ため、Go3 を 3 段に分ける。各段とも 🔴 Hiroto Go。
+- **Go3a — bootstrap register window**: `KV:MESH_MODE=allowlist`＋`MESH_BOOTSTRAP_ALLOWLIST=5人 handle`＋`MESH_OWNER_ALLOWLIST=空/未投入`。
+  → bootstrap handle の 5 人だけ register 可（owner_ref を mint）。**content write はまだ不可**（owner_ref allowlist 外）。dual-read/cleanup/safety 維持。
+  → admin が D1 から 5 件の owner_ref を収集（`SELECT handle, owner_ref FROM r15_owner WHERE handle IN (…)`・metadata read）。
+- **Go3b — owner_ref allowlist redeploy**: `MESH_OWNER_ALLOWLIST=5人 owner_ref` を投入し redeploy（env 更新＝review 同伴）。
+- **Go3c — tester mesh write activation**: content write が 5 人に開く → round-trip / dual-read / exit-safe / fallback-to-legacy / no presence・plaintext・private を確認。
+- **🔴 Hiroto Go ＋ full review（Claude＋GPT）後**にだけ各段を進める。詳細手順は `docs/r2/go-review-pack-v0.1.md` §4・§7。
 - **rollback（本番データ後の正本・§G）**: `KV:MESH_MODE=off`（即時）→ **legacy-only 書き込みへ戻す** →
   **dual-read は維持** → **mesh に入った既存データは消さず、読めるものとして残す** → **データ損失を起こさない**。
 
