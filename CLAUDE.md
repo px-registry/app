@@ -213,6 +213,22 @@ node scripts\r2-goal-ui-smoke.mjs                # UI 一周（二扉/pair面/#d
   （切替は client state のみ）。2手: `python -m http.server 8099 -d out &` → `node scripts\r2-ws-smoke.mjs`
   （要 playwright・chromium）。器の骨格の回帰ネット。
 
+- **Device Mesh（内部名）／表層 Sync の local 設定（MESH_WRITE 便〜・2026-06-17）**: mesh write は
+  `meshWriteGate`（server authoritative・`effective=min(KV mesh:mode, MESH_MODE_CAP)`・正本 `docs/r2/cutover-plan-v0.2.md §B.0`）。
+  **mesh smoke を local で通すには env＋KV が要る**（無いと fail-closed off で register が 403）:
+  ```powershell
+  # .dev.vars（コミットしない）に local 既定:  MESH_MODE_CAP=on   /   MESH_OWNER_ALLOWLIST=（空）
+  npx wrangler kv key put --namespace-id 31c4f53ab2d54dea8a977fa7c719e229 "mesh:mode" "on" --local
+  # mesh tables 掃除（idempotent でないので smoke 前に）:
+  npx wrangler d1 execute px-app-board --local --command "DELETE FROM r15_mesh_ack; DELETE FROM r15_mesh_payload; DELETE FROM r15_device; DELETE FROM r15_owner_epoch; DELETE FROM r15_owner;"
+  node scripts\r2-mesh-smoke.mjs ; node scripts\r2-mesh-relay-smoke.mjs ; node scripts\r2-mesh-handoff-smoke.mjs ; node scripts\r2-mesh-talk-live-smoke.mjs
+  ```
+  - **gate smoke**: `node scripts\r2-mesh-write-gate-smoke.mjs <al-deny|off|on|al-allow>`（23 検査）。mode 切替は
+    `wrangler kv key put ... mesh:mode <v> --local` を**書いてから dev を再起動**（KV 値は dev 起動時前提で読む方が確実）。
+  - **罠（実測）**: ① `wrangler kv ... --local` は pages dev と同じ `.wrangler\state\v3\kv\<AUTH-id>` を共有＝seed が効く。
+    ② `Start-Process "npx"` は不可（.cmd）→ `npx.cmd`。③ pages dev を bg 起動すると親 node が log ファイルを掴んで
+    残る — 後始末は `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` から CommandLine に `wrangler` を含むものだけ kill。
+
 - **退役（2026-06-13）**: r15-ui-smoke.mjs は pre-R2 の signal 形で恒久 stale → 削除（歴史は git）。
   r15-smoke.ps1 も同 stale — R2 では使わない（档案として残置）。
 - 便別 smoke（R1.5 期・対象機能の回帰確認にだけ使う）: batch2-9・c17・ollama-smoke・responsive-sweep。

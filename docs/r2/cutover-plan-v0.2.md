@@ -89,7 +89,37 @@ effective = min(KV:MESH_MODE, MESH_MODE_CAP)   # 弱い方が勝つ（cap を超
 - **Go3**: `KV:MESH_MODE=allowlist`（→ effective=allowlist・5 人だけ書ける）。
 - **緊急停止**: `KV:MESH_MODE=off`（→ effective=off・即時・再 deploy 不要）。
 - **global on**: **別 Go**（`MESH_MODE_CAP=on` ＋ `KV:MESH_MODE=on`）。
-- ※この flag/allowlist の **本実装は Go2 前の別便**（赤に入る前）。本書は方針の固定のみ。
+
+#### B.0 実装済み（2026-06-17・local/dev・本番非接触）
+- 判定の正本ロジック = `lib/meet-mesh/mode.ts`（純粋・client と Functions が同一実装を読む）:
+  `effectiveMeshMode(cap, kv)=min`（どちらか欠落/不正→off）・`meshWriteAllowed(mode, ownerRef, allowlist)`
+  （off→不可・on→owner_ref 形なら可・allowlist→list 内のみ・owner_ref 不在→不可）。unit = `mode.test.ts`（8）。
+- Functions: `functions/_mesh.ts` の `meshEffectiveMode(env)`（KV `mesh:mode` を `env.AUTH.get` で読む・try/catch→null→off）と
+  `meshWriteGate(env, ownerRef)`。KV は **AUTH KV の `mesh:mode` キー**を使う（新 binding を足さない・allowlist は KV に置かない＝env のみ）。
+- **gate を足した write 経路（4）**: `register`（新規 bootstrap）・`device`（device-add）・`relay/put`・`handoff/put`。
+  ※`device`（device-add）は §B.0 の明示3経路に CC 判断で追加（handoff の前段 write・off/rollback で「bundle の付かない孤児 device 行」を防ぐ＝strictly more fail-closed・新データ/意味の拡張なし）。
+- **register の chicken-egg 解決**: owner_ref は register で mint されるため allowlist 判定が register 時に不可能。
+  → **register は mode>off だけで判定**（off→403 mesh_disabled・allowlist/on→bootstrap 可）。
+  **allowlist は content write（relay/handoff/device）側で owner_ref を見て効かせる**。
+  既存 owner の register（read・INSERT 無し）は mode 不問で ref を返し、応答に capability を載せる。
+- **deny / fallback honesty matrix A**（不許可時の挙動・CC が正直に裁定）:
+  | write type | 不許可時 | client fallback | 理由 |
+  |---|---|---|---|
+  | relay put `talk-msg`（peer） | HTTP 200 `{denied,fallback:"legacy"}` | 既存 envelope へ落とす | Talk 本文を落とさない |
+  | relay put `memory-delta`/`talk-mirror`（self） | HTTP 200 `{denied,fallback:"none"}` | no-op（Sync 未有効として静かに） | legacy 等価が無い |
+  | `handoff/put` | HTTP 403 `mesh_disabled` | deny（UI は off を正直に表示） | deliberate device-add・等価無し |
+  | `device`（device-add） | HTTP 403 `mesh_disabled` | deny | 同上（孤児防止） |
+  | `register`（新規） | HTTP 403 `mesh_disabled` | mock に誤魔化さず off 表示 | mode=off は mesh 不有効 |
+  - **safety は止めない**（実機確認済）: `relay/fetch`（read）・`relay/purge`（cleanup）は拒否 mode でも 200 ok。
+- **capability 表示の正直さ B**: `register`・`devices` 応答に `mode`・`writeAllowed` を同梱（server authoritative）。
+  client（`SyncSection`）は `writeAllowed=false` のとき**「同期中」と言わない**（per-device label を抑止）＋ off 状態の一行を出す。
+  → off 文言 `MEET.sync.offState` は **★PROVISIONAL（命名ゲート STOP④・Hiroto 確定待ち）**。暫定値「この端末はまだ同期していません。」
+- **検証（local/dev）**: endpoint smoke `scripts/r2-mesh-write-gate-smoke.mjs <al-deny|off|on|al-allow>`（23 検査）。
+  `KV:mesh:mode` を session ごとに reseed（`wrangler kv key put --namespace-id <AUTH> mesh:mode <v> --local`）→ dev 再起動。
+  flag flip で**再 register なしに** write 可否が変わること（rollback 復帰）を on session で実証。既存 mesh smoke は
+  mode=on で全 green（base14/relay23/handoff12/talk-live15）＝gate が既存 flow を壊さない。
+- **local 既定**（`.dev.vars`・コミットしない）: `MESH_MODE_CAP=on` ＋ `MESH_OWNER_ALLOWLIST=`（空）＋ KV `mesh:mode=on` seed
+  ＝ローカルは mesh 全開（建設現場）。本番は §B.0 の初回構成（cap=allowlist・KV=off）。
 
 ### B.0b flag が止めるもの / 止めないもの
 | 止める（effective=off / allowlist 外） | 止めない（rollback でも安全・cleanup 経路） |
@@ -100,7 +130,8 @@ effective = min(KV:MESH_MODE, MESH_MODE_CAP)   # 弱い方が勝つ（cap を超
 | allowlist 外 owner の mesh write | purge / owner purge（exit-safe） |
 | cutover 対象外 owner の mesh write | revoke（端末を外す）|
 | 新規 handoff put / mesh payload put（write 扱い） | expired cleanup（TTL GC）|
-|  | 既存 mesh payload の回収（fetch/ack/purge）|
+| device-add / register（新規 bootstrap・write 扱い） | 既存 mesh payload の回収（fetch/ack/purge）|
+|  | relay fetch（read）・devices（read・capability 同梱）|
 - **rollback 時は write を止める。cleanup / safety path（ack・purge・revoke・expired・dual-read）は止めない。**
 
 ### Go1 — 0015 apply（5 表を作る・休眠）
