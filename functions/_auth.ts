@@ -20,12 +20,15 @@ import {
 } from "../lib/webauthn/encoding.ts";
 import { getWebAuthnRpId } from "../lib/webauthn/rp.ts";
 import { PX_REGISTRY_DOMAIN } from "../lib/handle/index.ts";
+import { resolveAuthSecret } from "../lib/webauthn/auth-secret.ts";
 
 export interface AuthEnv {
   /** KV namespace bound in wrangler.toml ([[kv_namespaces]] binding = "AUTH"). */
   AUTH: KVNamespace;
-  /** HMAC secret for session + challenge cookies. Set as a Pages secret. */
+  /** HMAC secret for session + challenge cookies. Set as a Pages secret in prod. */
   AUTH_SECRET?: string;
+  /** "1" ONLY in local/dev (.dev.vars). Absent in production → DEV_SECRET refused. */
+  ALLOW_DEV_SECRET?: string;
 }
 
 /** The durable record PX keeps for an owner. No secret, no PII. */
@@ -46,9 +49,10 @@ export const SESSION_COOKIE = "__px_session";
 export const CHALLENGE_COOKIE = "__px_chal";
 const SESSION_TTL_S = 30 * 86_400; // 30 days
 const CHALLENGE_TTL_S = 300; // 5 minutes
-// A fallback secret only for local dev. Production MUST set AUTH_SECRET as a
-// Pages secret; sessions signed with this dev value are worthless off-localhost.
-const DEV_SECRET = "px-dev-insecure-secret-set-AUTH_SECRET-in-prod";
+// The HMAC secret resolution (incl. the fail-closed rule) lives in
+// lib/webauthn/auth-secret.ts (pure + node-tested). Production MUST set
+// AUTH_SECRET; with no secret and no ALLOW_DEV_SECRET marker, secretOf returns
+// null and every token op fails closed (no forge-able DEV_SECRET in prod).
 
 // ── KV record ───────────────────────────────────────────────────────────────
 
@@ -67,8 +71,9 @@ export async function putOwner(env: AuthEnv, rec: OwnerRecord): Promise<void> {
 
 // ── HMAC + signed tokens ──────────────────────────────────────────────────────
 
-function secretOf(env: AuthEnv): string {
-  return env.AUTH_SECRET || DEV_SECRET;
+/** HMAC secret, or null to fail-closed (prod with no AUTH_SECRET). */
+function secretOf(env: AuthEnv): string | null {
+  return resolveAuthSecret(env);
 }
 
 async function hmac(secret: string, msg: string): Promise<string> {
@@ -120,8 +125,11 @@ interface SessionPayload {
 }
 
 export function createSessionToken(env: AuthEnv, handle: string): Promise<string> {
+  const secret = secretOf(env);
+  // Fail-closed: no secret (prod misconfig) → refuse to mint a session.
+  if (secret === null) throw new Error("auth_secret_required");
   const e = Math.floor(Date.now() / 1000) + SESSION_TTL_S;
-  return signToken(secretOf(env), { h: handle, e } satisfies SessionPayload);
+  return signToken(secret, { h: handle, e } satisfies SessionPayload);
 }
 
 export async function readSession(
@@ -130,7 +138,9 @@ export async function readSession(
 ): Promise<{ handle: string } | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
-  const payload = await verifyToken<SessionPayload>(secretOf(env), token);
+  const secret = secretOf(env);
+  if (secret === null) return null; // fail-closed: no secret → no valid session
+  const payload = await verifyToken<SessionPayload>(secret, token);
   return payload ? { handle: payload.h } : null;
 }
 
@@ -154,8 +164,10 @@ export function createChallengeToken(
   purpose: ChallengePurpose,
   handle: string,
 ): Promise<string> {
+  const secret = secretOf(env);
+  if (secret === null) throw new Error("auth_secret_required");
   const e = Math.floor(Date.now() / 1000) + CHALLENGE_TTL_S;
-  return signToken(secretOf(env), {
+  return signToken(secret, {
     c: challengeB64,
     p: purpose,
     h: handle,
@@ -169,7 +181,9 @@ export async function readChallenge(
 ): Promise<{ challengeB64: string; purpose: ChallengePurpose; handle: string } | null> {
   const token = readCookie(request, CHALLENGE_COOKIE);
   if (!token) return null;
-  const p = await verifyToken<ChallengePayload>(secretOf(env), token);
+  const secret = secretOf(env);
+  if (secret === null) return null; // fail-closed
+  const p = await verifyToken<ChallengePayload>(secret, token);
   return p ? { challengeB64: p.c, purpose: p.p, handle: p.h } : null;
 }
 
