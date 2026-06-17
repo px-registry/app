@@ -285,6 +285,24 @@ await page.locator("#step-sync .m-sync-row", { hasText: "iPhone" }).locator("but
 ok(await page.locator('#step-sync [role="dialog"]').getByText("iPhone を外しますか？").count() === 1, "別端末の外す確認（名指し）");
 ok(await page.locator('#step-sync [role="dialog"]').getByText("その端末の中に残ります（PXは消せません）", { exact: false }).count() === 1, "外しても過去は端末内に残る（正直文言）");
 
+// 14) 全消去の再着地（Hiroto 2026-06-17）: Sync でなく Memory 側の危険操作（整理 fold）に置く。
+await page.goto(`${BASE}memory/`, { waitUntil: "networkidle" }).catch(() => {});
+await page.waitForTimeout(250);
+ok(await page.locator("#step-sync").count() === 0, "Memory ページに Sync セクションは無い");
+ok(!(await page.locator("[data-mem-wipe]").isVisible().catch(() => false)), "全消去は折り畳み（整理）の中＝既定では非表示");
+await page.locator(".m-mem-backup summary").click().catch(() => {});
+await page.waitForTimeout(200);
+ok(await page.locator("[data-mem-wipe]").count() === 1, "Memory の整理に全消去 entry（MemoryとTalkを消す）");
+ok((await page.locator("[data-mem-wipe]").innerText()).includes("MemoryとTalkを消す"), "entry button 文言 = MemoryとTalkを消す");
+await page.locator("[data-mem-wipe]").click();
+await page.waitForTimeout(150);
+ok(await page.locator('.m-mem-backup [role="dialog"]').getByText("このPXのMemoryとTalkを消しますか？").count() === 1, "全消去の確認 dialog（確定 title）");
+ok(await page.locator('.m-mem-backup [role="dialog"]').getByText("接続済みの自分の端末にも削除を伝えます", { exact: false }).count() === 1, "自分の端末には削除を伝える（確定 body）");
+ok(await page.locator('.m-mem-backup [role="dialog"]').getByText("相手の端末にある会話は消えません", { exact: false }).count() === 1, "相手の端末/PX に触れない（正直文言）");
+ok(await page.locator('.m-mem-backup [role="dialog"] button').filter({ hasText: "すべて消す" }).count() === 1, "[すべて消す]");
+ok(await page.locator('.m-mem-backup [role="dialog"] button').filter({ hasText: "やめる" }).count() === 1, "[やめる]");
+await page.locator('.m-mem-backup [role="dialog"] button').filter({ hasText: "やめる" }).click(); // 実消去はしない（dialog 検査のみ）
+
 await browser.close();
 console.log(`\nPASS ${pass} / FAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

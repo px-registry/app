@@ -47,6 +47,7 @@ import {
 } from "@/lib/meet-net";
 import { RIG_MEMORY_KINDS, type RigMemoryKindV1 } from "@/lib/rig";
 import { mintEncKeyPair, encPubToString } from "@/lib/meet-crypto/keys.ts";
+import { wipeMine } from "@/lib/meet-mesh/sync.ts";
 import { BoundaryNote } from "../BoundaryNote.tsx";
 
 type RigEntry = { entryId: string; item: MeetRigItemV1 };
@@ -603,6 +604,16 @@ export function MemoryPanel() {
     await reload();
   };
 
+  // 全消去（Memory ＋ Talk）— UI便（Hiroto 2026-06-17）: Sync でなく Memory 側の危険操作に置く。
+  // clearAll（記憶カードのみ）とは別＝Memory と Talk を消し、relay の自分宛 payload も purge（exit-safe）。
+  // 相手の端末・相手の PX には触れない（wipeMine は自分が audience の payload だけ）。
+  const [confirmingWipe, setConfirmingWipe] = useState(false);
+  const wipeAll = async () => {
+    await wipeMine(); // relay purge（自分宛）＋ ローカル Talk / Memory clear
+    setConfirmingWipe(false);
+    await reload();
+  };
+
   // ── publish (候補に出す) — explicit owner action, never automatic ────────────
   const [pubState, setPubState] = useState<"idle" | "busy" | "done" | "failed">("idle");
   const [pubCount, setPubCount] = useState(0);
@@ -956,6 +967,36 @@ export function MemoryPanel() {
           )}
           {report && <p className="m-note">{report}</p>}
           <p className="m-note">{MEET.memory.durability}</p>
+
+          {/* 全消去（Memory ＋ Talk・relay purge）— clearAll（記憶カードのみ）より重い破壊操作。
+              Sync には置かない（端末管理に破壊操作を混ぜない）。相手の端末・相手の PX には触れない。 */}
+          <div style={{ marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="m-btn m-btn-quiet m-btn-danger"
+              data-mem-wipe
+              onClick={() => setConfirmingWipe(true)}
+              disabled={confirmingWipe}
+            >
+              {MEET.sync.wipe.entry}
+            </button>
+          </div>
+          {confirmingWipe && (
+            <div className="m-card" role="dialog" aria-label={MEET.sync.wipe.title} style={{ marginTop: "0.75rem" }}>
+              <p className="m-h2" style={{ margin: 0 }}>{MEET.sync.wipe.title}</p>
+              <p style={{ margin: "0.5rem 0 0", color: "var(--text)" }}>{MEET.sync.wipe.body}</p>
+              <p className="m-note" style={{ margin: "0.5rem 0 0" }}>{MEET.sync.wipe.others}</p>
+              <p className="m-note" style={{ margin: "0.25rem 0 0" }}>{MEET.sync.wipe.publicNote}</p>
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+                <button type="button" className="m-btn m-btn-quiet m-btn-danger" onClick={() => void wipeAll()}>
+                  {MEET.sync.wipe.go}
+                </button>
+                <button type="button" className="m-btn m-btn-quiet" onClick={() => setConfirmingWipe(false)}>
+                  {MEET.sync.wipe.cancel}
+                </button>
+              </div>
+            </div>
+          )}
         </details>
       </section>
 
