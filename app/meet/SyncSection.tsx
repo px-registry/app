@@ -25,7 +25,6 @@ import {
   cancelHandoff,
   type HandoffQRV1,
 } from "@/lib/meet-mesh/handoff.ts";
-import { wipeMine } from "@/lib/meet-mesh/sync.ts";
 
 type MeshDevice = { id: string; label: string; here: boolean; syncing: boolean };
 type Step = null | "qr" | "approve" | "done" | "failed" | "noDevice";
@@ -61,7 +60,6 @@ export function SyncSection() {
   const [step, setStep] = useState<Step>(null);
   const [removeTarget, setRemoveTarget] = useState<MeshDevice | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
-  const [wipeOpen, setWipeOpen] = useState(false);
   const [live, setLive] = useState(false);
   // handoff フロー
   const [qrText, setQrText] = useState("");
@@ -187,14 +185,6 @@ export function SyncSection() {
     }
     setDevices((d) => d.filter((x) => x.id !== target.id));
   };
-  const confirmWipe = (): void => {
-    setWipeOpen(false);
-    void (async () => {
-      await wipeMine();
-      setDevices([]);
-      setStep(null);
-    })();
-  };
 
   return (
     <div className="m-card" id="step-sync" data-sync-scaffold="wired" data-sync-step={step ?? "idle"}>
@@ -307,11 +297,10 @@ export function SyncSection() {
           <p className="m-h2" style={{ margin: 0 }}>
             {S.approve.title}
           </p>
-          <p style={{ margin: "var(--space-1) 0 0", fontWeight: 600 }}>{pendingQr?.name || S.thisDevice}</p>
-          <p className="m-note" style={{ margin: 0 }}>
-            {S.approve.proximity} ・ {EXAMPLE_TIME}
-          </p>
-          <p style={{ margin: "var(--space-1) 0 0" }}>{S.approve.body(pendingQr?.name || S.thisDevice)}</p>
+          {/* 記述子＝端末名（UA 導出 or fallback「新しい端末」）＋時刻。近接は owner-local に確信が無いので出さない。 */}
+          <p style={{ margin: "var(--space-1) 0 0", fontWeight: 600 }}>{pendingQr?.name || S.newDevice}</p>
+          <p className="m-note" style={{ margin: 0 }}>{EXAMPLE_TIME}</p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.approve.body(pendingQr?.name || S.newDevice)}</p>
           <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
             {S.approve.syncs}
           </p>
@@ -424,38 +413,8 @@ export function SyncSection() {
         </div>
       ) : null}
 
-      {/* 全消去（Memory と Talk・purgeMine ＋ ローカル clear）。着地は Setup の Sync 下端（破壊操作）。 */}
-      <button
-        type="button"
-        className="m-btn m-btn-quiet"
-        data-sync-wipe
-        style={{ marginTop: "var(--stack)" }}
-        onClick={() => setWipeOpen(true)}
-      >
-        {S.wipe.title}
-      </button>
-      {wipeOpen ? (
-        <div className="m-sync-panel" role="dialog" aria-label={S.wipe.title} style={panelStyle}>
-          <p className="m-h2" style={{ margin: 0 }}>
-            {S.wipe.title}
-          </p>
-          <p style={{ margin: "var(--space-1) 0 0" }}>{S.wipe.body}</p>
-          <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
-            {S.wipe.others}
-          </p>
-          <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
-            {S.wipe.publicNote}
-          </p>
-          <div style={rowActions}>
-            <button type="button" className="m-btn m-btn-danger" onClick={confirmWipe}>
-              {S.wipe.go}
-            </button>
-            <button type="button" className="m-btn m-btn-quiet" onClick={() => setWipeOpen(false)}>
-              {S.wipe.cancel}
-            </button>
-          </div>
-        </div>
-      ) : null}
+      {/* 全消去（Memory と Talk）は Sync に置かない（端末管理に破壊操作を混ぜない・Hiroto 2026-06-17）。
+          MEET.sync.wipe ＋ sync.ts wipeMine は保持し、Memory/Trust 側の別便で配線する。 */}
     </div>
   );
 }

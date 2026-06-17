@@ -236,7 +236,7 @@ ok(await page.locator("#step-sync").getByText("接続済みの端末").count() =
 ok(await page.locator("#step-sync .m-badge").filter({ hasText: "この端末" }).count() === 1, "現端末に「この端末」印");
 ok(await page.locator("#step-sync .m-sync-row").count() >= 2, "一覧に端末が並ぶ（backend 無し＝mock）");
 ok(await page.locator("#step-sync .m-sync-state").filter({ hasText: "同期中" }).count() >= 1, "同期状態は label「同期中」");
-ok(await page.locator("#step-sync [data-sync-wipe]").count() === 1, "全消去ボタン（purgeMine 接続）");
+ok(await page.locator("#step-sync [data-sync-wipe]").count() === 0, "全消去は Sync に出さない（Memory/Trust 側・別便）");
 const syncText = await page.locator("#step-sync").innerText();
 ok(!/既読|届きました|入力中|オンライン/.test(syncText), "Sync 面に presence（相手の状態）は無い");
 
@@ -247,8 +247,8 @@ ok(await page.locator('#step-sync[data-sync-step="qr"]').count() === 1, "step=qr
 ok(await page.locator("#step-sync").getByText("この端末をつなぐ").count() === 1, "QR手引き 見出し");
 const qrText = await page.locator("#step-sync [data-sync-qr]").inputValue();
 ok(qrText.length > 80 && qrText.includes("\"sig\""), "QR テキストが生成される（署名つき・data-sync-qr）");
-ok(await page.locator("#step-sync button", { hasText: "QRをコピー" }).count() === 1, "[QRをコピー]");
-ok(await page.locator("#step-sync").getByText("別の端末を迎える").count() === 1, "貼付セクション（別の端末を迎える）");
+ok(await page.locator("#step-sync button", { hasText: "QRテキストをコピー" }).count() === 1, "[QRテキストをコピー]");
+ok(await page.locator("#step-sync").getByText("新しい端末をつなぐ").count() === 1, "貼付セクション（新しい端末をつなぐ）");
 // 復帰コードで戻る → 既存端末なし（一覧を隠す）
 await page.locator("#step-sync button", { hasText: "復帰コードで戻る" }).first().click();
 ok(await page.locator('#step-sync [role="dialog"]').getByText("接続済みの端末がありません。").count() === 1, "既存端末なしの面");
@@ -270,13 +270,9 @@ await page.locator('#step-sync [role="dialog"] button', { hasText: "追加する
 await page.waitForTimeout(300);
 ok(await page.locator('#step-sync [role="dialog"]').getByText("つなげませんでした。").count() === 1, "承認後にだけ seal 試行→backend 無しは honest に失敗（confirm-gated）");
 
-// 全消去 → 確認（purgeMine 接続）
+// リセット（idle へ）して一覧操作の検査へ
 await page.goto(`${BASE}start/`, { waitUntil: "networkidle" }).catch(() => {});
 await page.waitForTimeout(250);
-await page.locator("#step-sync [data-sync-wipe]").click();
-ok(await page.locator('#step-sync [role="dialog"]').getByText("このPXのMemoryとTalkを消しますか？").count() === 1, "全消去の確認（確定コピー）");
-ok(await page.locator('#step-sync [role="dialog"]').getByText("相手の端末にある会話は消えません", { exact: false }).count() === 1, "相手の端末には触れない（正直文言）");
-await page.locator('#step-sync [role="dialog"] button', { hasText: "やめる" }).click();
 
 // この端末の同期を止める（同期中 label → 確認・「同期を止める」）
 await page.locator("#step-sync .m-sync-row", { hasText: "この端末" }).getByText("同期中", { exact: true }).click();

@@ -431,18 +431,20 @@ export const MEET = {
       body: "すでにPXを使っている端末で、このQRを読み取ってください。Antenna、Talk、Memoryをこの端末でも使えるようにします。",
       show: "QRを表示",
       recover: "復帰コードで戻る",
-      /** UI便（2026-06-17）— テキスト貼り付け版の暫定文言【STOP④ 暫定・要 Hiroto 確定】。
-       *  camera/scanner は最後の便。今は QR の JSON テキストをコピー/貼り付けで橋渡しする。 */
-      copyAction: "QRをコピー",
+      /** UI便（テキスト貼り付け版・Hiroto 確定 2026-06-17）。camera/scanner 版では QR 表示/読取の語へ戻す。
+       *  「相手」は Talk の通信相手＝別人に読めるため handoff では使わない（owner 自身の端末どうし）。 */
+      copyAction: "QRテキストをコピー",
       copied: "コピーしました",
-      pasteTitle: "別の端末を迎える",
-      pastePlaceholder: "相手の端末のQRテキストを貼り付け",
+      pasteTitle: "新しい端末をつなぐ",
+      pastePlaceholder: "新しい端末のQRテキストを貼り付ける",
       pasteConfirm: "QRを確認",
-      invalid: "QRが読めませんでした。期限切れか、内容が壊れています。",
+      invalid: "QRテキストを確認できませんでした。期限が切れたか、内容が正しくありません。",
       /** 新端末側: 既存端末の承認後に取り込む（poll install）。 */
       receive: "受け取る",
       waiting: "まだ届いていません。",
     },
+    /** 承認画面の端末名 fallback（UA 導出できないとき）。`この端末` は現操作端末に読めるため使わない。 */
+    newDevice: "新しい端末",
     /** 接続完了（確定 2026-06-17）。AIキー無しの分岐つき。 */
     done: {
       title: "つながりました。",
@@ -476,9 +478,10 @@ export const MEET = {
      *  端末名・時刻は動的。場所は精密に出さず「近くの端末」＝近接確認だけを示す。 */
     approve: {
       title: "新しい端末を追加しますか？",
-      proximity: "近くの端末",
+      proximity: "近くの端末", // 保持のみ — owner-local に確信が無い限り UI に出さない（Hiroto 2026-06-17）
+      // 端末名 fallback ＝「新しい端末」。`この {name} で` の形は使わない（現操作端末と紛れる）。
       body: (device: string): string =>
-        `追加すると、この ${device} で Antenna・Talk・Memory を使えるようになります。`,
+        `追加すると、${device}で Antenna・Talk・Memory を使えるようになります。`,
       syncs: "同期するもの: Antenna / Talk / Memory / 呼び名 / ひとこと",
       noSyncs: "同期しないもの: APIキー / 生のAI会話 / 未確認の下書き",
       go: "追加する",
@@ -505,8 +508,10 @@ export const MEET = {
       sendFailed: "送れませんでした",
       syncedHere: "この端末に同期済み",
     },
-    /** 全消去（「同期を止める」とは別操作・着地は Memory/Trust・足場では未配線）。 */
+    /** 全消去（「同期を止める」とは別操作・着地は Memory/Trust — Sync には出さない・Hiroto 2026-06-17）。
+     *  entry button は Memory/Trust 側の別便で配線する（コピーはここに保持）。 */
     wipe: {
+      entry: "MemoryとTalkを消す",
       title: "このPXのMemoryとTalkを消しますか？",
       body: "この端末から Memory と Talk を消し、接続済みの自分の端末にも削除を伝えます。まだ届いていない分も削除します。",
       others: "相手の端末にある会話は消えません。相手のPXには触れません。",

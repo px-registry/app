@@ -28,6 +28,18 @@ export const HANDOFF_TTL_MS = 72 * 60 * 60 * 1000; // 72h hard
 const MAX_PIECE = 12000; // 平文 1 片（封緘後 ≤16KB に収まる）
 const MAX_CHUNKS = 64; // ≒ 768KB bundle 上限
 
+/** 端末名を UA から導出（owner 表示用・大まかな機種名）。判別不能なら "" を返し、受け手が
+ *  「新しい端末」fallback を当てる（fallback コピーは MEET.sync.newDevice の一箇所）。 */
+export function deviceNameFromUA(): string {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (/iPad/.test(ua)) return "iPad";
+  if (/Android/.test(ua)) return "Android";
+  if (/Macintosh|Mac OS X/.test(ua)) return "MacBook";
+  if (/Windows/.test(ua)) return "Windows PC";
+  return "";
+}
+
 type Chunk = { ix: number; of: number; ephPub: string; iv: string; ciphertext: string };
 
 function okHttp(r: MeshHttpResult): r is MeshHttpResult & { data: Record<string, unknown> } {
@@ -77,13 +89,15 @@ export async function startHandoffAsNewDevice(name = ""): Promise<{ qr: string; 
     dev = { entryId: "self", deviceId, sig: keys.sig, enc: keys.enc };
   }
   const exp = Date.now() + HANDOFF_TTL_MS;
+  // 端末名は明示指定 > UA 導出 > 空（受け手が「新しい端末」fallback）。
+  const label = name || deviceNameFromUA();
   const qrObj = await buildHandoffQR(
     dev.deviceId,
     encPubToString(dev.enc.pub),
     encPubToString(dev.sig.pub),
     dev.sig.priv,
     exp,
-    name,
+    label,
   );
   return { qr: JSON.stringify(qrObj), deviceId: dev.deviceId };
 }
