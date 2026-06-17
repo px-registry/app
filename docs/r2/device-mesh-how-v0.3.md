@@ -1,4 +1,8 @@
-# PX Device Mesh — Phase 0.5 HOW（実装前・草案 v0.2）
+# PX Device Mesh — Phase 0.5 HOW（実装前・草案 v0.3）
+
+> **v0.3（2026-06-17）**: GPT crypto verdict ＝ **条件付き PASS**。5条件を §13 に**受け入れゲート**として
+> 焼き込み、関係する設計節（§2.4 expires_at/epoch・§3.5 rotation 順・§4.2 stale-epoch 拒否・§4.6 TTL 列・
+> §5.1b QR 束）を verdict 拘束へ更新。**次＝Hiroto STOP #0 → 実装発注書**（crypto/server 実装は未着手）。
 
 > 内部名 **PX Device Mesh**／表層 **Sync・端末をつなぐ**。
 > **これは設計（HOW）だけ。実装しない。** server / schema / crypto に触れる重い面のため、
@@ -113,7 +117,7 @@ CREATE TABLE r15_mesh_payload (
   audience_ref TEXT NOT NULL,              -- 宛先 owner_ref（self lane=自分／peer lane=相手）
   lane         TEXT NOT NULL CHECK (lane IN ('self','peer')),
   ptype        TEXT NOT NULL CHECK (ptype IN ('memory-delta','talk-msg','talk-mirror','handoff','epoch-key')),
-  epoch        INTEGER NOT NULL,           -- wrap した epoch（device 宛 wrap のときは参照のみ）
+  epoch        INTEGER NOT NULL,           -- ★epoch id 明示（verdict G2）。wrap=epoch のとき宛先 epoch、device 宛は参照
   wrap_to      TEXT NOT NULL DEFAULT 'epoch' CHECK (wrap_to IN ('epoch','device')),
   to_device    TEXT NOT NULL DEFAULT '',   -- wrap_to='device' のとき宛先 device_id（handoff/epoch-key）
   eph_pub      TEXT NOT NULL,              -- ephemeral ECDH 公開（sealEnvelope）
@@ -122,10 +126,15 @@ CREATE TABLE r15_mesh_payload (
   chunk_ix     INTEGER NOT NULL DEFAULT 0, -- 16KB 超の束（handoff）の分割
   chunk_of     INTEGER NOT NULL DEFAULT 1,
   state        TEXT NOT NULL DEFAULT 'held' CHECK (state IN ('held','expired')),
-  created_at   TEXT NOT NULL
+  created_at   TEXT NOT NULL,
+  expires_at   TEXT NOT NULL               -- ★TTL を DB に持つ（verdict G5）。GC/fetch 不可判定の正本
 );
 CREATE INDEX idx_r15_mesh_aud ON r15_mesh_payload(audience_ref, state);
+CREATE INDEX idx_r15_mesh_exp ON r15_mesh_payload(expires_at);  -- request-time / GC purge
 ```
+> **verdict G2/G5 拘束**：`epoch` は payload に**明示**し、fetch/decrypt 時に端末の epoch private と突き合わせる。
+> `expires_at` は **DB 列**（created_at + lane 別 TTL を put 時に確定）— TTL を read-time の引き算に頼らず
+> 列で持つ＝expired 判定・GC・fetch 不可判定の正本。
 
 ### 2.5 `r15_mesh_ack` — per-device 配送状態（内部・counterparty に出さない）
 ```sql
@@ -215,20 +224,23 @@ WebCrypto の都合上 device key は **sig（ECDSA）と enc（ECDH）の2鍵**
 いずれも **content private はサーバを通らない**。サーバは「この公開鍵を持つ端末を owner 集合に入れてよい」
 という**認可の事実**だけを受ける。
 
-### 3.5 epoch rotation 手順（端末除去・定期巻き直し）
+### 3.5 epoch rotation 手順（端末除去・定期巻き直し・verdict G2 拘束順）
+verdict G2 の順序を**この順で**踏む（前後させない）：
 ```
-1. revoke：owner（信頼端末・passkey gate）が対象 device を revoked_at セット
-2. relay 遮断：サーバは revoked 端末の sig_pub からの fetch/put/ack を 401（fail-closed）
-3. purge：その owner_ref 宛の未配送 payload のうち、残存端末が全 ack 済みのものを delete。
-   未達分は held のまま（残存端末がいずれ ack→purge）。revoked 端末宛だけの payload は即 purge
-4. rotate：残存端末のいずれかが新 epoch keypair（epoch=n+1）を mint。
-   r15_owner.current_epoch ＝ n+1、r15_owner_epoch に epoch_pub(n+1, active=1)、旧 epoch を active=0
-5. 配布：新 epoch private を **残存各端末の device_enc pub に wrap**（ptype=epoch-key, wrap_to=device）して relay 投函。
-   各端末が fetch→unwrap→install→ack→purge
-6. 以後：新 epoch_pub で wrap。旧 epoch の暗号文は**残存端末が旧 epoch private を保持しているので読める**
-   （前方遮断は epoch 境界で足りる＝per-message forward secrecy は基本要件にしない＝確定設計どおり）
+1. inactive 化：旧 epoch を r15_owner_epoch.active=0（新規 wrap 宛先から外す）
+2. relay fetch 停止：revoke 対象 device の sig_pub からの fetch/put/ack を 401（fail-closed）
+3. purge（revoke 対象向け未配送）：to_device=revoked の未配送 payload を即 delete。
+   epoch private を渡すはずだった分も含め、revoked 宛は残さない
+4. 配布：新 epoch keypair（epoch=n+1）を mint → r15_owner_epoch に epoch_pub(n+1, active=1)、
+   r15_owner.current_epoch=n+1 → 新 epoch private を **active device 群の device_enc pub に wrap**
+   （ptype=epoch-key, wrap_to=device）して投函 → 各 active 端末 fetch→unwrap→install→ack→purge
+5. 以後：delta は **新 epoch public のみ**を宛先にする
 ```
-**revoked 端末の手元に既にある過去は端末内に残る**（remote wipe しない・できない）。UI はそれを**正直**に出す（§7・§ 安全表現）。
+- **stale epoch での新規 put 拒否**（verdict G2）：put 時に `epoch == current_epoch(active)` でなければ 409/拒否。
+  inactive epoch 宛の新規暗号文は relay に乗せない。
+- 旧 epoch の**既存**暗号文は、残存端末が旧 epoch private を保持しているので読める（過去 timeline は壊さない）。
+  前方遮断は epoch 境界で足りる（per-message forward secrecy は基本要件にしない＝確定設計どおり）。
+- **revoked 端末の手元に既にある過去は端末内に残る**（remote wipe しない・できない）。UI は正直に出す（§7・§安全表現）。
 
 ### 3.6 復旧の escape hatch（信頼端末ゼロ）
 - 既存端末が全滅し、handoff 元が無いとき、**私的履歴はサーバから戻せない**（relay は cache・正本でない）。
@@ -248,7 +260,9 @@ relay の各要求は **device_sig 署名**を載せる（body のハッシュ�
 ### 4.2 put（投函）`POST /api/mesh/put`
 - 入力：`{audience_ref, lane, ptype, epoch, wrap_to, to_device?, eph_pub, iv, ciphertext, chunk_ix, chunk_of}`（device_sig 署名）
 - 検証：ciphertext が**平文形でない**（tripwire）／size ≤ 16KB/chunk／audience_ref が実在／lane=self なら audience=自分。
-- 書込：`r15_mesh_payload` に held。
+- **stale epoch 拒否（verdict G2）**：`wrap_to='epoch'` なら `epoch` が audience の **active epoch** に一致すること。
+  不一致（inactive/旧 epoch）は **409 で拒否**（古い宛先の新規暗号文を relay に乗せない）。
+- 書込：`r15_mesh_payload` に held。`expires_at = created_at + TTL(lane)`（§4.6）を put 時に確定。
 - **送り手側状態は own-side のみ**（送信中→送った）。サーバは届いた/既読を返さない。
 
 ### 4.3 fetch（取得）`POST /api/mesh/fetch`
@@ -280,10 +294,12 @@ DELETE FROM r15_mesh_ack WHERE payload_id NOT IN (SELECT payload_id FROM r15_mes
 - **revoke 時**：対象端末だけ宛の payload（wrap_to=device,to_device=revoked）を即 delete。
 - **owner 全消去**：その owner_ref を audience とする payload を**実消去**（exit-safe）。
 
-### 4.6 TTL
-- 既定 **14日**（`MESH_TTL_DAYS=14`・既存 envelope と同値）。handoff 束は短め（例 **72時間**）— 受け渡しは即時的。
-- read-time に `held & created_at < cutoff` → `state='expired', ciphertext=''`（tombstone）→ 後続で hard delete。
-- relay は cache であって**蓄積場でない**ことを TTL で機械的に保証（numbers §gate）。
+### 4.6 TTL（`expires_at` 列が正本・verdict G5）
+- lane 別 TTL：delta/talk = **14日**（`MESH_TTL_DAYS=14`）。**handoff/epoch-key 束 = 72時間 hard**（`HANDOFF_TTL_HOURS=72`）。
+  put 時に `expires_at` 列へ確定（read-time の created_at 引き算に頼らない）。
+- GC：request-time GC（fetch/ack の度に `expires_at < now` を expired 化→ciphertext='')＋必要なら定期 GC。
+  **expired は fetch で返さない**（取得不可）。後続で hard delete。
+- relay は cache であって**蓄積場でない**ことを `expires_at` で機械的に保証（numbers §gate）。
 
 ### 4.7 per-device 配送状態（不変条件・STOP-E 裁定確定）
 - 状態は `r15_mesh_ack` に**端末ごと**＝最初の1台 ack で他端末が取り逃さない。
@@ -312,19 +328,36 @@ HandoffBundleV1 = {
 }
 ```
 
+### 5.1b QR 束（verdict G1・MITM 対策の信頼起点）
+QR は **pairing nonce だけでは不足**。QR 自身に新端末の公開鍵まで載せ、**それを信頼起点**にする：
+```
+HandoffQRV1 = {
+  sessionId,           // この handoff セッション id
+  nonce,               // 短命 pairing nonce
+  newDeviceEncPub,     // ★新端末の device_enc 公開鍵（束はこれ宛に封緘する）
+  newDeviceSigPub,     // ★新端末の device_sig 公開鍵（または fingerprint）
+  expiry,              // QR の失効時刻（短命）
+  name?,               // 任意の端末名（表示用）
+}
+```
+- **既存端末は QR 内の `newDeviceEncPub` へ handoff bundle を封緘する**（QR を読んだ事実が信頼起点）。
+- **server から後取得した公開鍵を handoff の信頼起点にしない**（rogue 公開鍵の差し込みを断つ）。
+  device-add 登録時の sig_pub/enc_pub は QR の値と**一致検証**する。
+
 ### 5.2 手順（port-once）
 ```
-1. 新端末：device_sig/device_enc keypair を mint。device_enc pub ＋ 短い pairing nonce を QR に焼く
-2. 既存端末：QR を読む（または手入力の短コード）。owner に承認を出す（「この端末をつなぐ？」）
-3. 既存端末：device-add を device_sig で署名し /api/mesh/device に登録（§3.4 経路2）
-4. 既存端末：HandoffBundle を作り、新端末 device_enc pub に sealEnvelope（16KB 超は chunk 分割）
-   → ptype=handoff, wrap_to=device, to_device=new で relay 投函
+1. 新端末：device_sig/device_enc keypair を mint → HandoffQRV1（§5.1b・enc_pub/sig_pub/sessionId/nonce/expiry）を QR に焼く
+2. 既存端末：QR を読む。owner に承認の問い（§12）を出す。expiry 切れは handoff 失敗（§12）
+3. 既存端末：device-add を device_sig で署名し登録。登録 pub は **QR の値と一致検証**（§5.1b）
+4. 既存端末：HandoffBundle を **QR の newDeviceEncPub** に sealEnvelope（16KB 超は chunk 分割）
+   → ptype=handoff, wrap_to=device, to_device=new で relay 投函（server 後取得鍵は使わない）
 5. 新端末：fetch→unwrap（device_enc priv）→ chunk 結合→ install
    （epoch priv を meshepoch へ・journal を mergeForeign で取り込み・talk を union）→ ack→purge
 6. 以後：新端末は current epoch を持つので relay で自然に届く
 ```
-- **pairing nonce** は中間者対策（QR を撮った端末だけが承認に進める短命トークン）。
-- 物理的に離れた端末でも、束は relay（72h TTL・全 ack で即 purge）を**配送 cache として一回だけ**通す＝正本化しない。
+- 物理的に離れた端末でも、束は relay（**72h hard TTL**・全 ack で即 purge・owner cancel で削除）を
+  **配送 cache として一回だけ**通す＝正本化しない。PX は復号不可（QR の enc_pub 宛封緘）。
+- UI は「**移しています**」（§7・預ける表現にしない）。
 - **信頼端末ゼロなら handoff 元が無い** → §3.6（封緘 backup か、正直に「戻らない」）。
 
 ---
@@ -484,12 +517,13 @@ type MemJournalRecordV2 = MemJournalRecordV1 & {
 **残る STOP（crypto/server 実装の前提・まだ閉じていない）**
 - **STOP-B（憲法境界＝新規 server data・Hiroto STOP #0）**：`r15_owner`/`r15_owner_epoch`/`r15_device`/
   `r15_mesh_payload`/`r15_mesh_ack` の新設（§2 全体）＋ edge_note 追補。additive だがサーバ保持データの新設＝境界。
-- **GPT crypto 5点 verdict**：rotation 前方遮断 / HLC+fold 収束 / handoff 信頼起点 MITM / 72h 一時滞留の許容 /
-  mesh_payload purge 実効。
+- **GPT crypto 5点 verdict** ✅ **条件付き PASS**（2026-06-17）— 設計は実装準備に進める水準。
+  5条件を**受け入れゲート**として §13 に焼き込み済み（handoff MITM / epoch rotation / HLC+fold /
+  72h handoff relay / mesh_payload purge）。STOP #0 はこの v0.3 文書を見て裁く。
 - ~~STOP-D 残（命名）~~ ✅ **解決**（2026-06-17・全文言確定・§12 ＋ SyncSection 反映済み）。
 
-> 実装（crypto/server）は GPT 5点 verdict ＋ Hiroto STOP #0 が開くまで入らない。
-> 緑作業（docs 反映・非 crypto UI 足場）はここまで。
+> 実装（crypto/server）は **Hiroto STOP #0 → Claude 実装発注書**が開くまで入らない。
+> 緑作業（docs v0.3 反映・非 crypto UI 足場）はここまで。順序＝文書(v0.3) → STOP #0 → 実装発注書。
 
 ---
 
@@ -578,3 +612,54 @@ QRの期限が切れたか、承認が完了しませんでした。もう一度
 > 足場での mock 状態機械: idle→[端末をつなぐ]→qr→[QRを表示]→approve→[追加する]→done／[やめる]→failed→
 > [もう一度QRを表示]→qr。qr→[復帰コードで戻る]→noDevice。実 QR・承認・配送は crypto/relay＝赤のため
 > placeholder。本物の鍵/relay/schema/crypto は未接続。
+
+---
+
+## 13. GPT crypto verdict — 条件付き PASS の受け入れゲート（2026-06-17）
+
+> verdict ＝**条件付き PASS**。下の 5 ゲートは prose でなく**受け入れ条件**＝crypto/server 実装は
+> 各チェックを満たして初めて緑。STOP #0 とその後の実装はこのゲートに照らして検収する。
+> 各条目の末尾 §ref は本書の該当設計節（既に verdict 拘束へ更新済み）。
+
+### G1. handoff MITM 対策（信頼起点）
+- [ ] QR は pairing nonce **だけでは不足**＝不可。QR 束に **{sessionId, nonce, newDeviceEncPub, newDeviceSigPub(or fingerprint), expiry, name?}** を含める。§5.1b
+- [ ] 既存端末は **QR 内の `newDeviceEncPub`** へ handoff bundle を封緘する（QR を読んだ事実が信頼起点）。§5.2-4
+- [ ] **server から後取得した公開鍵を handoff の信頼起点にしない**。device-add 登録 pub は QR の値と一致検証。§5.1b
+- [ ] QR `expiry` 切れは handoff 失敗（§12「つなげませんでした。」）。
+
+### G2. epoch rotation
+- [ ] 順序：**inactive 化 → relay fetch 停止 → revoke 対象 device 向け未配送 payload purge → 新 epoch private を active device 群へ配布 → 以後 delta は新 epoch public のみ宛先**。§3.5
+- [ ] **stale epoch での新規 put 拒否**（put 時 `epoch == active epoch` でなければ 409）。§4.2
+- [ ] payload に **epoch id を明示**（`r15_mesh_payload.epoch`）。§2.4
+- [ ] 旧 epoch の既存暗号文は残存端末で読める（過去 timeline を壊さない）／前方遮断は epoch 境界。§3.5
+
+### G3. HLC + fold
+- [ ] record は **origin + hlc + recordId**、deterministic tie-break。§6.2
+- [ ] fold は**到着順でなく** recordId/targetId/tombstone/supersede 関係から計算。§6.3-6.4
+- [ ] **forget wins**・supersede は **targetId 明示**。§6.4
+- [ ] HLC/順序材料は **timeline 収束専用**。ranking/matching/candidate quality に**流入させない**（import グラフ＋smoke で断言）。§6.4・§9-9
+
+### G4. 72h handoff relay
+- [ ] fallback 配送であり**正本でない**・新端末 enc_pub へ封緘・**PX 復号不可**。§5.2
+- [ ] **TTL 72h hard**・ACK 削除・**owner cancel 削除**・取得上限・サイズ上限。§4.6・§5.2
+- [ ] UI は「**移しています**」（**預ける表現にしない**）。§7・§5.2
+
+### G5. mesh_payload purge
+- [ ] **`expires_at` を DB に持つ**・TTL GC か request-time GC。§2.4・§4.6
+- [ ] **全 active device ACK で purge**・**最初の1台 ACK では消さない**。§4.4-4.5
+- [ ] **revoke 時に当該 device 未配送分 purge**・**owner purge**・**inactive は ACK 待ち集合から外す**。§3.5・§4.5
+- [ ] **expired payload は fetch 不可**・payload body は**暗号文のみ**・**ack は内部資料**（UI/counterparty/presence 非開示）。§4.6・§4.7
+
+---
+
+## 14. STOP #0 で見る対象（順序: 文書 v0.3 → STOP #0 → 実装発注書）
+
+1. **5テーブル**（`r15_owner`/`r15_owner_epoch`/`r15_device`/`r15_mesh_payload`/`r15_mesh_ack`・§2）
+2. **QR 束縛 handoff**（§5.1b・G1）
+3. **epoch rotation 手順**（§3.5・G2）
+4. **purge 実装ゲート**（§4.5・§4.6・G5）
+5. **legacy dual-read ＋ edge_note 追補**（§2.7）
+6. **本番 D1 適用の Go 境界**（0010 以降を本番へ `--remote` 適用しない線＝カットオーバーゲートまで）
+
+> crypto/server 実装・epoch keypair・relay 暗号化・handoff 封緘・本物 backend/schema/crypto 配線・
+> 5テーブルの本番 D1 migration・本番 deploy・main 直 push は **STOP #0 通過後の実装発注書まで赤**。
