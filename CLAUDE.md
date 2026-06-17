@@ -217,7 +217,8 @@ node scripts\r2-goal-ui-smoke.mjs                # UI 一周（二扉/pair面/#d
   `meshWriteGate`（server authoritative・`effective=min(KV mesh:mode, MESH_MODE_CAP)`・正本 `docs/r2/cutover-plan-v0.2.md §B.0`）。
   **mesh smoke を local で通すには env＋KV が要る**（無いと fail-closed off で register が 403）:
   ```powershell
-  # .dev.vars（コミットしない）に local 既定:  MESH_MODE_CAP=on   /   MESH_OWNER_ALLOWLIST=（空）
+  # .dev.vars（コミットしない）に local 既定:  MESH_MODE_CAP=on / MESH_OWNER_ALLOWLIST=（空） / MESH_BOOTSTRAP_ALLOWLIST=（空）
+  #   ※allowlist mode で register を試すなら MESH_BOOTSTRAP_ALLOWLIST=<passkey handle>、content write は MESH_OWNER_ALLOWLIST=<owner_ref>。
   npx wrangler kv key put --namespace-id 31c4f53ab2d54dea8a977fa7c719e229 "mesh:mode" "on" --local
   # mesh tables 掃除（idempotent でないので smoke 前に）:
   npx wrangler d1 execute px-app-board --local --command "DELETE FROM r15_mesh_ack; DELETE FROM r15_mesh_payload; DELETE FROM r15_device; DELETE FROM r15_owner_epoch; DELETE FROM r15_owner;"
