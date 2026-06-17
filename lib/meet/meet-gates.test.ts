@@ -277,13 +277,15 @@ test("M-11b: the face order stands — eyebrow→接点→basis→作る→texta
 
 // ── M-12 (c18): 死んだ edge への行為に成功の顔をさせない ─────────────────────────
 //
-// 話してみる / こちらも話してみる は送信結果を読み、棄却は正直な一行になる。
+// Talk を始める / こちらも Talk を始める は送信結果を読み、棄却は正直な一行になる。
 // 文言は指示書 §3 verbatim。sent 文言はペア単位だと読める形。
+// 期待の追従（Hiroto 命名ゲート 2026-06-17）: 「話してみる」→ Talk 語へ統一（PX UI 憲法: ユーザーへの信頼・
+// 状態を静かに示す）。sent は「Talkを始めたいと伝えてあります。」。
 
 test("M-12: c18 文言 — the gated refusal lines + pair-scoped sent, verbatim", () => {
   assert.equal(MEET.home.signals.notInPool, "この相手は、いまは候補に出ていません。");
   assert.equal(MEET.home.signals.nameFirst, "先に呼び名を決めてください。");
-  assert.equal(MEET.proposal.talkSent, "この相手には「話してみる」を伝えてあります。");
+  assert.equal(MEET.proposal.talkSent, "Talkを始めたいと伝えてあります。");
   // 期待の追従（Hiroto 確定 2026-06-16・表層語彙統一便 第2手）: 「記憶で書けます」退場 →
   // 「Setupで設定できます。」（リンク先は呼び名フィールドの在る /meet/memory/#name のまま）。
   assert.equal(MEET.receive.nameWhere, "Setupで設定できます。", "the name-row link wording (Setup)");

@@ -27,6 +27,9 @@ export const FORBIDDEN_TERMS: readonly string[] = [
   "ベスト",
   "マッチ度",
   "ランキング",
+  // 退場（Hiroto 2026-06-17・命名ゲート通過）: 旧「話してみる」→ Talk 語へ統一。
+  // 「押した/誘導/説明」型でなく「状態を静かに示す」型へ（PX UI 憲法: ユーザーへの信頼）。
+  "話してみる",
   // JA — labour / employment-placement safety
   "採用",
   "推薦",

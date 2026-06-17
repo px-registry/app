@@ -169,15 +169,15 @@ export const MEET = {
       // 表層語彙統一便（Hiroto 確定 2026-06-16）: eyebrow を英字意匠の全大文字へ
       // （YOUR AI と同テクスチャ）。
       eyebrow: "FOR YOU",
-      heading: "あなたへの「話してみる」",
+      heading: "Talk",
       // 表層語彙統一便 第2手（Hiroto 確定 2026-06-16）: 「相手のAI」→「ほかの人のAI」。
       subnote: "ほかの人のAIが、あなたのAntennaや候補を見つけたとき、ここに届きます。",
       // 第3手→統一便（Hiroto 確定）: Talk＝届いた話の空状態（届く相手＝Talk の語に寄せる）。
       empty: "まだ届いていません。",
       // UI便 copy catch（Hiroto 2026-06-17・確定候補）: 「話してみる」を押しました → Talk を始めたい。
       incoming: (name: string): string => `${name}さんがTalkを始めたいと伝えました。`,
-      talkBack: "こちらも話してみる",
-      mutual: "おたがいが「話してみる」を押しました。",
+      talkBack: "こちらもTalkを始める",
+      mutual: "おたがいがTalkを始めたいと伝えました。",
       contactHeading: "連絡のメモ",
       contactNote: "連絡のメモを交換できます。届くのはこの相手だけです。",
       /** R2 GOAL — 渡す遅延（spec §11-5 前倒し・黄・仮置き）: 渡すは任意・急がない。 */
@@ -662,9 +662,9 @@ export const MEET = {
   },
 
   proposal: {
-    talk: "話してみる",
+    talk: "Talkを始める",
     /** c18: ペア単位の状態だと読める形（カード単位でない — edge単位化は R2）。 */
-    talkSent: "この相手には「話してみる」を伝えてあります。",
+    talkSent: "Talkを始めたいと伝えてあります。",
     talkNote: "押すと、相手にTalkが届きます。連絡先はまだ伝わりません。",
     mutualNote: "おたがいが押したら、連絡のメモを交換できます。",
     /** 第7便 D — basisItemId の項目1件だけを開く折りたたみ。 */
@@ -694,7 +694,7 @@ export const MEET = {
     failed: "開けませんでした。合鍵を確かめてください。",
     empty: "まだ記録がありません。",
     poolHeading: "候補プール",
-    signalsHeading: "「話してみる」のながれ",
+    signalsHeading: "Talkのながれ",
     logsHeading: "提案と読み",
     readingLabel: "読み",
     noReading: "（読みはまだありません）",
