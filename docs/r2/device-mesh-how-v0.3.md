@@ -386,6 +386,21 @@ HandoffQRV1 = {
 - UI は「**移しています**」（§7・預ける表現にしない）。
 - **信頼端末ゼロなら handoff 元が無い** → §3.6（封緘 backup か、正直に「戻らない」）。
 
+### 5.3 🟥 security 申し送り（UI 便へ）— 全体すり替えは「人」が止める（二層 MITM 耐性）
+暗号（§5.1b の QR 署名・QR encPub 封緘）は **「QR の中身の部分すり替え」を完全に止める**
+（encPub/sigPub を差し替えれば署名が破れる）。**だが「QR まるごとを攻撃者の整合 QR に差し替える」**
+（攻撃者が自分の鍵対で正しく署名した QR を owner に読ませる）は **暗号だけでは止まらない**。
+これを止めるのは **人の確認ゲート**：
+- 既存端末が**端末記述子**を出す ——「**MacBook ／ 近くの端末・今日 21:34**」＋
+  「**身に覚えのない端末なら、追加しないでください。**」（STOP-D 確定コピー・§12 承認の問い）。
+- owner が**確認してから初めて**封緘（seal）に進む。
+- **二層**：暗号が部分すり替えを、人が全体すり替えを止める。両方で handoff の MITM 耐性が成立する。
+- **UI 配線時の必須（装飾でなく security gate）**：**「記述子確認 → 承認 → 封緘」の順序を強制**する。
+  承認を通過するまで **seal（approveAndSendHandoff の bundle 封緘・put）アクションに到達できない**こと。
+  確認なしに seal へ進める導線を作らない（confirm-gated）。
+- Phase B の protocol（`approveAndSendHandoff`）は「承認後に呼ぶ」前提で組んである — UI 便はこの順序を
+  画面の必須フローとして固定する（§7 の承認の問い → 承認 → 送信）。
+
 ---
 
 ## 6. merge（append-only journal の差分・union・dedup・時刻順・忘却）
@@ -690,3 +705,47 @@ QRの期限が切れたか、承認が完了しませんでした。もう一度
 
 > crypto/server 実装・epoch keypair・relay 暗号化・handoff 封緘・本物 backend/schema/crypto 配線・
 > 5テーブルの本番 D1 migration・本番 deploy・main 直 push は **STOP #0 通過後の実装発注書まで赤**。
+
+---
+
+## 15. edge_note 追補（Phase C 着手前・docs-only・実装はまだ入らない）
+
+> Phase C（relay/delta・G3/G5）の **前提**として `edge_note`／standing note の扱いを固定する。
+> ここは **設計の線引きだけ**。`edge_note` の mesh 化は **実装しない**（Phase C 完了後 or Phase D の別裁定）。
+
+### 15.1 用語の確定（何が `edge_note` か）
+- **`edge_note`（＝standing note）** ＝ 既存 `r15_envelope` の **kind='note'**。edge（縁）に立つ一枚で、
+  `(edge_id, from_ref)` 一意・編集可・edge が閉じれば畳まれる（0013 §3）。**E2EE**（PX は本文を読めない）。
+- 区別する owner-local の私的下書き（**mesh の note ではない**）：
+  - **firstnote**（`lib/meet-memory/firstnote` 第一信下書き）＝端末ローカル・サーバに出ない。
+  - **後日談（epilogue）** ＝端末ローカル完結（サーバ無関与）。
+  これらは Memory（self lane）側の私的データであり、`edge_note` とは別物。
+
+### 15.2 分類（私的メモか／相手と共有か）— 第6点
+- **`edge_note`（standing note）は「相手と共有」**：読者は **相手と相手の AI**（`MEET.home.talk.noteReaders`＝
+  「相手と、相手のAIが読めます。」）。edge-scoped・E2EE で**相手に渡る**＝共有メモ。**私的 owner-local ではない**。
+- **firstnote / 後日談は「私的（owner-local）」**：端末の外に出ない。これらは（共有でないので）Memory の
+  self lane に属し、`edge_note` の共有 lane とは混ぜない。
+- → `edge_note` の mesh 化は「**共有データを epoch 宛先へ寄せる**」話になり、peer 配送の意味づけが要る
+  （Phase D で別裁定）。私的 note（firstnote/後日談）は Memory delta（self lane）の射程。
+
+### 15.3 Phase C での扱い（第1〜5・7点）
+1. **Phase C 初手では `edge_note` を mesh に混ぜない**（mesh lane は §15.4 の2種に限定）。
+2. **既存 `edge_note` / standing note は legacy lane として維持**（`r15_envelope` kind='note'・§2.7 非破壊）。
+   破壊的 migration ゼロ・bulk migrate なし。
+3. **mesh lane はまず Talk message / Memory delta に限定**（`ptype` = `talk-msg` / `talk-mirror` /
+   `memory-delta`。`note` は mesh に乗せない）。
+4. **UI timeline の dual-read**：legacy message（`r15_envelope` kind=message）と mesh message
+   （`r15_mesh_payload` talk-msg）を **一本の Talk 時系列に並べる**（§2.7 dual-read・§6 順序材料）。
+   `edge_note` は時系列メッセージではなく「edge に立つ一枚」なので、この dual-read の**時系列対象に入れない**
+   （従来どおり edge 面の note として表示）。
+5. **`edge_note` の mesh 化は Phase C 完了後 or Phase D の別裁定**（本追補では mesh 化しない）。
+
+### 15.4 mesh lane（Phase C の射程）と不変条件 — 第7点
+- mesh に乗るのは **Talk message（peer lane: talk-msg／自分側 mirror: talk-mirror）と Memory delta（self lane）** だけ。
+- **平文本文・private は mesh に出さない**：body は暗号文のみ（epoch_pub 封緘）・private key は端末のみ（§2.6）。
+- **presence に流入させない**：per-device ack は内部資料（counterparty/UI/presence 非開示・§4.7）。
+- **ranking/matching/candidate quality に流入させない**：HLC/時刻/seq は **timeline 収束専用**（§6.4 invariant・
+  M-14）。`edge_note` も含め、note/message の順序材料が候補生成・順位に波及しない。
+- 三語（§3.2）と非破壊 dual-read（§2.7）はそのまま。`edge_note` は legacy のまま自然退役の対象にもしない
+  （standing note は edge に従属する状態であって「配達して消える message」ではない — 退役判断は別便）。
