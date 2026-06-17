@@ -172,7 +172,11 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
   // same standing as display_name) — and 0010, the R2 edge stage (STOP②
   // gate-passed: docs/r2/0010-edge-and-item-ref.md; item_ref alias column +
   // r15_edge metadata — still no board-template, draft, or owner-memory
-  // table). The set stays locked so any surprise migration still trips.
+  // table) — and 0015, the PX Device Mesh registry/relay (STOP #0 条件付き GO
+  // 2026-06-17: docs/r2/device-mesh-how-v0.3.md; owner_ref / device / epoch
+  // registry + relay payload/ack — public keys + ciphertext only, NO plaintext
+  // body, NO private key, still no board-template / draft / owner-memory table).
+  // The set stays locked so any surprise migration still trips.
   const files = readdirSync(here("../../migrations")).filter((f) => f.endsWith(".sql")).sort();
   assert.deepEqual(files, [
     "0001_board_records.sql",
@@ -188,6 +192,7 @@ test("BoardTemplate-impl-9: Board Templates added no migration; no board-templat
     "0011_r15_edge_close_facts.sql",
     "0012_business_flag.sql",
     "0014_e2ee_envelope.sql",
+    "0015_device_mesh.sql",
   ]);
 });
 

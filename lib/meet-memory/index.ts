@@ -24,6 +24,14 @@ export { ItemAliasStore, mintItemRef, type ItemAliasV1 } from "./alias.ts";
 export { EncKeyStore, type EncKeyRecordV1 } from "./enckey.ts";
 export { WindowChatStore, type WindowChatRecordV1 } from "./windowchat.ts";
 export { TalkStore, PeerKeyStore, type TalkEntryV1, type TalkEntryKind } from "./talk.ts";
+export {
+  MeshIdentityStore,
+  MeshDeviceStore,
+  MeshEpochStore,
+  type MeshIdentityV1,
+  type MeshDeviceKeysV1,
+  type MeshEpochKeyV1,
+} from "./mesh.ts";
 export { validateNewEntry, validateStoredEntry, validateJournalRecord, type ValidationResult } from "./validate.ts";
 export {
   MeetMemoryStore,
@@ -73,7 +81,15 @@ export {
   type MaskPair,
 } from "./mask-check.ts";
 
-import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE, JOURNAL_STORE, WINDOWCHAT_STORE } from "./indexeddb.ts";
+import { IndexedDbMeetBackend, MEMORY_STORE, RECEIVED_STORE, FIRSTNOTE_STORE, ALIAS_STORE, ENCKEY_STORE, TALK_STORE, PEERKEY_STORE, JOURNAL_STORE, WINDOWCHAT_STORE, MESHID_STORE, MESHDEVICE_STORE, MESHEPOCH_STORE } from "./indexeddb.ts";
+import {
+  MeshIdentityStore,
+  MeshDeviceStore,
+  MeshEpochStore,
+  type MeshIdentityV1,
+  type MeshDeviceKeysV1,
+  type MeshEpochKeyV1,
+} from "./mesh.ts";
 import { MeetMemoryStore } from "./store.ts";
 import { MemJournalStore } from "./journal.ts";
 import { WindowChatStore, type WindowChatRecordV1 } from "./windowchat.ts";
@@ -131,4 +147,19 @@ export function openTalk(): TalkStore {
 /** Browser-side peer 鍵世代の覚え (R2 便6). Call only from client components. */
 export function openPeerKeys(): PeerKeyStore {
   return new PeerKeyStore(new IndexedDbMeetBackend<PeerKeyGenV1>(PEERKEY_STORE));
+}
+
+/** Device Mesh — 端末の身元（owner_ref/device_id）. Call only from client components. */
+export function openMeshIdentity(): MeshIdentityStore {
+  return new MeshIdentityStore(new IndexedDbMeetBackend<MeshIdentityV1>(MESHID_STORE));
+}
+
+/** Device Mesh — この端末の device 鍵（sig/enc・private 含む）. Client-only. */
+export function openMeshDevice(): MeshDeviceStore {
+  return new MeshDeviceStore(new IndexedDbMeetBackend<MeshDeviceKeysV1>(MESHDEVICE_STORE));
+}
+
+/** Device Mesh — content epoch 鍵（private 含む・過去 epoch も保持）. Client-only. */
+export function openMeshEpochs(): MeshEpochStore {
+  return new MeshEpochStore(new IndexedDbMeetBackend<MeshEpochKeyV1>(MESHEPOCH_STORE));
 }

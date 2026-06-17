@@ -31,12 +31,17 @@ export const TALK_STORE = "talk";
 export const PEERKEY_STORE = "peerkey";
 export const JOURNAL_STORE = "journal";
 export const WINDOWCHAT_STORE = "windowchat";
+// Device Mesh（Phase A）— private はこの端末にだけ住む 3 lane:
+export const MESHID_STORE = "meshid"; // singleton: { ownerRef, deviceId }
+export const MESHDEVICE_STORE = "meshdevice"; // singleton: device の sig/enc keypair（private 含む）
+export const MESHEPOCH_STORE = "meshepoch"; // epoch → epoch keypair（private 含む・過去 epoch も保持）
+// v8 (Device Mesh Phase A): + meshid / meshdevice / meshepoch（端末横断同期の鍵・身元）。
 // v7 (記憶装置 層2b): + windowchat（②opt-in の会話控え・既定では空）。
 // v6 (記憶装置 層1a): + journal (keyPath recordId). v5 (R2 便6): + talk / peerkey.
 // v4 (R2 0013): + enckey. v3 (R2 0010): + aliasmap. v2 (c17): + firstnote.
 // onupgradeneeded creates only what is missing, so older databases upgrade in
 // place without touching existing lanes.
-const VERSION = 7;
+const VERSION = 8;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -71,6 +76,16 @@ function openDb(): Promise<IDBDatabase> {
       // 記憶装置 層2b — windowchat lane（②opt-in の会話控え・singleton）。
       if (!db.objectStoreNames.contains(WINDOWCHAT_STORE)) {
         db.createObjectStore(WINDOWCHAT_STORE, { keyPath: "entryId" });
+      }
+      // Device Mesh Phase A — 身元・端末鍵・epoch 鍵（private はこの端末のみ）。
+      if (!db.objectStoreNames.contains(MESHID_STORE)) {
+        db.createObjectStore(MESHID_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(MESHDEVICE_STORE)) {
+        db.createObjectStore(MESHDEVICE_STORE, { keyPath: "entryId" });
+      }
+      if (!db.objectStoreNames.contains(MESHEPOCH_STORE)) {
+        db.createObjectStore(MESHEPOCH_STORE, { keyPath: "entryId" });
       }
     };
     req.onsuccess = () => resolve(req.result);

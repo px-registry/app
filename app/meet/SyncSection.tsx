@@ -19,8 +19,9 @@
 //   noDevice → [復帰コードで戻る]／[新しく始める] → idle
 //   一覧: 各端末に 同期/同期しない トグル＋外す（二態）。この端末のトグルは pauseThis 確認を開く。
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
+import { ensureRegistered, loadDevices, revokeDevice } from "@/lib/meet-mesh/client.ts";
 
 type MeshDevice = { id: string; label: string; here: boolean; syncing: boolean };
 type Step = null | "qr" | "approve" | "done" | "failed" | "noDevice";
@@ -59,10 +60,38 @@ export function SyncSection() {
   const [step, setStep] = useState<Step>(null);
   const [removeTarget, setRemoveTarget] = useState<MeshDevice | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
+  // live = backend（local/dev）に身元があり、一覧が実機由来。fetch 不可（静的配信・本番非接続）
+  // なら false のまま＝確定コピーの mock 足場を保つ（既存 ws-smoke はこの経路で green）。
+  const [live, setLive] = useState(false);
+
+  // 実機一覧へ差し替える（身元・backend があれば）。無ければ mock のまま（fail-closed）。
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const list = await loadDevices();
+    if (list !== null && list.length > 0) {
+      setDevices(list.map((v) => ({ id: v.deviceId, label: v.label || v.deviceId, here: v.here, syncing: true })));
+      setLive(true);
+      return true;
+    }
+    return false;
+  }, []);
+
+  // 既に登録済み（前回 bootstrap 済み）の端末は、開いた時点で実機一覧を読む。
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const fallbackAdd = (): void =>
+    setDevices((d) => [...d, { id: `d-${d.length}`, label: PENDING_LABEL, here: false, syncing: true }]);
 
   const addPending = (): void => {
-    setDevices((d) => [...d, { id: `d-${d.length}`, label: PENDING_LABEL, here: false, syncing: true }]);
     setStep("done");
+    // 既定は同期の mock 追加（backend 非接続でも即反映・既存挙動を保つ）。
+    fallbackAdd();
+    // backend（local/dev）があれば、この端末を bootstrap（公開鍵だけ送る）→ 実機一覧へ差し替え。
+    void (async () => {
+      const id = await ensureRegistered(PENDING_LABEL);
+      if (id !== null) await refresh();
+    })();
   };
   const toggleDevice = (dev: MeshDevice): void => {
     if (dev.here) {
@@ -72,12 +101,23 @@ export function SyncSection() {
     setDevices((d) => d.map((x) => (x.id === dev.id ? { ...x, syncing: !x.syncing } : x)));
   };
   const confirmPause = (): void => {
+    // 同期の persistence opt-in（local）。relay の停止は Phase C。
     setDevices((d) => d.map((x) => (x.here ? { ...x, syncing: false } : x)));
     setPauseOpen(false);
   };
   const confirmRemove = (): void => {
-    if (removeTarget) setDevices((d) => d.filter((x) => x.id !== removeTarget.id));
+    const target = removeTarget;
     setRemoveTarget(null);
+    if (target === null) return;
+    if (live) {
+      // 実機: revoke+rotate（registry 側）→ 一覧を読み直す。
+      void (async () => {
+        const r = await revokeDevice(target.id);
+        if (r.ok) await refresh();
+      })();
+      return;
+    }
+    setDevices((d) => d.filter((x) => x.id !== target.id));
   };
 
   return (

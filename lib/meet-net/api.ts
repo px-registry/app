@@ -505,3 +505,33 @@ export async function fetchPool(
     return { ok: false, error: "network" };
   }
 }
+
+// ── PX Device Mesh transport（Phase A）─────────────────────────────────────────
+// fetch はこのファイルだけ（MN-1）。署名・鍵・身元は lib/meet-mesh が組み立て、ここは
+// 同一オリジンの /api/mesh/* へ運ぶだけ。fail-closed: 失敗は { ok:false } に畳む。
+
+export type MeshHttpResult = { ok: boolean; status: number; data: Record<string, unknown> | null };
+
+export async function meshPost(path: string, body: unknown): Promise<MeshHttpResult> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data: unknown = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, data: isRecord(data) ? data : null };
+  } catch {
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+export async function meshGet(path: string): Promise<MeshHttpResult> {
+  try {
+    const res = await fetch(path);
+    const data: unknown = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, data: isRecord(data) ? data : null };
+  } catch {
+    return { ok: false, status: 0, data: null };
+  }
+}
