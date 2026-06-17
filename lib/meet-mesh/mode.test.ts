@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMeshMode, effectiveMeshMode, parseAllowlist, meshWriteAllowed } from "./mode.ts";
+import { parseMeshMode, effectiveMeshMode, parseAllowlist, meshWriteAllowed, parseHandleAllowlist, bootstrapAllowed } from "./mode.ts";
 
 const A = "a".repeat(32); // 32 hex（isOwnerRef を満たす）
 const B = "b".repeat(32);
@@ -75,5 +75,33 @@ test("MODE-8: fail-closed — owner_ref 不在/不正は全 mode で不可", () 
     assert.equal(meshWriteAllowed(mode, undefined, [A]), false);
     assert.equal(meshWriteAllowed(mode, "", [A]), false);
     assert.equal(meshWriteAllowed(mode, "short", [A]), false);
+  }
+});
+
+test("MODE-9: parseHandleAllowlist は任意 handle 文字列を拾う（空だけ捨てる）", () => {
+  assert.deepEqual(parseHandleAllowlist("alice, bob"), ["alice", "bob"]);
+  assert.deepEqual(parseHandleAllowlist(" alice , , bob "), ["alice", "bob"]);
+  assert.deepEqual(parseHandleAllowlist(""), []);
+  assert.deepEqual(parseHandleAllowlist(undefined), []);
+  assert.deepEqual(parseHandleAllowlist(null), []);
+});
+
+test("MODE-10: bootstrapAllowed — off は不可・on は handle あれば可", () => {
+  assert.equal(bootstrapAllowed("off", "alice", ["alice"]), false);
+  assert.equal(bootstrapAllowed("on", "alice", []), true);
+  assert.equal(bootstrapAllowed("on", "bob", ["alice"]), true);
+});
+
+test("MODE-11: bootstrapAllowed — allowlist は bootstrap list の handle だけ", () => {
+  assert.equal(bootstrapAllowed("allowlist", "alice", ["alice", "bob"]), true);
+  assert.equal(bootstrapAllowed("allowlist", "carol", ["alice", "bob"]), false); // 外
+  assert.equal(bootstrapAllowed("allowlist", "alice", []), false); // 空 list
+});
+
+test("MODE-12: bootstrapAllowed — handle 不在は全 mode で不可（fail-closed）", () => {
+  for (const mode of ["off", "allowlist", "on"] as const) {
+    assert.equal(bootstrapAllowed(mode, null, ["alice"]), false);
+    assert.equal(bootstrapAllowed(mode, undefined, ["alice"]), false);
+    assert.equal(bootstrapAllowed(mode, "", ["alice"]), false);
   }
 });

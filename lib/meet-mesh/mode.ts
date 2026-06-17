@@ -42,3 +42,28 @@ export function meshWriteAllowed(mode: MeshMode, ownerRef: string | null | undef
   if (mode === "allowlist") return allowlist.includes(ownerRef);
   return false; // off（既定）
 }
+
+/**
+ * bootstrap allowlist（passkey handle ベース）の env を配列へ。
+ * owner_ref と違い handle は任意文字列ゆえ形フィルタしない（空だけ捨てる）。
+ */
+export function parseHandleAllowlist(env: unknown): string[] {
+  if (typeof env !== "string" || env.trim() === "") return [];
+  return env
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * **新規 owner の bootstrap（register）可否**（owner_ref を mint する前の判定・fail-closed）。
+ * handle は **passkey session 由来**（server が HMAC 検証して解決・client 申告でない）。
+ * off → 不可。on → 可（global on は別 Go）。allowlist → handle が bootstrap allowlist に居るときだけ。
+ * handle 不在は不可。これで allowlist mode の register を「5 人」に閉じる（registry 行の blast radius を絞る）。
+ */
+export function bootstrapAllowed(mode: MeshMode, handle: string | null | undefined, handleAllowlist: readonly string[]): boolean {
+  if (typeof handle !== "string" || handle === "") return false;
+  if (mode === "on") return true;
+  if (mode === "allowlist") return handleAllowlist.includes(handle);
+  return false; // off（既定）
+}

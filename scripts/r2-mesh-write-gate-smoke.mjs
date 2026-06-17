@@ -22,6 +22,9 @@ const AUTH = "Basic " + Buffer.from(`${process.env.R2_USER ?? ""}:${process.env.
 const SECRET = process.env.AUTH_SECRET || "px-dev-insecure-secret-set-AUTH_SECRET-in-prod";
 const SCENARIO = process.argv[2] ?? "";
 const BFILE = "tmp-mesh-gate-B.json";
+// B の passkey handle は固定（bootstrap allowlist へ入れる）。Z は list 外（bootstrap-deny 検査用）。
+const HANDLE_B = "gate-bootstrap-B";
+const HANDLE_Z = "gate-bootstrap-Z-not-listed";
 
 let failures = 0;
 const check = (n, c, d = "") => { if (c) console.log(`  ok  ${n}`); else { failures += 1; console.log(`  FAIL ${n} ${d}`); } };
@@ -45,6 +48,12 @@ async function mintSession(handle) {
   const p = b64url(Buffer.from(JSON.stringify({ h: handle, e })));
   const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return `__px_session=${p}.${b64url(new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(p))))}`;
+}
+// handle を偽った session（HMAC を壊す）→ server は readSession で弾く（account 偽装は通らない）。
+async function tamperedSession(handle) {
+  const c = await mintSession(handle);
+  const last = c.slice(-1) === "A" ? "B" : "A";
+  return c.slice(0, -1) + last; // sig 末尾を反転
 }
 async function mintDevice() {
   const sig = await crypto.subtle.generateKey(ECDSA, true, ["sign", "verify"]);
@@ -88,17 +97,36 @@ function loadB() {
 console.log(`# scenario=${SCENARIO}`);
 
 if (SCENARIO === "al-deny") {
-  // mode=allowlist・空 list。B は register でき（mode>off）、content write は allowlist 外で拒否。
+  // mode=allowlist。owner allowlist=空 / bootstrap allowlist=HANDLE_B のみ。
+  // bootstrap allowlist 外 handle（Z）の register は 403。account 偽装（tampered session）も 401。
+  const Z = await mintDevice();
+  let rz = await post(
+    "/api/mesh/register",
+    { device: { deviceId: Z.deviceId, sigPub: pubStr(Z.sigPub), encPub: pubStr(Z.encPub), label: "Z" }, epochPub: await mintEpochPub() },
+    await mintSession(HANDLE_Z),
+  );
+  check("al-deny register（bootstrap allowlist 外 handle）→ 403 mesh_disabled", rz.status === 403 && rz.body?.error === "mesh_disabled", JSON.stringify(rz));
+  // account 偽装: handle を HANDLE_B に偽った tampered session → 401（HMAC 検証で弾く・bootstrap を抜けない）。
+  let rt = await post(
+    "/api/mesh/register",
+    { device: { deviceId: (await mintDevice()).deviceId, sigPub: pubStr((await mintDevice()).sigPub), encPub: pubStr((await mintDevice()).encPub), label: "T" }, epochPub: await mintEpochPub() },
+    await tamperedSession(HANDLE_B),
+  );
+  check("al-deny 偽装 session（handle 詐称）→ 401（account 偽装は通らない）", rt.status === 401, JSON.stringify(rt));
+
+  // bootstrap allowlist 内 handle（B）は register 可。client が body で owner_ref を偽っても無視される。
   const B = await mintDevice();
   B.epochPub = await mintEpochPub();
+  const forged = "0".repeat(32);
   const r = await post(
     "/api/mesh/register",
-    { device: { deviceId: B.deviceId, sigPub: pubStr(B.sigPub), encPub: pubStr(B.encPub), label: "B" }, epochPub: B.epochPub },
-    await mintSession(`gateB-${hex(6)}`),
+    { ownerRef: forged, device: { deviceId: B.deviceId, sigPub: pubStr(B.sigPub), encPub: pubStr(B.encPub), label: "B" }, epochPub: B.epochPub },
+    await mintSession(HANDLE_B),
   );
-  check("al-deny register B 201（mode>off で bootstrap 可）", r.status === 201 && r.body?.ok === true, JSON.stringify(r));
+  check("al-deny register B 201（bootstrap allowlist 内 handle）", r.status === 201 && r.body?.ok === true, JSON.stringify(r));
   check("al-deny register capability: mode=allowlist", r.body?.mode === "allowlist", JSON.stringify(r.body));
-  check("al-deny register capability: writeAllowed=false（B は list 外）", r.body?.writeAllowed === false, JSON.stringify(r.body));
+  check("al-deny register capability: writeAllowed=false（B owner_ref は list 外）", r.body?.writeAllowed === false, JSON.stringify(r.body));
+  check("al-deny 偽装 owner_ref は無視（mint 値が返る）", typeof r.body?.ownerRef === "string" && r.body.ownerRef !== forged && r.body.ownerRef.length === 32, JSON.stringify(r.body));
   B.ownerRef = r.body?.ownerRef;
   writeFileSync(BFILE, JSON.stringify(B));
 

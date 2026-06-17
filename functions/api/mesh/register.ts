@@ -18,6 +18,8 @@ import {
   meshEffectiveMode,
   meshWriteAllowed,
   parseAllowlist,
+  parseHandleAllowlist,
+  bootstrapAllowed,
   MAX_LABEL,
   type MeshEnv,
 } from "../../_mesh.ts";
@@ -45,14 +47,16 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
   // ownerToken は任意・補助のみ: 一方向ハッシュで participant_ref（公開面写像）にだけ使う。
   const participantRef = isOwnerToken(raw.ownerToken) ? await deriveParticipantRef(raw.ownerToken) : "";
 
-  // MESH_WRITE gate（server authoritative）。register は **新規 owner の bootstrap が write** —
-  // ただし owner_ref はここで mint される（chicken-egg）ので、新規は **mode>off** で通し、
-  // 載るべき allowlist 判定は content write（relay/handoff put）で owner_ref を見て効かせる。
-  // mode=off は「mesh を一切有効化しない」deliberate 状態 → 新規 bootstrap も止める（fail-closed）。
-  // 既存 owner の register は読み（INSERT 無し）→ mode に関わらず ref を返し、capability を同梱して
-  // client の正直表示（B）に使わせる。
+  // MESH_WRITE gate（server authoritative・2 段判定で register の blast radius を allowlist に閉じる）:
+  //   off → 403。on → 可（global on は別 Go）。allowlist のとき:
+  //     - 既存 owner_ref が解決できる → **owner_ref allowlist** で判定（INSERT 無しの read だが 5 人に閉じる）。
+  //     - owner_ref 未 mint の初回 register → **bootstrap allowlist（passkey handle）** で判定。
+  //   handle は passkey session 由来（HMAC 検証済・client 申告でない）、owner_ref は D1 lookup（client 申告でない）。
+  // これで allowlist 外 handle が owner/device/epoch registry 行を作れる blast radius を塞ぐ。
   const mode = await meshEffectiveMode(env);
-  const allowlist = parseAllowlist(env.MESH_OWNER_ALLOWLIST);
+  if (mode === "off") return json({ ok: false, error: "mesh_disabled", mode, writeAllowed: false }, 403);
+  const ownerAllowlist = parseAllowlist(env.MESH_OWNER_ALLOWLIST);
+  const bootstrapList = parseHandleAllowlist(env.MESH_BOOTSTRAP_ALLOWLIST);
 
   try {
     // owner_ref は handle に束ねる（passkey 同一性が根）。既にあれば既存を返す（冪等）。
@@ -63,16 +67,16 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
       .all<{ owner_ref: string }>();
     const existingRef = (existing.results ?? [])[0]?.owner_ref;
     if (existingRef !== undefined) {
-      return json({
-        ok: true,
-        ownerRef: existingRef,
-        existing: true,
-        mode,
-        writeAllowed: meshWriteAllowed(mode, existingRef, allowlist),
-      });
+      // 既存 owner: owner_ref allowlist で判定（allowlist mode で 5 人外は 403）。read だが register を閉じる。
+      const allowed = meshWriteAllowed(mode, existingRef, ownerAllowlist);
+      if (!allowed) return json({ ok: false, error: "mesh_disabled", mode, writeAllowed: false }, 403);
+      return json({ ok: true, ownerRef: existingRef, existing: true, mode, writeAllowed: true });
     }
 
-    if (mode === "off") return json({ ok: false, error: "mesh_disabled", mode, writeAllowed: false }, 403);
+    // 新規 bootstrap: passkey handle allowlist で判定（owner_ref はまだ無い）。
+    if (!bootstrapAllowed(mode, handle, bootstrapList)) {
+      return json({ ok: false, error: "mesh_disabled", mode, writeAllowed: false }, 403);
+    }
 
     const ownerRef = mintOwnerRef();
     const now = new Date().toISOString();
@@ -96,7 +100,7 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
         .bind(d.deviceId, ownerRef, d.sigPub, d.encPub, label, now),
     ]);
     return json(
-      { ok: true, ownerRef, epoch: 1, existing: false, mode, writeAllowed: meshWriteAllowed(mode, ownerRef, allowlist) },
+      { ok: true, ownerRef, epoch: 1, existing: false, mode, writeAllowed: meshWriteAllowed(mode, ownerRef, ownerAllowlist) },
       201,
     );
   } catch {

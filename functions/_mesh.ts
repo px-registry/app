@@ -25,7 +25,7 @@ import {
   MAX_LABEL,
   MESH_TS_SKEW_MS,
 } from "../lib/meet-crypto/mesh.ts";
-import { effectiveMeshMode, parseAllowlist, meshWriteAllowed, type MeshMode } from "../lib/meet-mesh/mode.ts";
+import { effectiveMeshMode, parseAllowlist, meshWriteAllowed, parseHandleAllowlist, bootstrapAllowed, type MeshMode } from "../lib/meet-mesh/mode.ts";
 
 export type { MeshMode };
 /** mesh write の KV lever のキー（AUTH KV 内・allowlist は KV に置かない＝env のみ）。 */
@@ -54,11 +54,14 @@ export type MeshEnv = MeetEnv &
   AuthEnv & {
     MESH_MODE_CAP?: string;
     MESH_OWNER_ALLOWLIST?: string;
+    // bootstrap allowlist（passkey handle/account）。register の owner_ref mint 前判定用（§B.0）。
+    MESH_BOOTSTRAP_ALLOWLIST?: string;
   };
 
 // 純粋ロジック（min/allowlist 判定）を re-export — endpoint 側で owner_ref 解決後に writeAllowed を
 // 計算するため（register は owner_ref を mint する＝gate を mode と allowlist の二段で読む）。
-export { effectiveMeshMode, parseAllowlist, meshWriteAllowed };
+// bootstrapAllowed/parseHandleAllowlist は register の owner_ref mint 前判定（passkey handle allowlist）用。
+export { effectiveMeshMode, parseAllowlist, meshWriteAllowed, parseHandleAllowlist, bootstrapAllowed };
 
 /**
  * effective mode（min(KV:mesh:mode, MESH_MODE_CAP)）だけを読む。
