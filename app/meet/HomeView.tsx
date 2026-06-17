@@ -89,6 +89,8 @@ import {
 import { pastedOutputEchoesPrivate, type RigOwnerV1 } from "@/lib/rig";
 import { mintEncKeyPair, encPubToString, parseEncPub } from "@/lib/meet-crypto/keys.ts";
 import { sealEnvelope, openEnvelope } from "@/lib/meet-crypto/envelope.ts";
+import { pollMesh } from "@/lib/meet-mesh/sync.ts";
+import { mergeTalkTimeline } from "@/lib/meet-mesh/timeline.ts";
 import { useT } from "@/lib/i18n/context.tsx";
 import { SignalsSection, type FirstNoteFaceData } from "./SignalsSection.tsx";
 import { BoundaryNote } from "./BoundaryNote.tsx";
@@ -293,8 +295,15 @@ export function HomeView() {
       if (ackIds.length > 0) void ackEnvelopes(getOrMintOwnerToken(), ackIds);
       setPeerNotes(notes);
     }
-    // 並び（時刻順）は棚の責務 — UI レーンは sort しない（M-4）
-    setThreads(await talkLane.threadsByEdge());
+    // Device Mesh dual-read: mesh の talk delta を**同じ棚**へ取り込んでから読む（身元無しは no-op・
+    // best-effort）。legacy（envelope）と mesh（talk-msg/talk-mirror）が同一 talk store に入り、
+    // entryId で dedup される。並び（時刻順）は棚の責務 — UI レーンは sort しない（M-4）。
+    // mergeTalkTimeline で (at,entryId) 決定的順＋edge_note(note-out) を timeline から除外（§15）。
+    await pollMesh().catch(() => undefined);
+    const grouped = await talkLane.threadsByEdge();
+    const mergedThreads: Record<string, TalkEntryV1[]> = {};
+    for (const edgeId of Object.keys(grouped)) mergedThreads[edgeId] = mergeTalkTimeline(grouped[edgeId]);
+    setThreads(mergedThreads);
 
     setLastPatrolAt(getPatrolLastRun());
     // 気配: how many participants are in the pool right now (count only)

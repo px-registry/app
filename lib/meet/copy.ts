@@ -425,12 +425,23 @@ export const MEET = {
     syncingLabel: "同期中",
     syncOn: "同期",
     syncOff: "同期しない",
-    /** QR 手引き（この端末を新たにつなぐ・確定 2026-06-17）。実 QR は crypto＝赤・足場は placeholder。 */
+    /** QR 手引き（この端末を新たにつなぐ・確定 2026-06-17）。 */
     qr: {
       title: "この端末をつなぐ",
       body: "すでにPXを使っている端末で、このQRを読み取ってください。Antenna、Talk、Memoryをこの端末でも使えるようにします。",
       show: "QRを表示",
       recover: "復帰コードで戻る",
+      /** UI便（2026-06-17）— テキスト貼り付け版の暫定文言【STOP④ 暫定・要 Hiroto 確定】。
+       *  camera/scanner は最後の便。今は QR の JSON テキストをコピー/貼り付けで橋渡しする。 */
+      copyAction: "QRをコピー",
+      copied: "コピーしました",
+      pasteTitle: "別の端末を迎える",
+      pastePlaceholder: "相手の端末のQRテキストを貼り付け",
+      pasteConfirm: "QRを確認",
+      invalid: "QRが読めませんでした。期限切れか、内容が壊れています。",
+      /** 新端末側: 既存端末の承認後に取り込む（poll install）。 */
+      receive: "受け取る",
+      waiting: "まだ届いていません。",
     },
     /** 接続完了（確定 2026-06-17）。AIキー無しの分岐つき。 */
     done: {

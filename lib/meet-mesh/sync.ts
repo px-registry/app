@@ -17,6 +17,7 @@ import {
   openMeshEpochs,
   openMemJournal,
   openTalk,
+  openMeetMemory,
   type MemJournalRecordV1,
   type TalkEntryV1,
 } from "../meet-memory/index.ts";
@@ -163,4 +164,16 @@ export async function purgeMine(): Promise<{ ok: boolean }> {
   if (dev === null) return { ok: false };
   const res = await meshPost("/api/mesh/relay/purge", await signedRequest(dev.deviceId, dev.sig.priv, {}));
   return { ok: okHttp(res) };
+}
+
+/**
+ * 全消去（「このPXのMemoryとTalkを消す」）: server relay payload を purge（exit-safe）＋
+ * 端末ローカルの Talk / Memory を消す。相手の端末・相手の PX には触れない（server は自分の audience だけ）。
+ * backend 不在でもローカルは消す（purge は best-effort）。
+ */
+export async function wipeMine(): Promise<{ ok: boolean }> {
+  const purged = await purgeMine();
+  await openTalk().clear();
+  await openMeetMemory().clear();
+  return { ok: purged.ok };
 }

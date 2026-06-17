@@ -11,6 +11,7 @@
 import { sealEnvelope, openEnvelope, type SealedEnvelopeV1 } from "../meet-crypto/envelope.ts";
 import { encPubToString, parseEncPub } from "../meet-crypto/keys.ts";
 import { buildHandoffQR, parseHandoffQR, mintDeviceKeys, mintDeviceId, type HandoffQRV1 } from "../meet-crypto/mesh.ts";
+export type { HandoffQRV1 } from "../meet-crypto/mesh.ts";
 import { meshPost, type MeshHttpResult } from "../meet-net/api.ts";
 import { signedRequest } from "./client.ts";
 import {

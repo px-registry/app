@@ -1,38 +1,41 @@
 "use client";
 
-// Device Mesh（内部名）／表層 Sync — 端末横断同期の UI 足場（緑2・2026-06-17）。
-// 設計: docs/r2/device-mesh-how-v0.3.md。STOP-D 確定コピーのみ・モック状態。
+// Device Mesh（内部名）／表層 Sync — UI便（2026-06-17）: 実機配線（local/dev・本番非接触）。
+// 設計: docs/r2/device-mesh-how-v0.3.md §5/§7/§13。
 //
-// 本物には一切つながない:
-//   - 鍵 / relay / 本番 schema / crypto 非接続（M-3: app/meet は I/O 禁止＝useState のみ）。
-//   - 実 QR は device_enc pub＋pairing nonce の crypto＝赤。足場は placeholder の四角だけ。
-//   - 順序材料を持たない・並べ替えない（M-4: .sort なし）＝「判定しない柱」を足場でも守る。
-//   - 自分側の事実のみ（STOP-E）。相手の届いた/読んだ/入力中/オンライン/相手端末同期 は出さない。
-// 文言はすべて MEET.sync 経由（インラインの日本語コピーを置かない）。
+// 配線（lib 経由・app/meet は fetch/indexedDB/localStorage を直接持たない）:
+//   - client.ts: ensureRegistered / loadDevices / revokeDevice
+//   - handoff.ts: startHandoffAsNewDevice（自分の QR テキスト）/ reviewIncomingQR（貼付 QR の検証）/
+//                 approveAndSendHandoff（**承認後にだけ**封緘＋put）/ cancelHandoff
+//   - sync.ts: wipeMine（全消去＝relay purge ＋ ローカル Talk/Memory clear）
 //
-// 連結フロー（モックの状態機械・確定コピーで各面を見せる）:
-//   idle → [端末をつなぐ] → qr（QR手引き）
-//   qr  → [QRを表示] → approve（既存端末の承認の問い）／[復帰コードで戻る] → noDevice
-//   approve → [追加する] → done(+一覧へ追加)／[やめる] → failed（承認未完了＝handoff失敗）
-//   done → [AI接続へ](=#step-key)／[あとで] → idle
-//   failed → [もう一度QRを表示] → qr
-//   noDevice → [復帰コードで戻る]／[新しく始める] → idle
-//   一覧: 各端末に 同期/同期しない トグル＋外す（二態）。この端末のトグルは pauseThis 確認を開く。
+// security（§5.3・confirm-gated seal）: 貼付→reviewIncomingQR（純粋な検証・封緘も put もしない）→
+//   承認の問い（記述子確認）→ **[追加する] を押して初めて** approveAndSendHandoff（device-add＋封緘＋put）。
+//   承認前に seal/put へ到達しない。封緘宛先は QR 内 encPub のみ（server 後取得鍵を信頼起点にしない）。
+// 自分側の事実のみ（STOP-E）。文言は MEET.sync 経由。backend 不在なら mock 一覧に畳む（ws-smoke 維持）。
 
 import { useCallback, useEffect, useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
 import { ensureRegistered, loadDevices, revokeDevice } from "@/lib/meet-mesh/client.ts";
+import {
+  startHandoffAsNewDevice,
+  reviewIncomingQR,
+  approveAndSendHandoff,
+  pollAndInstallHandoff,
+  cancelHandoff,
+  type HandoffQRV1,
+} from "@/lib/meet-mesh/handoff.ts";
+import { wipeMine } from "@/lib/meet-mesh/sync.ts";
 
 type MeshDevice = { id: string; label: string; here: boolean; syncing: boolean };
 type Step = null | "qr" | "approve" | "done" | "failed" | "noDevice";
 
-// モック初期端末（端末名・近接・時刻は実機では実データ。ここは確定コピーの例示値）。
+// backend 不在時の mock 一覧（確定コピーの足場・ws-smoke はこの経路）。
 const SEED: readonly MeshDevice[] = [
   { id: "d-here", label: "MacBook", here: true, syncing: true },
   { id: "d-phone", label: "iPhone", here: false, syncing: true },
 ];
-const EXAMPLE_TIME = "今日 21:34"; // 動的（モック例示・場所は精密に出さない＝近接のみ）
-const PENDING_LABEL = "MacBook"; // 追加候補（実機では QR/handoff 由来）
+const EXAMPLE_TIME = "今日 21:34"; // 記述子の時刻（動的・場所は精密に出さない＝近接のみ）
 
 const panelStyle: React.CSSProperties = {
   marginTop: "var(--stack)",
@@ -42,16 +45,14 @@ const panelStyle: React.CSSProperties = {
   background: "var(--card-face)",
 };
 const rowActions: React.CSSProperties = { display: "flex", gap: "0.5rem", marginTop: "var(--stack)" };
-// QR placeholder（実 QR は crypto＝赤・足場は四角のみ）。
-const qrBox: React.CSSProperties = {
-  width: 120,
-  height: 120,
+const codeArea: React.CSSProperties = {
+  width: "100%",
+  minHeight: 96,
   marginTop: "var(--space-1)",
-  border: "1px dashed var(--line)",
-  borderRadius: "var(--radius-card)",
-  display: "grid",
-  placeItems: "center",
-  opacity: 0.6,
+  fontFamily: "ui-monospace, monospace",
+  fontSize: "11px",
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-all",
 };
 
 export function SyncSection() {
@@ -60,41 +61,116 @@ export function SyncSection() {
   const [step, setStep] = useState<Step>(null);
   const [removeTarget, setRemoveTarget] = useState<MeshDevice | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
-  // live = backend（local/dev）に身元があり、一覧が実機由来。fetch 不可（静的配信・本番非接続）
-  // なら false のまま＝確定コピーの mock 足場を保つ（既存 ws-smoke はこの経路で green）。
+  const [wipeOpen, setWipeOpen] = useState(false);
   const [live, setLive] = useState(false);
+  // handoff フロー
+  const [qrText, setQrText] = useState("");
+  const [qrCopied, setQrCopied] = useState(false);
+  const [pasted, setPasted] = useState("");
+  const [pendingQr, setPendingQr] = useState<HandoffQRV1 | null>(null);
+  const [qrErr, setQrErr] = useState("");
+  const [receiveNote, setReceiveNote] = useState("");
 
-  // 実機一覧へ差し替える（身元・backend があれば）。無ければ mock のまま（fail-closed）。
   const refresh = useCallback(async (): Promise<boolean> => {
     const list = await loadDevices();
     if (list !== null && list.length > 0) {
-      setDevices(list.map((v) => ({ id: v.deviceId, label: v.label || v.deviceId, here: v.here, syncing: true })));
+      setDevices(list.map((v) => ({ id: v.deviceId, label: v.label || S.thisDevice, here: v.here, syncing: true })));
       setLive(true);
       return true;
     }
     return false;
-  }, []);
+  }, [S.thisDevice]);
 
-  // 既に登録済み（前回 bootstrap 済み）の端末は、開いた時点で実機一覧を読む。
+  // 開いた時点で（passkey session があれば）この端末を owner として bootstrap → 実機一覧へ。
+  // backend/ session 不在なら mock のまま（fail-closed）。
   useEffect(() => {
-    void refresh();
+    void (async () => {
+      await ensureRegistered("");
+      await refresh();
+    })();
   }, [refresh]);
 
-  const fallbackAdd = (): void =>
-    setDevices((d) => [...d, { id: `d-${d.length}`, label: PENDING_LABEL, here: false, syncing: true }]);
-
-  const addPending = (): void => {
-    setStep("done");
-    // 既定は同期の mock 追加（backend 非接続でも即反映・既存挙動を保つ）。
-    fallbackAdd();
-    // backend（local/dev）があれば、この端末を bootstrap（公開鍵だけ送る）→ 実機一覧へ差し替え。
+  // qr 画面に入ったら、この端末の QR テキスト（自分の鍵で署名）を作る。crypto はローカルのみ。
+  useEffect(() => {
+    if (step !== "qr" || qrText !== "") return;
     void (async () => {
-      const id = await ensureRegistered(PENDING_LABEL);
-      if (id !== null) await refresh();
+      const r = await startHandoffAsNewDevice("");
+      setQrText(r.qr);
+    })();
+  }, [step, qrText]);
+
+  const openConnect = (): void => {
+    setQrText("");
+    setPasted("");
+    setQrErr("");
+    setPendingQr(null);
+    setStep("qr");
+  };
+
+  const copyQr = (): void => {
+    void navigator.clipboard?.writeText(qrText).then(
+      () => {
+        setQrCopied(true);
+        setTimeout(() => setQrCopied(false), 2000);
+      },
+      () => undefined,
+    );
+  };
+
+  // 貼付 QR を検証（純粋・封緘も put もしない）→ 記述子確認（承認の問い）へ。
+  const reviewPasted = (): void => {
+    setQrErr("");
+    void (async () => {
+      const qr = await reviewIncomingQR(pasted.trim());
+      if (qr === null) {
+        setQrErr(S.qr.invalid);
+        return;
+      }
+      setPendingQr(qr);
+      setStep("approve");
     })();
   };
+
+  // 承認後にだけ封緘＋put（confirm-gated seal）。
+  const approve = (): void => {
+    if (pendingQr === null) {
+      setStep("failed");
+      return;
+    }
+    const qr = pendingQr;
+    void (async () => {
+      const r = await approveAndSendHandoff(qr);
+      if (r.ok) {
+        await refresh();
+        setStep("done");
+      } else {
+        setStep("failed");
+      }
+    })();
+  };
+
+  // 新端末側: 既存端末の承認後、bundle を取り込む（pollAndInstallHandoff）。
+  const receive = (): void => {
+    setReceiveNote("");
+    void (async () => {
+      const r = await pollAndInstallHandoff();
+      if (r.ok) {
+        await refresh();
+        setStep("done");
+      } else {
+        setReceiveNote(S.qr.waiting);
+      }
+    })();
+  };
+
+  const declineApprove = (): void => {
+    const qr = pendingQr;
+    setPendingQr(null);
+    setStep(null);
+    if (qr !== null) void cancelHandoff(qr.did);
+  };
+
   const confirmPause = (): void => {
-    // 同期の persistence opt-in（local）。relay の停止は Phase C。
     setDevices((d) => d.map((x) => (x.here ? { ...x, syncing: false } : x)));
     setPauseOpen(false);
   };
@@ -103,7 +179,6 @@ export function SyncSection() {
     setRemoveTarget(null);
     if (target === null) return;
     if (live) {
-      // 実機: revoke+rotate（registry 側）→ 一覧を読み直す。
       void (async () => {
         const r = await revokeDevice(target.id);
         if (r.ok) await refresh();
@@ -112,16 +187,23 @@ export function SyncSection() {
     }
     setDevices((d) => d.filter((x) => x.id !== target.id));
   };
+  const confirmWipe = (): void => {
+    setWipeOpen(false);
+    void (async () => {
+      await wipeMine();
+      setDevices([]);
+      setStep(null);
+    })();
+  };
 
   return (
-    <div className="m-card" id="step-sync" data-sync-scaffold="mock" data-sync-step={step ?? "idle"}>
+    <div className="m-card" id="step-sync" data-sync-scaffold="wired" data-sync-step={step ?? "idle"}>
       <h2 className="m-h2">{S.heading}</h2>
 
-      <button type="button" className="m-btn" onClick={() => setStep("qr")}>
+      <button type="button" className="m-btn" onClick={openConnect}>
         {S.connect}
       </button>
 
-      {/* noDevice（既存端末なし）面では一覧を隠す — 一覧との矛盾を避ける（Hiroto 確定）。 */}
       {step !== "noDevice" ? (
         <>
           <h3 className="m-h2" style={{ marginTop: "var(--stack)" }}>
@@ -142,8 +224,6 @@ export function SyncSection() {
                     </span>
                   ) : null}
                 </span>
-                {/* 同期状態は label「同期中」（旧「同期」ボタンは action に見えて弱い）。
-                    この端末だけ、押すと「同期を止める」確認へ（pauseThis）。他端末は静的 label。 */}
                 {dev.here ? (
                   <button
                     type="button"
@@ -172,38 +252,66 @@ export function SyncSection() {
         </>
       ) : null}
 
-      {/* QR 手引き（この端末をつなぐ・確定コピー・mock） */}
+      {/* QR 手引き — この端末の QR テキストを見せ（コピー可）、別端末の QR を貼って迎える（テキスト版・camera は後便）。 */}
       {step === "qr" ? (
         <div className="m-sync-panel" role="dialog" aria-label={S.qr.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
             {S.qr.title}
           </p>
           <p style={{ margin: "var(--space-1) 0 0" }}>{S.qr.body}</p>
-          <div style={qrBox} aria-hidden="true">
-            QR
-          </div>
+          <textarea className="m-field" data-sync-qr readOnly value={qrText} style={codeArea} />
           <div style={rowActions}>
-            <button type="button" className="m-btn m-btn-primary" onClick={() => setStep("approve")}>
-              {S.qr.show}
+            <button type="button" className="m-btn m-btn-quiet" onClick={copyQr}>
+              {qrCopied ? S.qr.copied : S.qr.copyAction}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" data-sync-receive onClick={receive}>
+              {S.qr.receive}
             </button>
             <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep("noDevice")}>
               {S.qr.recover}
             </button>
           </div>
+          {receiveNote !== "" ? (
+            <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
+              {receiveNote}
+            </p>
+          ) : null}
+
+          <h3 className="m-h2" style={{ marginTop: "var(--stack)" }}>
+            {S.qr.pasteTitle}
+          </h3>
+          <textarea
+            className="m-field"
+            data-sync-paste
+            value={pasted}
+            placeholder={S.qr.pastePlaceholder}
+            onChange={(e) => setPasted(e.target.value)}
+            style={codeArea}
+          />
+          {qrErr !== "" ? (
+            <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
+              {qrErr}
+            </p>
+          ) : null}
+          <div style={rowActions}>
+            <button type="button" className="m-btn m-btn-primary" onClick={reviewPasted}>
+              {S.qr.pasteConfirm}
+            </button>
+          </div>
         </div>
       ) : null}
 
-      {/* 承認の問い（既存端末に出る確認・確定コピー・mock） */}
+      {/* 承認の問い（記述子確認）— ここまで来ても封緘していない。[追加する] で初めて封緘＋put。 */}
       {step === "approve" ? (
         <div className="m-sync-panel" role="dialog" aria-label={S.approve.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
             {S.approve.title}
           </p>
-          <p style={{ margin: "var(--space-1) 0 0", fontWeight: 600 }}>{PENDING_LABEL}</p>
+          <p style={{ margin: "var(--space-1) 0 0", fontWeight: 600 }}>{pendingQr?.name || S.thisDevice}</p>
           <p className="m-note" style={{ margin: 0 }}>
             {S.approve.proximity} ・ {EXAMPLE_TIME}
           </p>
-          <p style={{ margin: "var(--space-1) 0 0" }}>{S.approve.body(PENDING_LABEL)}</p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.approve.body(pendingQr?.name || S.thisDevice)}</p>
           <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
             {S.approve.syncs}
           </p>
@@ -211,10 +319,10 @@ export function SyncSection() {
             {S.approve.noSyncs}
           </p>
           <div style={rowActions}>
-            <button type="button" className="m-btn m-btn-primary" onClick={addPending}>
+            <button type="button" className="m-btn m-btn-primary" onClick={approve}>
               {S.approve.go}
             </button>
-            <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep("failed")}>
+            <button type="button" className="m-btn m-btn-quiet" onClick={declineApprove}>
               {S.approve.cancel}
             </button>
           </div>
@@ -224,7 +332,6 @@ export function SyncSection() {
         </div>
       ) : null}
 
-      {/* 接続完了（確定コピー・mock）— AIキー無しの分岐は常時併記（足場） */}
       {step === "done" ? (
         <div className="m-sync-panel" role="dialog" aria-label={S.done.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
@@ -245,7 +352,6 @@ export function SyncSection() {
         </div>
       ) : null}
 
-      {/* handoff 失敗（確定コピー・mock） */}
       {step === "failed" ? (
         <div className="m-sync-panel" role="dialog" aria-label={S.failed.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
@@ -253,14 +359,13 @@ export function SyncSection() {
           </p>
           <p style={{ margin: "var(--space-1) 0 0" }}>{S.failed.body}</p>
           <div style={rowActions}>
-            <button type="button" className="m-btn m-btn-primary" onClick={() => setStep("qr")}>
+            <button type="button" className="m-btn m-btn-primary" onClick={openConnect}>
               {S.failed.retry}
             </button>
           </div>
         </div>
       ) : null}
 
-      {/* 既存端末が無い場合（確定コピー・mock） */}
       {step === "noDevice" ? (
         <div className="m-sync-panel" role="dialog" aria-label={S.noDevice.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
@@ -278,7 +383,6 @@ export function SyncSection() {
         </div>
       ) : null}
 
-      {/* 端末を外す（対象で二態・確定コピー・mock） */}
       {removeTarget ? (
         <div
           className="m-sync-panel"
@@ -303,7 +407,6 @@ export function SyncSection() {
         </div>
       ) : null}
 
-      {/* この端末の同期を止める（確定コピー・mock） */}
       {pauseOpen ? (
         <div className="m-sync-panel" role="dialog" aria-label={S.pauseThis.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
@@ -316,6 +419,39 @@ export function SyncSection() {
             </button>
             <button type="button" className="m-btn m-btn-quiet" onClick={() => setPauseOpen(false)}>
               {S.pauseThis.cancel}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 全消去（Memory と Talk・purgeMine ＋ ローカル clear）。着地は Setup の Sync 下端（破壊操作）。 */}
+      <button
+        type="button"
+        className="m-btn m-btn-quiet"
+        data-sync-wipe
+        style={{ marginTop: "var(--stack)" }}
+        onClick={() => setWipeOpen(true)}
+      >
+        {S.wipe.title}
+      </button>
+      {wipeOpen ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.wipe.title} style={panelStyle}>
+          <p className="m-h2" style={{ margin: 0 }}>
+            {S.wipe.title}
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.wipe.body}</p>
+          <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
+            {S.wipe.others}
+          </p>
+          <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
+            {S.wipe.publicNote}
+          </p>
+          <div style={rowActions}>
+            <button type="button" className="m-btn m-btn-danger" onClick={confirmWipe}>
+              {S.wipe.go}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setWipeOpen(false)}>
+              {S.wipe.cancel}
             </button>
           </div>
         </div>
