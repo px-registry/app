@@ -1,5 +1,10 @@
 # PX Device Mesh — Phase 0.5 HOW（実装 Phase A/B/C・草案 v0.5）
 
+> **UI便（2026-06-17）**: Sync 実機配線・confirm-gated handoff（テキスト QR）・Talk dual-read live wiring 済み。
+> **live 二者 Talk dual-read render smoke（cutover 前必須）= 閉じた**（`scripts/r2-mesh-talk-live-smoke.mjs` 15/15:
+> owner A→B の mesh talk-msg＋legacy envelope が受信側 B の実ブラウザ Talk 面で一本の thread に・dedup・
+> 決定的順・edge_note 除外・presence 非表示）。残: Memory/Trust 側 全消去配線（別便）・camera は最後。
+>
 > **v0.5（2026-06-17）**: **Phase C 実装**（relay put/fetch/ack/purge・per-device delivery・Talk/Memory delta・
 > HLC merge・legacy dual-read・自然退役）。G5＝全 active ACK で purge／最初の1台では消さない／expired は
 > fetch 不可／revoke は ACK 待ち集合から外す／owner purge／body 暗号文のみ。G3＝HLC（hlc.ts）＋決定的 merge
