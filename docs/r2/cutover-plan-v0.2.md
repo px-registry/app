@@ -1,4 +1,14 @@
-# PX Device Mesh — 本番 cutover 準備設計（Phase 0.5・草案 v0.1・docs-only）
+# PX Device Mesh — 本番 cutover 準備設計（Phase 0.5・草案 v0.2・docs-only）
+
+> **v0.2（2026-06-17・docs patch）**: ① MESH_WRITE/allowlist 方針を固定（緊急 flag=KV・allowlist/cap=env・
+> server authoritative・missing/invalid/KV-fail=OFF・client 判断不可・`effective=min(KV:MESH_MODE, MESH_MODE_CAP)`）。
+> ② flag が止める/止めない表。③ Go3 後 rollback 正本＝mesh-read capable artifact 維持・write OFF・legacy-only・
+> dual-read 維持・data 消さない（pre-mesh deploy へは「mesh 本番データが無い段階まで」だけ）。④ 用語: `dual-write`
+> を廃し **forward mesh-write ＋ dual-read**。⑤ `migrations list --remote` は今は実行せず Go1-prep の Hiroto Go 後の
+> read-only verification と明記。⑥ preview AUTH_SECRET は preview 専用（DEV_SECRET でも production secret でもない・
+> ALLOW_DEV_SECRET は preview/production に置かない）。⑦ §E を「気配ゼロ（presence 禁止）」と「運用 aggregate
+> numbers」に分離。⑧ Go2 prod branch diff は blessed stack のみ。⑨ copy catch: `話してみる`（signals.incoming）を
+> 「Talk を始めたい」へ（広い sweep は §I で STOP④ 提示）。
 
 > **これは設計（HOW）だけ。実装・本番適用はしない。** 本番 D1 `--remote` migration／deploy／main 直 push／
 > production data 接続には**入らない**。本書は **本番別 Go の前提資料**。確定は **Hiroto ＋ Claude ＋ GPT 一読後**。
@@ -52,7 +62,9 @@ CREATE TABLE r15_mesh_ack ( payload_id TEXT NOT NULL, device_id TEXT NOT NULL, a
 - 既存表（board_records / r15_pool_item / r15_edge / r15_envelope / r15_enc_key 等）に**一切触れない**。
 - 機械的裏打ち: `lib/board-template/template-gates.test.ts` impl-9（migration 一覧の pin に 0015 を追加）＋
   impl-10（migration に board-template/draft/board-state 表を作らない・破壊的変更なし）。
-- 適用前確認: `npx wrangler d1 migrations list px-app-board --remote` で **0015 のみ pending**を目視。
+- 適用前確認（**今は実行しない**）: **Go1-prep の Hiroto Go 後**に、read-only verification として
+  `npx wrangler d1 migrations list px-app-board --remote` を実行し **0015 のみ pending**を目視する
+  （本 docs 便では本番 `--remote` に一切触れない）。
 - 列の不変: `r15_owner_epoch.epoch_pub` は **public JWK のみ**（publish 時に `isPublicEncJwk` で `d` 密輸を 400 拒否）。
   `r15_mesh_payload.ciphertext` は **暗号文のみ**（put で平文形を弾く・PX は平文を持たない）。
   `r15_mesh_ack` は **purge 判定の内部資料**（fetch/応答・UI・presence に出さない）。`expires_at` 列＝TTL 正本。
@@ -60,6 +72,36 @@ CREATE TABLE r15_mesh_ack ( payload_id TEXT NOT NULL, device_id TEXT NOT NULL, a
 ---
 
 ## B. 段階 Go 構造（一括で進めない）
+
+### B.0 MESH_WRITE 方針（mesh 書き込みの可否を決める唯一の判定・server authoritative）
+- **緊急停止 flag = KV**（`KV:MESH_MODE`）／**allowlist = env**（`MESH_OWNER_ALLOWLIST`）／**cap = env**（`MESH_MODE_CAP`）。
+- 判定は **server authoritative**。**client 判断で mesh write を許可しない**（端末は put を出すだけ・許否はサーバ）。
+- **missing / invalid / KV read failure は OFF**（fail-closed）。
+- 構成:
+```
+MESH_MODE_CAP=off | allowlist | on          # env（上限・人手で上げる）
+MESH_OWNER_ALLOWLIST=owner_ref_1,owner_ref_2,...   # env（allowlist 対象 owner_ref）
+KV:MESH_MODE=off | allowlist | on           # KV（実行時に切替・緊急停止はここ）
+effective = min(KV:MESH_MODE, MESH_MODE_CAP)   # 弱い方が勝つ（cap を超えられない）
+```
+  順序 off < allowlist < on。`effective=allowlist` のとき書込可は **MESH_OWNER_ALLOWLIST に居る owner だけ**。
+- 初回本番: `MESH_MODE_CAP=allowlist` / `KV:MESH_MODE=off` / `MESH_OWNER_ALLOWLIST=5人`（→ effective=off・誰も書かない）。
+- **Go3**: `KV:MESH_MODE=allowlist`（→ effective=allowlist・5 人だけ書ける）。
+- **緊急停止**: `KV:MESH_MODE=off`（→ effective=off・即時・再 deploy 不要）。
+- **global on**: **別 Go**（`MESH_MODE_CAP=on` ＋ `KV:MESH_MODE=on`）。
+- ※この flag/allowlist の **本実装は Go2 前の別便**（赤に入る前）。本書は方針の固定のみ。
+
+### B.0b flag が止めるもの / 止めないもの
+| 止める（effective=off / allowlist 外） | 止めない（rollback でも安全・cleanup 経路） |
+|---|---|
+| 新規 mesh write（relay put 全般） | dual-read（legacy + mesh fetch） |
+| Talk mesh send（talk-msg / talk-mirror put） | legacy read / write（r15_envelope） |
+| Memory delta mesh send（memory-delta put） | ack（受領記録） |
+| allowlist 外 owner の mesh write | purge / owner purge（exit-safe） |
+| cutover 対象外 owner の mesh write | revoke（端末を外す）|
+| 新規 handoff put / mesh payload put（write 扱い） | expired cleanup（TTL GC）|
+|  | 既存 mesh payload の回収（fetch/ack/purge）|
+- **rollback 時は write を止める。cleanup / safety path（ack・purge・revoke・expired・dual-read）は止めない。**
 
 ### Go1 — 0015 apply（5 表を作る・休眠）
 - 操作: `npx wrangler d1 migrations apply px-app-board --remote`（本番 D1）。**🔴 本番 `--remote`＝Hiroto Go 必須。**
@@ -71,17 +113,18 @@ CREATE TABLE r15_mesh_ack ( payload_id TEXT NOT NULL, device_id TEXT NOT NULL, a
 ### Go2 — deploy（endpoint/UI は在る・mesh 書き込みは OFF/opt-in）
 - 操作: Device Mesh を本番 Pages（px-r15・production branch=`stage-r15-five-test`）へ deploy。
   コードは現在 `stage-r2-complete`。**prod branch への載せ替え（cherry-pick/merge）＋ deploy ＝ 🔴 Hiroto Go＋full review。**
-- **mesh 書き込みは OFF**（フラグ `MESH_WRITE`＝既定 off／または tester allowlist 限定）。relay put/handoff/register は
-  フラグ off の間 **403/no-op**。legacy lane は不変で稼働。
-- **rollback**: Cloudflare ダッシュボードで**直前 deployment へ rollback**（rollback 座標は §F）。`MESH_WRITE` OFF を確認。
-  legacy lane 維持（mesh は休眠のまま）。
+- **mesh 書き込みは effective=off**（`MESH_MODE_CAP=allowlist` ＋ `KV:MESH_MODE=off`・§B.0）。relay put 系（write）は
+  effective=off の間 **403/no-op**。legacy lane は不変で稼働。
+- **rollback**: Cloudflare ダッシュボードで**直前 deployment へ rollback**（座標 §F.1）。`KV:MESH_MODE=off` を確認。
+  legacy lane 維持（mesh は休眠のまま）。pre-mesh deploy へ戻せる段（mesh データ前）。
 - secrets: `AUTH_SECRET` が production に設定済みであること（§D）。`ALLOW_DEV_SECRET` は **置かない**。
 
 ### Go3 — cutover 起動（mesh 書き込み ON・最初は 5 人限定）
-- 操作: `MESH_WRITE` を **5 人テスターの owner_ref allowlist 限定**で ON。新規 Talk/Memory delta が mesh lane に乗り始める。
+- 操作: `KV:MESH_MODE=allowlist`（cap=allowlist・`MESH_OWNER_ALLOWLIST`=5 人）→ **effective=allowlist**。
+  allowlist の 5 人だけ新規 Talk/Memory delta が mesh lane に乗り始める。
 - **🔴 Hiroto Go ＋ full review（Claude＋GPT）後**にだけ flip。
-- **rollback（本番データ後の正本・§G）**: `MESH_WRITE` OFF → **legacy-only 書き込みへ戻す** → **dual-read は維持** →
-  **mesh に入った既存データは消さず、読めるものとして残す** → **データ損失を起こさない**。
+- **rollback（本番データ後の正本・§G）**: `KV:MESH_MODE=off`（即時）→ **legacy-only 書き込みへ戻す** →
+  **dual-read は維持** → **mesh に入った既存データは消さず、読めるものとして残す** → **データ損失を起こさない**。
 
 ---
 
@@ -91,8 +134,9 @@ CREATE TABLE r15_mesh_ack ( payload_id TEXT NOT NULL, device_id TEXT NOT NULL, a
 [legacy-only]    全書き込み legacy（r15_envelope）。mesh 休眠。              ← Go2 まで
     │ Go3 flip（allowlist 内）
     ▼
-[dual-write 前向き / dual-read]
-    - 新規 Talk message / Memory delta は **mesh lane**（talk-msg / memory-delta）へ。
+[forward mesh-write ＋ dual-read]   （※「dual-write」とは呼ばない — 同一新規 message を legacy と mesh の両方へ
+                                       書く設計ではない。forward write to mesh lane, read both legacy and mesh lanes.）
+    - 新規 Talk message / Memory delta は **mesh lane**（talk-msg / memory-delta）へ（前向き＝forward のみ）。
     - 既存 legacy は **legacy lane に残す**（移送しない・**bulk migrate なし**）。
     - 受信は **legacy（envelope-fetch）＋ mesh（relay/fetch）の両方を読む**＝dual-read。
       timeline は同一 talk store ＋ mergeTalkTimeline（entryId dedup・(at,entryId) 決定的順・note-out 除外）。
@@ -113,6 +157,7 @@ CREATE TABLE r15_mesh_ack ( payload_id TEXT NOT NULL, device_id TEXT NOT NULL, a
 cutover の各 Go 前に green を要求する。
 
 - [ ] **本番相当 smoke は実 `AUTH_SECRET`** で回す（DEV_SECRET に落ちない＝fail-closed・`lib/webauthn/auth-secret.ts`）。
+  - preview の `AUTH_SECRET` は **preview 専用の値**＝**DEV_SECRET ではない**・**production secret でもない**（別管理）。
 - [ ] **`ALLOW_DEV_SECRET` を preview / production env に置かない**（local `.dev.vars` のみ）。不在で session 偽造不可。
 - [ ] private-smuggle（epoch_pub に `d`）→ **400**。
 - [ ] sig-tamper（改竄署名）→ **401**。
@@ -144,9 +189,18 @@ cutover の各 Go 前に green を要求する。
 - [ ] **no presence**（相手の状態が一切出ない）
 - [ ] **no plaintext / no private key**（server に平文本文・private 鍵が無い＝暗号文/公開鍵のみ）
 
-**広げる判断点**: 上記 10 項目が 5 人で green ＋ 観察期間に気配（presence 漏れ・誤配送・取り逃し）ゼロ ＋
-relay の恒久コストが記憶量に比例しない（numbers）ことを確認 → **Hiroto 裁定で allowlist 解除（全テスター）**。
-それまで allowlist 外は legacy-only（mesh 書き込み OFF）。
+**広げる判断点**: 上記 10 項目が 5 人で green ＋ §E.2 の aggregate numbers が健全 ＋ presence 漏れゼロ
+→ **Hiroto 裁定で allowlist 解除（全テスター）**。それまで allowlist 外は legacy-only（mesh 書き込み OFF）。
+
+### E.2 運用 numbers（aggregate のみ・「気配ゼロ」とは別物）
+**気配ゼロ ＝ presence を一切出さない（憲法）**。運用の健全性は **aggregate（owner をまたいだ合算）numbers** で見る ——
+個人が見えない形だけ。
+- 見てよい（aggregate）: relay held payload 数／expired payload 数／purge 完了数／fully-acked→purged の lag／
+  relay fetch 成否数／401・409 率／decrypt 失敗数／handoff 成否数／mesh write の fallback-to-legacy 数／
+  duplicate suppression 数／owner purge 数／revoke 数。
+- **禁止（presence・個人特定）**: per-owner online/offline／per-owner last seen／per-owner read status／
+  相手の端末数表示／相手の ack 進捗表示／Talk 相手ごとの presence 推定／**small cohort で個人が推測できる
+  dashboard 表示**（5 人規模では特に — 合算でも人数が小さいと個人が割れる指標は出さない）。
 
 ---
 
@@ -167,18 +221,30 @@ relay の恒久コストが記憶量に比例しない（numbers）ことを確�
 - Go2/Go3 で新 deployment ID を記録し、**rollback は直前 ID へ Cloudflare ダッシュボードで戻す**。
 - D1 は本番と共有のため、deploy rollback では**スキーマは戻らない**（5 表は残る・§G）。
 
+### F.2 Go2 prod branch diff ＝ blessed stack のみ
+prod branch（`stage-r15-five-test`）へ載せ替える diff は **Device Mesh の blessed stack だけ**に絞る（無関係変更を混ぜない）。
+- **含める**: A registry／B handoff／C・C.1 relay・merge・dual-read／UI便（Sync 実機配線・confirm-gated handoff・
+  Talk dual-read live wiring）／live render smoke／flag・allowlist 便（Go2 前に実装される）。
+- **含めない**: Phase D edge_note mesh 化／camera・QR scanner／未確定コピー／unrelated cleanup／
+  production-adjacent refactor。
+- diff レビュー（full review・Claude＋GPT）はこの blessed stack に対して行う。
+
 ---
 
 ## G. rollback の正本
 
 - **`DROP 5 表` は Go1 直後＝本番書き込みが一切無い場合だけ** rollback として扱う。
 - **本番データが入った後（Go3 以降）の rollback 正本**:
-  1. `MESH_WRITE` フラグ OFF（mesh 書き込み停止）。
+  0. **mesh-read capable な artifact を維持する**（＝**pre-mesh deploy へ戻すことを正本にしない**）。読めないと
+     mesh に入った既存データが宙に浮く。
+  1. `KV:MESH_MODE=off`（mesh 書き込み停止・即時）。
   2. legacy-only 書き込みへ戻す。
   3. **dual-read は維持**（mesh 既存データは読めるまま）。
-  4. **data を消さない**（mesh に入った既存は残す・relay payload は TTL/ack で自然に減る）。
-  - すなわち **schema は残す・書き込みを止める・読みは保つ**。DROP は呼ばない（データ損失になる）。
-- deploy 不具合は §F.1 の deployment rollback（コード）と §G の flag OFF（書き込み）を**独立に**使える。
+  4. **mesh 既存 data は消さない**（schema/data 残置・relay payload は TTL/ack で自然に減る）。
+  - すなわち **mesh-read 可能なまま・書き込みを止める・読みは保つ・data 残置**。DROP も pre-mesh deploy 戻しも呼ばない。
+- **pre-mesh deploy（§F.1）へ戻せるのは、mesh 本番データが無い段階（Go2 まで）だけ**。Go3 で mesh データが入ったら
+  rollback は §G（flag OFF＋dual-read 維持）が正本。
+- deploy 不具合（mesh データ前）は §F.1 の deployment rollback（コード）と flag OFF（書き込み）を**独立に**使える。
 
 ---
 
@@ -199,3 +265,18 @@ relay の恒久コストが記憶量に比例しない（numbers）ことを確�
 4. **camera / QR scanner** → 5. **本番 migration / deploy / cutover は別 Go**（Go1→Go2→Go3）。
 
 > 本書確定までは赤（本番 D1 `--remote`・deploy・main・production data・presence）に入らない。
+
+---
+
+## I. copy catch — `話してみる` の扱い（🟥 STOP④ 提示）
+
+- **済（本便）**: `MEET.home.signals.incoming` を「`{name}さんがTalkを始めたいと伝えました。`」へ（screenshot で
+  leak した行・Hiroto 確定候補）。`禁止` 語（話してみる/話せる/マッチング/おすすめ/ランキング/スコア/見回り）に抵触しない。
+- **🟥 STOP④（要 Hiroto・未着手）**: `話してみる` は /meet の**中心動詞**として他に少なくとも以下に在る ——
+  `signals.heading`「あなたへの「話してみる」」／`signals.talkBack`「こちらも話してみる」／`signals.mutual`
+  「おたがいが「話してみる」を押しました。」／`proposal.talk`「話してみる」／`proposal.talkSent`／
+  `host.signalsHeading`「「話してみる」のながれ」。
+  - これらを一括 sweep するのは**確定済み中心語彙の置換＝命名ゲート**。各箇所の置換文言は Hiroto の確定が要る
+    （`incoming` 以外の候補は CC が発明しない）。**いま inconsistent（incoming だけ Talk 語）になっている**点も含め、
+    sweep するか／このままにするか裁定を仰ぐ。
+  - もし sweep するなら同便で `forbidden.ts` に `話してみる` を追加し M-1/M-2 で恒久化（現状は未追加＝既存 copy を壊さないため）。

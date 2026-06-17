@@ -174,7 +174,8 @@ export const MEET = {
       subnote: "ほかの人のAIが、あなたのAntennaや候補を見つけたとき、ここに届きます。",
       // 第3手→統一便（Hiroto 確定）: Talk＝届いた話の空状態（届く相手＝Talk の語に寄せる）。
       empty: "まだ届いていません。",
-      incoming: (name: string): string => `${name}さんが「話してみる」を押しました。`,
+      // UI便 copy catch（Hiroto 2026-06-17・確定候補）: 「話してみる」を押しました → Talk を始めたい。
+      incoming: (name: string): string => `${name}さんがTalkを始めたいと伝えました。`,
       talkBack: "こちらも話してみる",
       mutual: "おたがいが「話してみる」を押しました。",
       contactHeading: "連絡のメモ",
