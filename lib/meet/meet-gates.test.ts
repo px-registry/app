@@ -372,3 +372,26 @@ test("M-9: the basis fold resolves a single basisItemId; basisItems is never ite
     );
   }
 });
+
+// ── M-14 (Device Mesh 足場・2026-06-17): 順序材料は ranking/matching 経路に到達しない ──
+//
+// HOW v0.2 §6.4 新 invariant（判定しない柱の延長）の足場版断言。Sync の UI 足場は
+// 候補/pool/ranking/matching を import せず、順序材料（hlc/at/seq/.sort）に触れない。
+// crypto/merge 実装が入るまでの前線をここで固定する（M-3=I/O 禁止・M-4=.sort 禁止と同系譜）。
+
+test("M-14: SyncSection (Device Mesh 足場) は ranking/matching/順序材料に触れない", () => {
+  const src = read("app/meet/SyncSection.tsx");
+  const code = stripComments(src);
+  // 候補生成・順位・matching の経路を import しない（依存方向で断つ）
+  for (const re of [/from\s+["'][^"']*pool/i, /from\s+["'][^"']*candidate/i, /from\s+["'][^"']*ranking/i, /from\s+["'][^"']*matching/i, /from\s+["'][^"']*proposal/i, /from\s+["'][^"']*meet-ai/i]) {
+    assert.ok(!re.test(code), `SyncSection must not import a ranking/candidate path: ${re}`);
+  }
+  // 順序材料を持たない・並べ替えない（足場は useState のみ・mock）
+  for (const re of [/\.sort\s*\(/, /\bhlc\b/i, /localeCompare/]) {
+    assert.ok(!re.test(code), `SyncSection must carry no order material: ${re}`);
+  }
+  // 自分側の事実のみ（STOP-E）— 相手の状態の語を持ち込まない
+  for (const banned of ["既読", "入力中", "オンライン", "相手に届", "相手が読"]) {
+    assert.ok(!code.includes(banned), `SyncSection must not surface peer presence: ${banned}`);
+  }
+});

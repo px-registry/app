@@ -221,6 +221,31 @@ const findsHref = await page.locator(".m-rail-link", { hasText: "Finds" }).first
 ok(typeof findsHref === "string" && findsHref.includes("/meet/?s=proposals"),
   `サブページの Finds は home 面への導線リンク（${findsHref}）`);
 
+// 13) Device Mesh 足場（緑2・2026-06-17）— Setup の Sync セクション＋接続済みの端末 一覧。
+//     確定コピー（STOP-D）・モック状態（鍵/relay/本番schema/crypto 非接続）。
+await page.goto(`${BASE}start/`, { waitUntil: "networkidle" }).catch(() => {});
+await page.waitForTimeout(150);
+ok(await page.locator("#step-sync").count() === 1, "Setup に Sync セクション（#step-sync）");
+ok(await page.locator('#step-sync[data-sync-scaffold="mock"]').count() === 1, "Sync は足場（mock 印・本物 backend 非接続）");
+ok((await page.locator("#step-sync h2").first().innerText()) === "Sync", "Sync 見出し");
+ok(await page.locator("#step-sync button", { hasText: "端末をつなぐ" }).count() === 1, "「端末をつなぐ」ボタン");
+ok(await page.locator("#step-sync").getByText("接続済みの端末").count() === 1, "「接続済みの端末」一覧見出し");
+ok(await page.locator("#step-sync .m-badge").filter({ hasText: "この端末" }).count() === 1, "現端末に「この端末」印");
+ok(await page.locator("#step-sync .m-sync-row").count() >= 2, "一覧にモック端末が並ぶ");
+// 自分側の事実のみ（STOP-E）— 相手の状態（既読/届いた/入力中）は画面に無い
+const syncText = await page.locator("#step-sync").innerText();
+ok(!/既読|届きました|入力中|オンライン/.test(syncText), "Sync 面に presence（相手の状態）は無い");
+// 承認の問い（確定コピー）— 端末をつなぐ で開く
+await page.locator("#step-sync button", { hasText: "端末をつなぐ" }).click();
+ok(await page.locator('#step-sync [role="dialog"]').getByText("新しい端末を追加しますか？").count() === 1, "承認の問いが開く");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("同期するもの: Antenna / Talk / Memory / 呼び名 / ひとこと").count() === 1, "同期するもの の確定コピー");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("身に覚えのない端末なら、追加しないでください。").count() === 1, "身に覚えのない端末の注意");
+await page.locator('#step-sync [role="dialog"] button', { hasText: "やめる" }).click();
+// 端末を外す（別端末＝二態の other 文）
+await page.locator("#step-sync .m-sync-row", { hasText: "iPhone" }).locator("button", { hasText: "外す" }).click();
+ok(await page.locator('#step-sync [role="dialog"]').getByText("iPhone を外しますか？").count() === 1, "別端末の外す確認（名指し）");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("その端末の中に残ります（PXは消せません）", { exact: false }).count() === 1, "外しても過去は端末内に残る（正直文言）");
+
 await browser.close();
 console.log(`\nPASS ${pass} / FAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

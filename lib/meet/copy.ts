@@ -408,6 +408,66 @@ export const MEET = {
     },
   },
 
+  /**
+   * Device Mesh（内部名）／表層 Sync — 端末横断の同期（HOW v0.2・STOP-D 確定コピー verbatim）。
+   * 足場（緑2・2026-06-17）: 確定コピーのみ・モック状態。鍵/relay/本番schema/本物 crypto 非接続。
+   * 自分側の事実のみ（STOP-E）: 相手の届いた/読んだ/入力中/オンライン/相手端末同期 は出さない。
+   * GPT 版そのまま採用の 5本（QR手引き/接続完了/handoff失敗/既存端末なし/同期を止める）は
+   * paste 待ち＝ここに未掲載（受領次第ここへ追加し、足場の保留箇所へ流し込む）。
+   */
+  sync: {
+    heading: "Sync",
+    /** 入口（Setup の Sync セクション）。 */
+    connect: "端末をつなぐ",
+    listHeading: "接続済みの端末",
+    thisDevice: "この端末",
+    /** per-端末トグル（persistence opt-in）。 */
+    syncOn: "同期",
+    syncOff: "同期しない",
+    /** 承認の問い（既存端末に出る・追加対象を名指し＋近接/時刻＝本物確認）。
+     *  端末名・時刻は動的。場所は精密に出さず「近くの端末」＝近接確認だけを示す。 */
+    approve: {
+      title: "新しい端末を追加しますか？",
+      proximity: "近くの端末",
+      body: (device: string): string =>
+        `追加すると、この ${device} で Antenna・Talk・Memory を使えるようになります。`,
+      syncs: "同期するもの: Antenna / Talk / Memory / 呼び名 / ひとこと",
+      noSyncs: "同期しないもの: APIキー / 生のAI会話 / 未確認の下書き",
+      go: "追加する",
+      cancel: "やめる",
+      warn: "身に覚えのない端末なら、追加しないでください。",
+    },
+    /** 端末を外す（対象で二態）。 */
+    remove: {
+      action: "外す",
+      go: "外す",
+      cancel: "やめる",
+      otherTitle: (device: string): string => `${device} を外しますか？`,
+      otherBody:
+        "外した端末は、これから届くものを読めません。すでにその端末にあった会話は、その端末の中に残ります（PXは消せません）。",
+      thisTitle: "この端末を外しますか？",
+      thisBody:
+        "この端末は、これから届くものを読めなくなります。すでにこの端末にある会話は、この端末の中に残ります（PXは消せません）。",
+    },
+    /** 自分側の事実のみ（STOP-E・HOW §4.7）。「送った」＝relay に置いた事実（届いた保証でない）。 */
+    status: {
+      unsent: "未送信",
+      sending: "送信中",
+      sent: "送った",
+      sendFailed: "送れませんでした",
+      syncedHere: "この端末に同期済み",
+    },
+    /** 全消去（「同期を止める」とは別操作・着地は Memory/Trust・足場では未配線）。 */
+    wipe: {
+      title: "このPXのMemoryとTalkを消しますか？",
+      body: "この端末から Memory と Talk を消し、接続済みの自分の端末にも削除を伝えます。まだ届いていない分も削除します。",
+      others: "相手の端末にある会話は消えません。相手のPXには触れません。",
+      publicNote: "公開済みの Antenna・呼び名・ひとことは、別に取り下げてください。",
+      go: "すべて消す",
+      cancel: "やめる",
+    },
+  },
+
   /** 記憶の種類 — rig kinds の表示名。 */
   kinds: {
     have: "持っている",

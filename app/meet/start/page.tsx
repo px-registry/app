@@ -5,6 +5,7 @@ import { PortConnect } from "./PortConnect.tsx";
 import { BoundaryNote } from "../BoundaryNote.tsx";
 import { MeetWorkspace } from "../MeetWorkspace.tsx";
 import { NameField } from "../NameField.tsx";
+import { SyncSection } from "../SyncSection.tsx";
 
 // Setup（表層語彙統一便 第3手・Hiroto 確定 2026-06-17）: 「三ステップ直列の準備」でなく
 // 「Antenna と Run の違いが分かる画面」。
@@ -65,6 +66,10 @@ export default function MeetStart() {
 
           {/* 呼び名（フィールドカード・#name）— 実体は Memory 側 store と共用（NameField）。 */}
           <NameField />
+
+          {/* Sync — 端末をつなぐ（Device Mesh 足場・モック状態・#step-sync）。
+              鍵/relay/本番schema/crypto 非接続。crypto 実装は GPT 5点 verdict＋STOP#0 まで待つ。 */}
+          <SyncSection />
         </div>
       </section>
 
