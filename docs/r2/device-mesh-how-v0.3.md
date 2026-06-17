@@ -1,5 +1,10 @@
-# PX Device Mesh — Phase 0.5 HOW（実装 Phase A 着手・草案 v0.4）
+# PX Device Mesh — Phase 0.5 HOW（実装 Phase A/B/C・草案 v0.5）
 
+> **v0.5（2026-06-17）**: **Phase C 実装**（relay put/fetch/ack/purge・per-device delivery・Talk/Memory delta・
+> HLC merge・legacy dual-read・自然退役）。G5＝全 active ACK で purge／最初の1台では消さない／expired は
+> fetch 不可／revoke は ACK 待ち集合から外す／owner purge／body 暗号文のみ。G3＝HLC（hlc.ts）＋決定的 merge
+> （createdAt+recordId キーで収束・timeline 専用・ranking 不流入）。edge_note は mesh に混ぜない（§15）。
+>
 > **v0.4（2026-06-17）**: Phase A 実装＋**A.1 裁定**（bootstrap の identity root = passkey session・§3.4）。
 > register は passkey session 必須・`owner_ref` は handle に束ねる・`ownerToken` は補助 ID（一方向ハッシュのみ）。
 > UI 文言: 一覧の同期は状態 label「同期中」／pauseThis 確認は「同期を止める」／noDevice は一覧を隠す（§12）。

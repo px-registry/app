@@ -29,6 +29,10 @@ import {
 /** Phase B handoff: 72h hard TTL / chunk 上限（≒768KB bundle）。 */
 export const HANDOFF_TTL_HOURS = 72;
 export const MAX_HANDOFF_CHUNKS = 64;
+/** Phase C relay delta: 14日 TTL（既存 envelope と同値）。 */
+export const MESH_TTL_DAYS = 14;
+export const MESH_LANES = new Set(["self", "peer"]);
+export const MESH_DELTA_PTYPES = new Set(["memory-delta", "talk-mirror", "talk-msg"]);
 
 // 純粋ロジック（形ガード・署名検証・上限）は lib/meet-crypto/mesh.ts に住み、ここで re-export。
 // このファイルには D1/identity を要すヘルパー（verifySignedRequest / activeEpoch / rotateEpoch /
@@ -134,6 +138,32 @@ export async function activeDeviceCount(env: MeshEnv, ownerRef: string): Promise
     .bind(ownerRef)
     .all<{ n: number }>();
   return (found.results ?? [])[0]?.n ?? 0;
+}
+
+/**
+ * 全 active device ACK で payload を物理削除する（verdict G5）。最初の1台 ACK では消さない。
+ * inactive(revoked) device は分母にも ack 集合にも入らない（join で revoked_at='' に限定）＝
+ * 残りの active が全員 ack すれば purge が完走する。owner 配下の epoch-wrap payload に限定。
+ * 直前に ack された id 群（任意）に絞って評価する（無指定なら owner の held 全件）。
+ */
+export async function purgeFullyAcked(env: MeshEnv, ownerRef: string, payloadIds?: string[]): Promise<void> {
+  const filter =
+    payloadIds && payloadIds.length > 0
+      ? ` AND p.payload_id IN (${payloadIds.map((_, i) => `?${i + 2}`).join(", ")})`
+      : "";
+  const sql =
+    "DELETE FROM r15_mesh_payload WHERE payload_id IN (" +
+    "  SELECT p.payload_id FROM r15_mesh_payload p" +
+    "  WHERE p.audience_ref = ?1 AND p.wrap_to = 'epoch'" +
+    filter +
+    "    AND (SELECT COUNT(*) FROM r15_device d WHERE d.owner_ref = ?1 AND d.revoked_at = '')" +
+    "      = (SELECT COUNT(*) FROM r15_mesh_ack a JOIN r15_device d2 ON d2.device_id = a.device_id" +
+    "         WHERE a.payload_id = p.payload_id AND d2.revoked_at = '')" +
+    ")";
+  const binds = payloadIds && payloadIds.length > 0 ? [ownerRef, ...payloadIds] : [ownerRef];
+  await env.BOARD.prepare(sql).bind(...binds).run();
+  // 親 payload を失った ack 行を掃除（孤児）。
+  await env.BOARD.prepare("DELETE FROM r15_mesh_ack WHERE payload_id NOT IN (SELECT payload_id FROM r15_mesh_payload)").run();
 }
 
 /**
