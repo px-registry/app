@@ -409,7 +409,7 @@ export const MEET = {
   },
 
   /**
-   * Device Mesh（内部名）／表層 Sync — 端末横断の同期（HOW v0.2・STOP-D 確定コピー verbatim）。
+   * Device Mesh（内部名）／表層 Sync — 端末横断の同期（HOW v0.3・STOP-D 確定コピー verbatim）。
    * 足場（緑2・2026-06-17）: 確定コピーのみ・モック状態。鍵/relay/本番schema/本物 crypto 非接続。
    * 自分側の事実のみ（STOP-E）: 相手の届いた/読んだ/入力中/オンライン/相手端末同期 は出さない。
    * 全文言は STOP-D 確定（Hiroto 2026-06-17）— 連結フロー（qr/done/failed/noDevice/pauseThis）も掲載済み。

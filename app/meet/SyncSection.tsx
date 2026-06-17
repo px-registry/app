@@ -1,7 +1,7 @@
 "use client";
 
 // Device Mesh（内部名）／表層 Sync — 端末横断同期の UI 足場（緑2・2026-06-17）。
-// 設計: docs/r2/device-mesh-how-v0.1.md（v0.2）。STOP-D 確定コピーのみ・モック状態。
+// 設計: docs/r2/device-mesh-how-v0.3.md。STOP-D 確定コピーのみ・モック状態。
 //
 // 本物には一切つながない:
 //   - 鍵 / relay / 本番 schema / crypto 非接続（M-3: app/meet は I/O 禁止＝useState のみ）。
