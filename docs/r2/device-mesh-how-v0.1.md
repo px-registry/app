@@ -403,7 +403,7 @@ type MemJournalRecordV2 = MemJournalRecordV1 & {
 - **禁止（presence・相手の状態）**：相手に届きました／相手が読みました／相手が入力中／相手がオンライン／
   相手の端末に同期済み。これらは UI・API・schema のどこにも出さない（presence 永続禁止）。
 - 一覧コピー「**同期／同期しない**」（確定）で per-端末の persistence opt-in を表現。
-  ※「この端末の同期を止める」の確定文言は GPT 版採用（§12・要 paste）。
+  「この端末の同期を止める」確認は確定（§12）— 足場は `MEET.sync.pauseThis` で配線済み。
 
 ### 7.4 API キー移行 opt-in（明示のみ）
 - 既定 **同期しない**。端末追加フローの中に独立トグル「この端末に API キーも渡す（任意）」。
@@ -411,10 +411,10 @@ type MemJournalRecordV2 = MemJournalRecordV1 & {
 - 下書き・生 AI 会話は**同期しない**（束にも入れない・§制約）。
 
 ### 7.5 コピー（`lib/meet/copy.ts` に集中・forbidden scan 通過）
-- 確定済み（指示書が祝福＝命名ゲート通過）：`Sync`／`つなぐ`／`端末をつなぐ`／`接続済みの端末`／`外す`／
-  `同期`／`同期しない`／revoke の正直文言。→ そのまま実装してよい（勝手に整えない）。
-- **未確定（指示書が文言を与えていない）→ §10 命名 STOP**：QR 画面の手引き、handoff 承認の問い、
-  「復号できませんでした」等のエラー文、「この端末に残る過去」の正直一文の**確定文言**。候補のみ出す。
+- ✅ **全文言確定**（2026-06-17）：`Sync`／`端末をつなぐ`／`接続済みの端末`／`この端末`／`外す`（二態）／
+  `同期`／`同期しない`／承認の問い／全消去／連結フロー 5本（QR手引き・接続完了・handoff失敗・既存端末なし・
+  同期を止める）。→ `MEET.sync` に集中・SyncSection に配線済み（勝手に整えない・verbatim）。
+- 残るエラー文（「復号できませんでした」等）は crypto/relay 実装時に確定（赤・ゲート後）。
 
 ---
 
@@ -478,7 +478,7 @@ type MemJournalRecordV2 = MemJournalRecordV1 & {
 | **STOP-A**（owner_ref 新設 vs 昇格） | ✅ **解決＝新設**（昇格しない・backfill しない・三語固定）。§3.2 |
 | **STOP-C**（legacy 去就） | ✅ **解決＝非破壊 dual-read・自然退役**。§2.7 |
 | **STOP-E**（自分側の事実） | ✅ **解決**（own-side 5語のみ・presence 禁止）。§4.7・§7.3 |
-| **STOP-D**（命名） | ✅ 確定コピー採用（§12）。**ただし下記 5本は GPT 版 paste 待ち** |
+| **STOP-D**（命名） | ✅ **全文言確定**（2026-06-17）。連結フロー 5本も §12 ＋ SyncSection 反映済み |
 | 新 invariant（順序材料） | ✅ §6.4 に焼いた（判定しない柱の延長） |
 
 **残る STOP（crypto/server 実装の前提・まだ閉じていない）**
@@ -486,9 +486,7 @@ type MemJournalRecordV2 = MemJournalRecordV1 & {
   `r15_mesh_payload`/`r15_mesh_ack` の新設（§2 全体）＋ edge_note 追補。additive だがサーバ保持データの新設＝境界。
 - **GPT crypto 5点 verdict**：rotation 前方遮断 / HLC+fold 収束 / handoff 信頼起点 MITM / 72h 一時滞留の許容 /
   mesh_payload purge 実効。
-- **STOP-D 残（命名・CC が paste 待ち）**：GPT 版でそのまま採用とされた 5本の本文 ——
-  **QR 手引き / 接続完了 / handoff 失敗 / 既存端末なし / 「この端末の同期を止める」**。
-  本書・UI 足場には未反映（CC が GPT 版テキストを受領次第 §12 と SyncSection に流し込む）。
+- ~~STOP-D 残（命名）~~ ✅ **解決**（2026-06-17・全文言確定・§12 ＋ SyncSection 反映済み）。
 
 > 実装（crypto/server）は GPT 5点 verdict ＋ Hiroto STOP #0 が開くまで入らない。
 > 緑作業（docs 反映・非 crypto UI 足場）はここまで。
@@ -549,6 +547,34 @@ iPhone を外しますか？
 - per-端末トグル：`同期` / `同期しない`
 - 自分側の状態（§4.7）：`未送信` / `送信中` / `送った` / `送れませんでした` / `この端末に同期済み`
 
-### GPT 版そのまま採用（**本文 paste 待ち・未反映**）
-- QR 手引き／接続完了／handoff 失敗／既存端末なし／「この端末の同期を止める」
-  → 受領次第 `MEET.sync` と SyncSection に流し込む（現状は scaffold で該当箇所を保留）。
+### 連結フロー（確定 2026-06-17・`MEET.sync` ＋ SyncSection 反映済み）
+```
+〔QR手引き〕
+この端末をつなぐ
+すでにPXを使っている端末で、このQRを読み取ってください。Antenna、Talk、Memoryをこの端末でも使えるようにします。
+[QRを表示]  復帰コードで戻る
+
+〔接続完了〕
+つながりました。
+この端末でも、Antenna、Talk、Memoryを使えます。
+（AIキーが無い場合）AIキーはまだこの端末にありません。Runするには、この端末でもAI接続してください。
+[AI接続へ] [あとで]
+
+〔handoff 失敗〕
+つなげませんでした。
+QRの期限が切れたか、承認が完了しませんでした。もう一度やり直してください。
+[もう一度QRを表示]
+
+〔既存端末が無い場合〕
+接続済みの端末がありません。
+控えがない場合、MemoryとTalkの履歴は戻せません。Antennaなど公開済みの内容は、本人確認後に戻ります。
+[復帰コードで戻る] [新しく始める]
+
+〔この端末の同期を止める〕
+この端末への同期を止めます。
+この端末にまだ届いていない内容は削除されます。すでにこの端末やほかの端末に保存された内容は、それぞれの端末に残ります。
+（go/cancel は確定トークン流用: [同期しない][やめる]）
+```
+> 足場での mock 状態機械: idle→[端末をつなぐ]→qr→[QRを表示]→approve→[追加する]→done／[やめる]→failed→
+> [もう一度QRを表示]→qr。qr→[復帰コードで戻る]→noDevice。実 QR・承認・配送は crypto/relay＝赤のため
+> placeholder。本物の鍵/relay/schema/crypto は未接続。

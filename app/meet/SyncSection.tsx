@@ -5,20 +5,25 @@
 //
 // 本物には一切つながない:
 //   - 鍵 / relay / 本番 schema / crypto 非接続（M-3: app/meet は I/O 禁止＝useState のみ）。
+//   - 実 QR は device_enc pub＋pairing nonce の crypto＝赤。足場は placeholder の四角だけ。
 //   - 順序材料を持たない・並べ替えない（M-4: .sort なし）＝「判定しない柱」を足場でも守る。
 //   - 自分側の事実のみ（STOP-E）。相手の届いた/読んだ/入力中/オンライン/相手端末同期 は出さない。
 // 文言はすべて MEET.sync 経由（インラインの日本語コピーを置かない）。
 //
-// 保留（GPT 版 paste 待ち＝本コンポーネント未反映）:
-//   QR 手引き / 接続完了 / handoff 失敗 / 既存端末なし / 「この端末の同期を止める」。
-//   「端末をつなぐ」押下は、実機では QR→handoff を経て承認の問いへ至る。足場では QR 段を
-//   省いて承認の問い（確定コピー）を直接見せる（モック）。全消去（wipe）は着地が Memory/Trust
-//   のため、コピーは copy.ts に確定済・ここでは未配線。
+// 連結フロー（モックの状態機械・確定コピーで各面を見せる）:
+//   idle → [端末をつなぐ] → qr（QR手引き）
+//   qr  → [QRを表示] → approve（既存端末の承認の問い）／[復帰コードで戻る] → noDevice
+//   approve → [追加する] → done(+一覧へ追加)／[やめる] → failed（承認未完了＝handoff失敗）
+//   done → [AI接続へ](=#step-key)／[あとで] → idle
+//   failed → [もう一度QRを表示] → qr
+//   noDevice → [復帰コードで戻る]／[新しく始める] → idle
+//   一覧: 各端末に 同期/同期しない トグル＋外す（二態）。この端末のトグルは pauseThis 確認を開く。
 
 import { useState } from "react";
 import { MEET } from "@/lib/meet/copy.ts";
 
 type MeshDevice = { id: string; label: string; here: boolean; syncing: boolean };
+type Step = null | "qr" | "approve" | "done" | "failed" | "noDevice";
 
 // モック初期端末（端末名・近接・時刻は実機では実データ。ここは確定コピーの例示値）。
 const SEED: readonly MeshDevice[] = [
@@ -28,7 +33,7 @@ const SEED: readonly MeshDevice[] = [
 const EXAMPLE_TIME = "今日 21:34"; // 動的（モック例示・場所は精密に出さない＝近接のみ）
 const PENDING_LABEL = "MacBook"; // 追加候補（実機では QR/handoff 由来）
 
-const modalStyle: React.CSSProperties = {
+const panelStyle: React.CSSProperties = {
   marginTop: "var(--stack)",
   padding: "var(--space-2)",
   border: "1px solid var(--line)",
@@ -36,29 +41,50 @@ const modalStyle: React.CSSProperties = {
   background: "var(--card-face)",
 };
 const rowActions: React.CSSProperties = { display: "flex", gap: "0.5rem", marginTop: "var(--stack)" };
+// QR placeholder（実 QR は crypto＝赤・足場は四角のみ）。
+const qrBox: React.CSSProperties = {
+  width: 120,
+  height: 120,
+  marginTop: "var(--space-1)",
+  border: "1px dashed var(--line)",
+  borderRadius: "var(--radius-card)",
+  display: "grid",
+  placeItems: "center",
+  opacity: 0.6,
+};
 
 export function SyncSection() {
   const S = MEET.sync;
   const [devices, setDevices] = useState<MeshDevice[]>([...SEED]);
-  const [approving, setApproving] = useState(false);
+  const [step, setStep] = useState<Step>(null);
   const [removeTarget, setRemoveTarget] = useState<MeshDevice | null>(null);
+  const [pauseOpen, setPauseOpen] = useState(false);
 
   const addPending = (): void => {
     setDevices((d) => [...d, { id: `d-${d.length}`, label: PENDING_LABEL, here: false, syncing: true }]);
-    setApproving(false);
+    setStep("done");
   };
-  const toggleSync = (id: string): void =>
-    setDevices((d) => d.map((x) => (x.id === id ? { ...x, syncing: !x.syncing } : x)));
+  const toggleDevice = (dev: MeshDevice): void => {
+    if (dev.here) {
+      setPauseOpen(true); // この端末の同期を止めるのは確認を挟む
+      return;
+    }
+    setDevices((d) => d.map((x) => (x.id === dev.id ? { ...x, syncing: !x.syncing } : x)));
+  };
+  const confirmPause = (): void => {
+    setDevices((d) => d.map((x) => (x.here ? { ...x, syncing: false } : x)));
+    setPauseOpen(false);
+  };
   const confirmRemove = (): void => {
     if (removeTarget) setDevices((d) => d.filter((x) => x.id !== removeTarget.id));
     setRemoveTarget(null);
   };
 
   return (
-    <div className="m-card" id="step-sync" data-sync-scaffold="mock">
+    <div className="m-card" id="step-sync" data-sync-scaffold="mock" data-sync-step={step ?? "idle"}>
       <h2 className="m-h2">{S.heading}</h2>
 
-      <button type="button" className="m-btn" onClick={() => setApproving(true)}>
+      <button type="button" className="m-btn" onClick={() => setStep("qr")}>
         {S.connect}
       </button>
 
@@ -84,7 +110,7 @@ export function SyncSection() {
               type="button"
               className="m-btn m-btn-quiet"
               style={{ whiteSpace: "nowrap" }}
-              onClick={() => toggleSync(dev.id)}
+              onClick={() => toggleDevice(dev)}
             >
               {dev.syncing ? S.syncOn : S.syncOff}
             </button>
@@ -100,9 +126,30 @@ export function SyncSection() {
         ))}
       </ul>
 
-      {/* 承認の問い（既存端末に出る確認・確定コピー・モック） */}
-      {approving ? (
-        <div className="m-sync-modal" role="dialog" aria-label={S.approve.title} style={modalStyle}>
+      {/* QR 手引き（この端末をつなぐ・確定コピー・mock） */}
+      {step === "qr" ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.qr.title} style={panelStyle}>
+          <p className="m-h2" style={{ margin: 0 }}>
+            {S.qr.title}
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.qr.body}</p>
+          <div style={qrBox} aria-hidden="true">
+            QR
+          </div>
+          <div style={rowActions}>
+            <button type="button" className="m-btn m-btn-primary" onClick={() => setStep("approve")}>
+              {S.qr.show}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep("noDevice")}>
+              {S.qr.recover}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 承認の問い（既存端末に出る確認・確定コピー・mock） */}
+      {step === "approve" ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.approve.title} style={panelStyle}>
           <p className="m-h2" style={{ margin: 0 }}>
             {S.approve.title}
           </p>
@@ -121,7 +168,7 @@ export function SyncSection() {
             <button type="button" className="m-btn m-btn-primary" onClick={addPending}>
               {S.approve.go}
             </button>
-            <button type="button" className="m-btn m-btn-quiet" onClick={() => setApproving(false)}>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep("failed")}>
               {S.approve.cancel}
             </button>
           </div>
@@ -131,13 +178,67 @@ export function SyncSection() {
         </div>
       ) : null}
 
-      {/* 端末を外す（対象で二態・確定コピー・モック） */}
+      {/* 接続完了（確定コピー・mock）— AIキー無しの分岐は常時併記（足場） */}
+      {step === "done" ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.done.title} style={panelStyle}>
+          <p className="m-h2" style={{ margin: 0 }}>
+            {S.done.title}
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.done.body}</p>
+          <p className="m-note" style={{ margin: "var(--space-1) 0 0" }}>
+            {S.done.noKey}
+          </p>
+          <div style={rowActions}>
+            <a className="m-btn m-btn-primary" href="#step-key" onClick={() => setStep(null)}>
+              {S.done.toKey}
+            </a>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep(null)}>
+              {S.done.later}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* handoff 失敗（確定コピー・mock） */}
+      {step === "failed" ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.failed.title} style={panelStyle}>
+          <p className="m-h2" style={{ margin: 0 }}>
+            {S.failed.title}
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.failed.body}</p>
+          <div style={rowActions}>
+            <button type="button" className="m-btn m-btn-primary" onClick={() => setStep("qr")}>
+              {S.failed.retry}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 既存端末が無い場合（確定コピー・mock） */}
+      {step === "noDevice" ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.noDevice.title} style={panelStyle}>
+          <p className="m-h2" style={{ margin: 0 }}>
+            {S.noDevice.title}
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.noDevice.body}</p>
+          <div style={rowActions}>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep(null)}>
+              {S.noDevice.recover}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setStep(null)}>
+              {S.noDevice.fresh}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 端末を外す（対象で二態・確定コピー・mock） */}
       {removeTarget ? (
         <div
-          className="m-sync-modal"
+          className="m-sync-panel"
           role="dialog"
           aria-label={removeTarget.here ? S.remove.thisTitle : S.remove.otherTitle(removeTarget.label)}
-          style={modalStyle}
+          style={panelStyle}
         >
           <p className="m-h2" style={{ margin: 0 }}>
             {removeTarget.here ? S.remove.thisTitle : S.remove.otherTitle(removeTarget.label)}
@@ -151,6 +252,24 @@ export function SyncSection() {
             </button>
             <button type="button" className="m-btn m-btn-quiet" onClick={() => setRemoveTarget(null)}>
               {S.remove.cancel}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* この端末の同期を止める（確定コピー・mock） */}
+      {pauseOpen ? (
+        <div className="m-sync-panel" role="dialog" aria-label={S.pauseThis.title} style={panelStyle}>
+          <p className="m-h2" style={{ margin: 0 }}>
+            {S.pauseThis.title}
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0" }}>{S.pauseThis.body}</p>
+          <div style={rowActions}>
+            <button type="button" className="m-btn m-btn-danger" onClick={confirmPause}>
+              {S.pauseThis.go}
+            </button>
+            <button type="button" className="m-btn m-btn-quiet" onClick={() => setPauseOpen(false)}>
+              {S.pauseThis.cancel}
             </button>
           </div>
         </div>

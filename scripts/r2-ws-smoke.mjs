@@ -221,8 +221,9 @@ const findsHref = await page.locator(".m-rail-link", { hasText: "Finds" }).first
 ok(typeof findsHref === "string" && findsHref.includes("/meet/?s=proposals"),
   `サブページの Finds は home 面への導線リンク（${findsHref}）`);
 
-// 13) Device Mesh 足場（緑2・2026-06-17）— Setup の Sync セクション＋接続済みの端末 一覧。
-//     確定コピー（STOP-D）・モック状態（鍵/relay/本番schema/crypto 非接続）。
+// 13) Device Mesh 足場（緑2・2026-06-17）— Setup の Sync セクション＋接続済みの端末 一覧
+//     ＋連結フロー（QR手引き→承認→接続完了/失敗・既存端末なし・同期を止める）。
+//     確定コピー（STOP-D・全文言確定 2026-06-17）・モック状態（鍵/relay/本番schema/crypto 非接続）。
 await page.goto(`${BASE}start/`, { waitUntil: "networkidle" }).catch(() => {});
 await page.waitForTimeout(150);
 ok(await page.locator("#step-sync").count() === 1, "Setup に Sync セクション（#step-sync）");
@@ -235,12 +236,46 @@ ok(await page.locator("#step-sync .m-sync-row").count() >= 2, "一覧にモッ�
 // 自分側の事実のみ（STOP-E）— 相手の状態（既読/届いた/入力中）は画面に無い
 const syncText = await page.locator("#step-sync").innerText();
 ok(!/既読|届きました|入力中|オンライン/.test(syncText), "Sync 面に presence（相手の状態）は無い");
-// 承認の問い（確定コピー）— 端末をつなぐ で開く
+
+// 連結フロー: 端末をつなぐ → QR 手引き
 await page.locator("#step-sync button", { hasText: "端末をつなぐ" }).click();
+ok(await page.locator('#step-sync[data-sync-step="qr"]').count() === 1, "step=qr へ遷移");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("この端末をつなぐ").count() === 1, "QR手引き 見出し");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("すでにPXを使っている端末で、このQRを読み取ってください", { exact: false }).count() === 1, "QR手引き 本文");
+ok(await page.locator("#step-sync button", { hasText: "QRを表示" }).count() === 1, "[QRを表示] ボタン");
+// 復帰コードで戻る → 既存端末なし
+await page.locator("#step-sync button", { hasText: "復帰コードで戻る" }).first().click();
+ok(await page.locator('#step-sync [role="dialog"]').getByText("接続済みの端末がありません。").count() === 1, "既存端末なしの面");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("MemoryとTalkの履歴は戻せません", { exact: false }).count() === 1, "控えなしは履歴戻らない（正直文言）");
+ok(await page.locator("#step-sync button", { hasText: "新しく始める" }).count() === 1, "[新しく始める]");
+await page.locator("#step-sync button", { hasText: "新しく始める" }).click();
+
+// 端末をつなぐ → QRを表示 → 承認の問い
+await page.locator("#step-sync button", { hasText: "端末をつなぐ" }).click();
+await page.locator("#step-sync button", { hasText: "QRを表示" }).click();
 ok(await page.locator('#step-sync [role="dialog"]').getByText("新しい端末を追加しますか？").count() === 1, "承認の問いが開く");
 ok(await page.locator('#step-sync [role="dialog"]').getByText("同期するもの: Antenna / Talk / Memory / 呼び名 / ひとこと").count() === 1, "同期するもの の確定コピー");
 ok(await page.locator('#step-sync [role="dialog"]').getByText("身に覚えのない端末なら、追加しないでください。").count() === 1, "身に覚えのない端末の注意");
+// やめる（承認未完了）→ handoff失敗
 await page.locator('#step-sync [role="dialog"] button', { hasText: "やめる" }).click();
+ok(await page.locator('#step-sync [role="dialog"]').getByText("つなげませんでした。").count() === 1, "handoff失敗の面");
+ok(await page.locator("#step-sync button", { hasText: "もう一度QRを表示" }).count() === 1, "[もう一度QRを表示]");
+// もう一度 → QR → 追加する → 接続完了（一覧に1台増える）
+const rowsBefore = await page.locator("#step-sync .m-sync-row").count();
+await page.locator("#step-sync button", { hasText: "もう一度QRを表示" }).click();
+await page.locator("#step-sync button", { hasText: "QRを表示" }).click();
+await page.locator('#step-sync [role="dialog"] button', { hasText: "追加する" }).click();
+ok(await page.locator('#step-sync [role="dialog"]').getByText("つながりました。").count() === 1, "接続完了の面");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("AIキーはまだこの端末にありません", { exact: false }).count() === 1, "AIキー無し分岐の文");
+ok(await page.locator("#step-sync .m-sync-row").count() === rowsBefore + 1, "接続完了で一覧に端末が1台増える");
+await page.locator("#step-sync", { hasText: "つながりました。" }).getByText("あとで").click();
+
+// この端末の同期を止める（この端末のトグル → 確認）
+await page.locator("#step-sync .m-sync-row", { hasText: "この端末" }).getByText("同期", { exact: true }).click();
+ok(await page.locator('#step-sync [role="dialog"]').getByText("この端末への同期を止めます。").count() === 1, "この端末の同期を止める 確認");
+ok(await page.locator('#step-sync [role="dialog"]').getByText("それぞれの端末に残ります", { exact: false }).count() === 1, "止めても各端末に残る（正直文言）");
+await page.locator('#step-sync [role="dialog"] button', { hasText: "やめる" }).click();
+
 // 端末を外す（別端末＝二態の other 文）
 await page.locator("#step-sync .m-sync-row", { hasText: "iPhone" }).locator("button", { hasText: "外す" }).click();
 ok(await page.locator('#step-sync [role="dialog"]').getByText("iPhone を外しますか？").count() === 1, "別端末の外す確認（名指し）");
