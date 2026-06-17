@@ -46,6 +46,11 @@ function okHttp(r: MeshHttpResult): r is MeshHttpResult & { data: Record<string,
   return r.ok && r.data !== null && r.data.ok === true;
 }
 
+/** 応答が MESH_WRITE gate の拒否（mesh_disabled）か。handoff は deny（fallback 無し）— UI は off を正直に出す。 */
+function isMeshDisabled(r: MeshHttpResult): boolean {
+  return r.data !== null && r.data.ok === false && r.data.error === "mesh_disabled";
+}
+
 /** bundle 平文を片に割り、各片を QR encPub へ封緘（片ごとに ephemeral）。 */
 async function sealChunks(recipientPub: JsonWebKey, plaintext: string): Promise<Chunk[]> {
   const pieces: string[] = [];
@@ -176,6 +181,7 @@ export async function approveAndSendHandoff(qr: HandoffQRV1): Promise<{ ok: bool
       newDevice: { deviceId: qr.did, sigPub: qr.sigPub, encPub: qr.encPub, label: qr.name ?? "" },
     }),
   );
+  if (isMeshDisabled(add)) return { ok: false, error: "mesh_disabled" };
   if (!okHttp(add)) return { ok: false, error: "device_add" };
 
   const epochs = (await openMeshEpochs().list()).map((e) => ({ epoch: e.epoch, pub: e.pub, priv: e.priv }));
@@ -192,6 +198,7 @@ export async function approveAndSendHandoff(qr: HandoffQRV1): Promise<{ ok: bool
     "/api/mesh/handoff/put",
     await signedRequest(dev.deviceId, dev.sig.priv, { toDevice: qr.did, chunks }),
   );
+  if (isMeshDisabled(put)) return { ok: false, error: "mesh_disabled" };
   return { ok: okHttp(put) };
 }
 

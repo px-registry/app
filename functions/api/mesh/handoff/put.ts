@@ -12,6 +12,7 @@ import {
   isB64,
   validPubStr,
   verifySignedRequest,
+  meshWriteGate,
   mintPayloadId,
   HANDOFF_TTL_HOURS,
   MAX_HANDOFF_CHUNKS,
@@ -24,6 +25,12 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
   const raw = (await request.json().catch(() => null)) as unknown;
   const auth = await verifySignedRequest(env, raw);
   if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+
+  // MESH_WRITE gate（server authoritative）。handoff put は deliberate な device-add の write —
+  // matrix A: legacy 等価が無い → **deny**（403）。client は「Sync はまだ有効でない」を正直に表示する。
+  // ※止めるのは put（write）だけ。handoff fetch/ack/cancel（受領・掃除・取消＝safety）は別経路で不変。
+  const gate = await meshWriteGate(env, auth.device.owner_ref);
+  if (!gate.allowed) return json({ ok: false, error: "mesh_disabled", denied: true, mode: gate.mode }, 403);
 
   const toDevice = auth.data.toDevice;
   if (!isDeviceId(toDevice)) return json({ ok: false, error: "to_device" }, 400);

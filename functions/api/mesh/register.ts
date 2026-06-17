@@ -15,6 +15,9 @@ import {
   validPubStr,
   sessionHandle,
   mintOwnerRef,
+  meshEffectiveMode,
+  meshWriteAllowed,
+  parseAllowlist,
   MAX_LABEL,
   type MeshEnv,
 } from "../../_mesh.ts";
@@ -42,6 +45,15 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
   // ownerToken は任意・補助のみ: 一方向ハッシュで participant_ref（公開面写像）にだけ使う。
   const participantRef = isOwnerToken(raw.ownerToken) ? await deriveParticipantRef(raw.ownerToken) : "";
 
+  // MESH_WRITE gate（server authoritative）。register は **新規 owner の bootstrap が write** —
+  // ただし owner_ref はここで mint される（chicken-egg）ので、新規は **mode>off** で通し、
+  // 載るべき allowlist 判定は content write（relay/handoff put）で owner_ref を見て効かせる。
+  // mode=off は「mesh を一切有効化しない」deliberate 状態 → 新規 bootstrap も止める（fail-closed）。
+  // 既存 owner の register は読み（INSERT 無し）→ mode に関わらず ref を返し、capability を同梱して
+  // client の正直表示（B）に使わせる。
+  const mode = await meshEffectiveMode(env);
+  const allowlist = parseAllowlist(env.MESH_OWNER_ALLOWLIST);
+
   try {
     // owner_ref は handle に束ねる（passkey 同一性が根）。既にあれば既存を返す（冪等）。
     // 2 台目以降は register でなく handoff/device-add（Phase B）を通る。
@@ -51,8 +63,16 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
       .all<{ owner_ref: string }>();
     const existingRef = (existing.results ?? [])[0]?.owner_ref;
     if (existingRef !== undefined) {
-      return json({ ok: true, ownerRef: existingRef, existing: true });
+      return json({
+        ok: true,
+        ownerRef: existingRef,
+        existing: true,
+        mode,
+        writeAllowed: meshWriteAllowed(mode, existingRef, allowlist),
+      });
     }
+
+    if (mode === "off") return json({ ok: false, error: "mesh_disabled", mode, writeAllowed: false }, 403);
 
     const ownerRef = mintOwnerRef();
     const now = new Date().toISOString();
@@ -75,7 +95,10 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
         )
         .bind(d.deviceId, ownerRef, d.sigPub, d.encPub, label, now),
     ]);
-    return json({ ok: true, ownerRef, epoch: 1, existing: false }, 201);
+    return json(
+      { ok: true, ownerRef, epoch: 1, existing: false, mode, writeAllowed: meshWriteAllowed(mode, ownerRef, allowlist) },
+      201,
+    );
   } catch {
     return json({ ok: false, error: "register_failed" }, 500);
   }

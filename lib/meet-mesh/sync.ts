@@ -26,6 +26,18 @@ function okHttp(r: MeshHttpResult): r is MeshHttpResult & { data: Record<string,
   return r.ok && r.data !== null && r.data.ok === true;
 }
 
+/** mesh write の結果。denied = サーバが MESH_WRITE gate で拒否（off/allowlist 外）— 真の失敗ではない。
+ *  fallback: "legacy"=既存 envelope へ落とせる（talk-msg）／"none"=等価無し＝no-op（memory-delta/talk-mirror）。 */
+export type MeshSendResult = { ok: boolean; denied?: boolean; fallback?: "legacy" | "none" };
+
+/** put の応答が MESH_WRITE 拒否（HTTP 200・ok:false・denied:true）かを見て fallback を読む。 */
+function deniedFallback(r: MeshHttpResult): "legacy" | "none" | null {
+  if (r.ok && r.data !== null && r.data.ok === false && r.data.denied === true) {
+    return r.data.fallback === "legacy" ? "legacy" : "none";
+  }
+  return null;
+}
+
 async function currentEpoch(): Promise<{ epoch: number; pub: JsonWebKey } | null> {
   const epochs = openMeshEpochs();
   const hi = await epochs.highest();
@@ -34,8 +46,9 @@ async function currentEpoch(): Promise<{ epoch: number; pub: JsonWebKey } | null
   return rec === null ? null : { epoch: rec.epoch, pub: rec.pub };
 }
 
-/** Memory delta（自分の journal records）を self lane に投函（自分の current epoch へ封緘）。 */
-export async function sendMemoryDelta(records: MemJournalRecordV1[]): Promise<{ ok: boolean }> {
+/** Memory delta（自分の journal records）を self lane に投函（自分の current epoch へ封緘）。
+ *  MESH_WRITE off/allowlist 外なら denied（fallback="none"＝no-op・Sync 未有効として静かに扱う）。 */
+export async function sendMemoryDelta(records: MemJournalRecordV1[]): Promise<MeshSendResult> {
   if (records.length === 0) return { ok: true };
   const id = await openMeshIdentity().get();
   const dev = await openMeshDevice().get();
@@ -53,16 +66,20 @@ export async function sendMemoryDelta(records: MemJournalRecordV1[]): Promise<{ 
       ciphertext: sealed.ciphertext,
     }),
   );
+  const fb = deniedFallback(res);
+  if (fb !== null) return { ok: false, denied: true, fallback: fb };
   return { ok: okHttp(res) };
 }
 
-/** Talk message を相手 owner へ（peer lane）＋自分の他端末へ mirror（self lane）。 */
-export async function sendTalkMsg(peerOwnerRef: string, entry: TalkEntryV1): Promise<{ ok: boolean }> {
+/** Talk message を相手 owner へ（peer lane）＋自分の他端末へ mirror（self lane）。
+ *  MESH_WRITE off/allowlist 外なら denied（fallback="legacy"）→ 呼び出し側は既存 envelope 送信へ落とす。 */
+export async function sendTalkMsg(peerOwnerRef: string, entry: TalkEntryV1): Promise<MeshSendResult> {
   const dev = await openMeshDevice().get();
   if (dev === null) return { ok: false };
   // peer lane: 相手の active epoch pub へ封緘（公開鍵を GET・content は相手だけが読める）。
   const peer = await getEpochPub(peerOwnerRef);
   let peerOk = false;
+  let denied: "legacy" | "none" | null = null;
   if (peer !== null) {
     const pub = parseEncPub(peer.epochPub);
     if (pub !== null) {
@@ -79,15 +96,18 @@ export async function sendTalkMsg(peerOwnerRef: string, entry: TalkEntryV1): Pro
           ciphertext: sealed.ciphertext,
         }),
       );
+      denied = deniedFallback(res);
       peerOk = okHttp(res);
     }
   }
   await sendTalkMirror(entry);
+  // peer 投函が gate で拒否されたら、呼び出し側へ legacy fallback を申告（Talk 本文を落とさない）。
+  if (denied !== null) return { ok: false, denied: true, fallback: "legacy" };
   return { ok: peerOk };
 }
 
-/** 送信控えを自分の他端末へ（self lane talk-mirror）。 */
-export async function sendTalkMirror(entry: TalkEntryV1): Promise<{ ok: boolean }> {
+/** 送信控えを自分の他端末へ（self lane talk-mirror）。off/allowlist 外なら denied（fallback="none"・no-op）。 */
+export async function sendTalkMirror(entry: TalkEntryV1): Promise<MeshSendResult> {
   const dev = await openMeshDevice().get();
   const ep = await currentEpoch();
   if (dev === null || ep === null) return { ok: false };
@@ -103,6 +123,8 @@ export async function sendTalkMirror(entry: TalkEntryV1): Promise<{ ok: boolean 
       ciphertext: sealed.ciphertext,
     }),
   );
+  const fb = deniedFallback(res);
+  if (fb !== null) return { ok: false, denied: true, fallback: fb };
   return { ok: okHttp(res) };
 }
 

@@ -12,6 +12,7 @@ import {
   isB64,
   validPubStr,
   verifySignedRequest,
+  meshWriteGate,
   activeEpoch,
   mintPayloadId,
   MESH_LANES,
@@ -33,6 +34,16 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
   // lane と ptype の対応（self=memory-delta/talk-mirror・peer=talk-msg）。
   if (lane === "peer" && ptype !== "talk-msg") return json({ ok: false, error: "lane_ptype" }, 400);
   if (lane === "self" && ptype === "talk-msg") return json({ ok: false, error: "lane_ptype" }, 400);
+
+  // MESH_WRITE gate（server authoritative・送信端末の owner_ref で判定）。
+  // 止めるのは **この put（write）だけ** — fetch/ack/purge/revoke/expired cleanup は別経路で不変。
+  // 不許可時の honesty（matrix A）: talk-msg は legacy（既存 envelope）へ落とせる＝fallback="legacy"、
+  // memory-delta/talk-mirror は legacy 等価が無い＝fallback="none"（client は no-op・Sync 未有効として静かに扱う）。
+  // HTTP は 200（真のエラーでない・client が fallback 値で分岐）。client 申告でなくサーバが拒否する。
+  const gate = await meshWriteGate(env, auth.device.owner_ref);
+  if (!gate.allowed) {
+    return json({ ok: false, denied: true, mode: gate.mode, fallback: ptype === "talk-msg" ? "legacy" : "none" });
+  }
 
   const audience = lane === "self" ? auth.device.owner_ref : auth.data.audienceRef;
   if (!isOwnerRef(audience)) return json({ ok: false, error: "audience" }, 400);

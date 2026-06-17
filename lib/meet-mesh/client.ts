@@ -35,6 +35,18 @@ export type MeshDeviceView = {
   here: boolean;
 };
 
+/** mesh write の capability（server authoritative・正直な表示用＝B）。
+ *  writeAllowed=false のとき UI は「同期中」と言わない（嘘をつかない）。 */
+export type MeshCapability = { mode: "off" | "allowlist" | "on"; writeAllowed: boolean };
+
+function readCapability(data: Record<string, unknown>): MeshCapability {
+  const mode = data.mode === "allowlist" || data.mode === "on" ? data.mode : "off";
+  return { mode, writeAllowed: data.writeAllowed === true };
+}
+
+/** ensureRegistered の結果。disabled = サーバが mesh_disabled（mode off）で bootstrap を拒否。 */
+export type EnsureResult = { identity: MeshIdentityV1 | null; capability: MeshCapability | null; disabled: boolean };
+
 function ok(r: MeshHttpResult): r is MeshHttpResult & { data: Record<string, unknown> } {
   return r.ok && r.data !== null && r.data.ok === true;
 }
@@ -60,10 +72,10 @@ export async function signedRequest(deviceId: string, sigPriv: JsonWebKey, data:
  * 無ければ device 鍵＋epoch=1 を生成し、**公開鍵だけ**をサーバへ送る（private は端末に保管）。
  * ownerToken は補助 ID として同送するだけ（サーバが一方向ハッシュで participant_ref 写像に使う）。
  */
-export async function ensureRegistered(label = ""): Promise<MeshIdentityV1 | null> {
+export async function ensureRegistered(label = ""): Promise<EnsureResult> {
   const idStore = openMeshIdentity();
   const existing = await idStore.get();
-  if (existing !== null) return existing;
+  if (existing !== null) return { identity: existing, capability: null, disabled: false };
 
   const ownerToken = getOrMintOwnerToken();
   const deviceId = mintDeviceId();
@@ -81,23 +93,30 @@ export async function ensureRegistered(label = ""): Promise<MeshIdentityV1 | nul
     },
     epochPub: encPubToString(epoch1.pub),
   });
-  if (!ok(res)) return null; // 401 passkey_required 含む → mock のまま
+  // mesh_disabled（mode off で bootstrap 拒否）は **正直な off 状態** — mock に誤魔化さない（B）。
+  // network 失敗・401 passkey_required は disabled でない（mock のまま＝足場）。
+  if (res.data !== null && res.data.ok === false && res.data.error === "mesh_disabled") {
+    return { identity: null, capability: readCapability(res.data), disabled: true };
+  }
+  if (!ok(res)) return { identity: null, capability: null, disabled: false };
 
+  const capability = readCapability(res.data);
   const ownerRef = typeof res.data.ownerRef === "string" && isOwnerRef(res.data.ownerRef) ? res.data.ownerRef : null;
-  if (ownerRef === null) return null;
+  if (ownerRef === null) return { identity: null, capability, disabled: false };
   // existing:true = この handle は既に別端末で bootstrap 済み → この端末は handoff（Phase B）で
   // 合流すべき（register は 2 台目を登録しない）。未登録のまま身元を保存しない。
-  if (res.data.existing === true) return null;
+  if (res.data.existing === true) return { identity: null, capability, disabled: false };
 
   // private 鍵と身元は端末にだけ保管（登録成功後・サーバ authoritative の owner_ref を使う）。
   await openMeshDevice().set({ deviceId, sig: keys.sig, enc: keys.enc });
   await openMeshEpochs().put({ epoch: 1, pub: epoch1.pub, priv: epoch1.priv });
   await idStore.set(ownerRef, deviceId);
-  return { entryId: "self", ownerRef, deviceId };
+  return { identity: { entryId: "self", ownerRef, deviceId }, capability, disabled: false };
 }
 
-/** 自分の接続済み端末一覧（署名つき）。身元（=registered）/鍵が無ければ null（mock 表示）。 */
-export async function loadDevices(): Promise<MeshDeviceView[] | null> {
+/** 自分の接続済み端末一覧（署名つき）＋ capability（writeAllowed・正直表示用）。
+ *  身元（=registered）/鍵が無ければ null（mock 表示）。 */
+export async function loadDevices(): Promise<{ devices: MeshDeviceView[]; capability: MeshCapability } | null> {
   const id = await openMeshIdentity().get();
   const dev = await openMeshDevice().get();
   if (id === null || dev === null) return null;
@@ -117,7 +136,7 @@ export async function loadDevices(): Promise<MeshDeviceView[] | null> {
       here: r.here === true,
     });
   }
-  return out;
+  return { devices: out, capability: readCapability(res.data) };
 }
 
 /**

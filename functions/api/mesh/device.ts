@@ -10,6 +10,7 @@ import {
   isDeviceId,
   validPubStr,
   verifySignedRequest,
+  meshWriteGate,
   MAX_LABEL,
   type MeshEnv,
 } from "../../_mesh.ts";
@@ -20,6 +21,12 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
   const raw = (await request.json().catch(() => null)) as unknown;
   const auth = await verifySignedRequest(env, raw);
   if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+
+  // MESH_WRITE gate（server authoritative）。device-add は handoff の前段 write —
+  // ここを止めないと off/rollback 時に「bundle の付かない孤児 device 行」を作る。3 経路に加え
+  // device-add も gate（strictly more fail-closed・新データ/意味の拡張なし＝GOAL 内）。deny=403。
+  const gate = await meshWriteGate(env, auth.device.owner_ref);
+  if (!gate.allowed) return json({ ok: false, error: "mesh_disabled", denied: true, mode: gate.mode }, 403);
 
   const nd = auth.data.newDevice;
   if (typeof nd !== "object" || nd === null) return json({ ok: false, error: "new_device" }, 400);

@@ -25,6 +25,11 @@ import {
   MAX_LABEL,
   MESH_TS_SKEW_MS,
 } from "../lib/meet-crypto/mesh.ts";
+import { effectiveMeshMode, parseAllowlist, meshWriteAllowed, type MeshMode } from "../lib/meet-mesh/mode.ts";
+
+export type { MeshMode };
+/** mesh write の KV lever のキー（AUTH KV 内・allowlist は KV に置かない＝env のみ）。 */
+export const MESH_MODE_KV_KEY = "mesh:mode";
 
 /** Phase B handoff: 72h hard TTL / chunk 上限（≒768KB bundle）。 */
 export const HANDOFF_TTL_HOURS = 72;
@@ -43,7 +48,42 @@ export { MAX_MESH_PUB, MAX_LABEL, MESH_TS_SKEW_MS, MAX_CIPHERTEXT_B64 };
 
 // MeshEnv は BOARD（D1）＋ AUTH/AUTH_SECRET（passkey session 検証）を持つ。
 // bootstrap の identity root は **passkey session**（ownerToken ではない・A.1 裁定 2026-06-17）。
-export type MeshEnv = MeetEnv & AuthEnv;
+// mesh write の lever: env(MESH_MODE_CAP=deliberate cap・MESH_OWNER_ALLOWLIST=env のみ)＋
+// KV(MESH_MODE=速い lever・AUTH KV 内 mesh:mode)。どれも optional＝欠落は fail-closed(off)。
+export type MeshEnv = MeetEnv &
+  AuthEnv & {
+    MESH_MODE_CAP?: string;
+    MESH_OWNER_ALLOWLIST?: string;
+  };
+
+// 純粋ロジック（min/allowlist 判定）を re-export — endpoint 側で owner_ref 解決後に writeAllowed を
+// 計算するため（register は owner_ref を mint する＝gate を mode と allowlist の二段で読む）。
+export { effectiveMeshMode, parseAllowlist, meshWriteAllowed };
+
+/**
+ * effective mode（min(KV:mesh:mode, MESH_MODE_CAP)）だけを読む。
+ * KV 読み取り失敗・env/KV 欠落/不正は off（fail-closed）。owner_ref を要さない場面（register の mint 前）用。
+ */
+export async function meshEffectiveMode(env: MeshEnv): Promise<MeshMode> {
+  let kvMode: string | null = null;
+  try {
+    kvMode = await env.AUTH.get(MESH_MODE_KV_KEY);
+  } catch {
+    kvMode = null; // KV 読み取り失敗 → off
+  }
+  return effectiveMeshMode(env.MESH_MODE_CAP, kvMode);
+}
+
+/**
+ * mesh write の許否を **サーバが**決める（server authoritative）。
+ * allowed は owner_ref（passkey session 由来・呼び出し側が解決）が allowlist/on を満たすか。
+ * **この gate は write だけを止める** — dual-read/legacy/ack/purge/revoke/expired cleanup/safety は別経路で生きる。
+ */
+export async function meshWriteGate(env: MeshEnv, ownerRef: string | null): Promise<{ allowed: boolean; mode: MeshMode }> {
+  const mode = await meshEffectiveMode(env);
+  const allowed = meshWriteAllowed(mode, ownerRef, parseAllowlist(env.MESH_OWNER_ALLOWLIST));
+  return { allowed, mode };
+}
 
 /**
  * passkey session（__px_session・HMAC 署名 cookie）から handle を解決する。

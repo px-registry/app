@@ -426,6 +426,10 @@ export const MEET = {
     syncingLabel: "同期中",
     syncOn: "同期",
     syncOff: "同期しない",
+    /** MESH_WRITE off / allowlist 外のときの正直な off 状態（B・自分側の事実）。
+     *  ★PROVISIONAL（命名ゲート STOP④・Hiroto 確定待ち）: 嘘（「同期中」）を出さないための暫定文。
+     *  presence でない・「サーバが判定」でない・own-side。確定後に verbatim 差し替え。 */
+    offState: "この端末はまだ同期していません。",
     /** QR 手引き（この端末を新たにつなぐ・確定 2026-06-17）。 */
     qr: {
       title: "この端末をつなぐ",

@@ -5,7 +5,7 @@
 // presence は無い（最終取得・オンライン等は持たない・返さない）。counterparty へは出さない設計。
 // POST だが read-only（署名で本人確認するため body が要る）。
 
-import { json, isAllowedWriteOrigin, verifySignedRequest, type MeshEnv } from "../../_mesh.ts";
+import { json, isAllowedWriteOrigin, verifySignedRequest, meshWriteGate, type MeshEnv } from "../../_mesh.ts";
 
 export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) => {
   if (!isAllowedWriteOrigin(request)) return json({ ok: false, error: "bad_origin" }, 403);
@@ -28,7 +28,10 @@ export const onRequestPost: PagesFunction<MeshEnv> = async ({ request, env }) =>
       revoked: r.revoked_at !== "",
       here: r.device_id === auth.device.device_id,
     }));
-    return json({ ok: true, ownerRef: auth.device.owner_ref, devices });
+    // capability（B・正直な表示用）: この owner が今 mesh write できるか。devices は read（管理面）＝
+    // gate で止めない。client は writeAllowed=false のとき「同期中」と言わない（嘘をつかない）。
+    const cap = await meshWriteGate(env, auth.device.owner_ref);
+    return json({ ok: true, ownerRef: auth.device.owner_ref, devices, mode: cap.mode, writeAllowed: cap.allowed });
   } catch {
     return json({ ok: false, error: "devices_failed" }, 500);
   }

@@ -61,6 +61,9 @@ export function SyncSection() {
   const [removeTarget, setRemoveTarget] = useState<MeshDevice | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [live, setLive] = useState(false);
+  // capability（B）: サーバが mesh write を許すか。false なら「同期中」と言わない（嘘をつかない）。
+  // 既定 true は mock 足場（backend 不在）用 — live 取得 or mesh_disabled で上書きする。
+  const [writeActive, setWriteActive] = useState(true);
   // handoff フロー
   const [qrText, setQrText] = useState("");
   const [qrCopied, setQrCopied] = useState(false);
@@ -70,9 +73,12 @@ export function SyncSection() {
   const [receiveNote, setReceiveNote] = useState("");
 
   const refresh = useCallback(async (): Promise<boolean> => {
-    const list = await loadDevices();
-    if (list !== null && list.length > 0) {
-      setDevices(list.map((v) => ({ id: v.deviceId, label: v.label || S.thisDevice, here: v.here, syncing: true })));
+    const r = await loadDevices();
+    if (r !== null && r.devices.length > 0) {
+      // 同期状態は **server の writeAllowed** に従う（client 判断でない）— off なら「同期中」と出さない。
+      const syncing = r.capability.writeAllowed;
+      setWriteActive(syncing);
+      setDevices(r.devices.map((v) => ({ id: v.deviceId, label: v.label || S.thisDevice, here: v.here, syncing })));
       setLive(true);
       return true;
     }
@@ -80,10 +86,11 @@ export function SyncSection() {
   }, [S.thisDevice]);
 
   // 開いた時点で（passkey session があれば）この端末を owner として bootstrap → 実機一覧へ。
-  // backend/ session 不在なら mock のまま（fail-closed）。
+  // backend/ session 不在なら mock のまま（fail-closed）。mesh_disabled（mode off）は正直な off 状態を出す。
   useEffect(() => {
     void (async () => {
-      await ensureRegistered("");
+      const reg = await ensureRegistered("");
+      if (reg.disabled) setWriteActive(false); // mode off — mock の「同期中」で誤魔化さない
       await refresh();
     })();
   }, [refresh]);
@@ -199,6 +206,12 @@ export function SyncSection() {
           <h3 className="m-h2" style={{ marginTop: "var(--stack)" }}>
             {S.listHeading}
           </h3>
+          {/* MESH_WRITE off / allowlist 外: 「同期中」と言わず、正直な off 状態を own-side で出す（B）。 */}
+          {!writeActive ? (
+            <p className="m-note" data-sync-offstate style={{ margin: "var(--space-1) 0 0" }}>
+              {S.offState}
+            </p>
+          ) : null}
           <ul style={{ listStyle: "none", padding: 0, margin: "var(--space-1) 0 0" }}>
             {devices.map((dev) => (
               <li
@@ -221,11 +234,11 @@ export function SyncSection() {
                     style={{ whiteSpace: "nowrap" }}
                     onClick={() => setPauseOpen(true)}
                   >
-                    {dev.syncing ? S.syncingLabel : S.syncOff}
+                    {dev.syncing && writeActive ? S.syncingLabel : S.syncOff}
                   </button>
                 ) : (
                   <span className="m-badge m-sync-state" style={{ whiteSpace: "nowrap" }}>
-                    {dev.syncing ? S.syncingLabel : S.syncOff}
+                    {dev.syncing && writeActive ? S.syncingLabel : S.syncOff}
                   </span>
                 )}
                 <button
