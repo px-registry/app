@@ -8,7 +8,8 @@ export {
   createMemoryEvent,
   createMemoryItemFromEvent,
   moveMemoryToSurface,
-  stowMemoryDeep,
+  // stowMemoryDeep は内部実装（spec の関数名として memory.ts に保持）。「Deep」を public
+  // API 名に出さないため barrel からは公開しない — 公開名は removeMemoryFromRun（=「外す」）。
   removeMemoryFromRun,
   forgetMemory,
   foldMemoryItems,
