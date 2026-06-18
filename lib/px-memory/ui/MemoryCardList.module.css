@@ -1,0 +1,81 @@
+/* PX Memory v0.1 — presentational card list（隔離・未配線）。
+   placement を文字で見せない。残す/外すはチェックの ON/OFF（affordance）で伝える。 */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--meet-line, #d9d4c9);
+  border-radius: 10px;
+  background: var(--meet-card, #fffdf8);
+}
+
+/* 残す/外すのチェック。ON=残す（通常 Run で読まれる）/ OFF=外す。言葉を出さない。 */
+.keep {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: var(--meet-ink, #2b2b2b);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.text {
+  margin: 0;
+  color: var(--meet-ink, #2b2b2b);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cue {
+  font-size: 12px;
+  color: var(--meet-faint, #6b6657);
+  border: 1px solid var(--meet-line, #d9d4c9);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.antenna {
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid var(--meet-line, #d9d4c9);
+  border-radius: 8px;
+  background: transparent;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.antennaOn {
+  background: var(--meet-ink, #2b2b2b);
+  color: var(--meet-paper, #fffdf8);
+}
+
+.empty {
+  color: var(--meet-faint, #6b6657);
+  padding: 8px 0;
+}
