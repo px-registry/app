@@ -1,13 +1,13 @@
 name: Deploy to Cloudflare Pages
 
-# Auto-deploy on push to main. Requires two repo secrets:
+# Manual deploy ONLY (workflow_dispatch). A push to main does NOT auto-deploy —
+# production deploys are an explicit, deliberate action. Requires two repo secrets:
 #   CLOUDFLARE_API_TOKEN   (Pages:Edit scope)
 #   CLOUDFLARE_ACCOUNT_ID
-# Until those are set, the initial deploy is done via `wrangler pages deploy`.
+# When run without those secrets, the deploy step fails closed (no deploy).
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
